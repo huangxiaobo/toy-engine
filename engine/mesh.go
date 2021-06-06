@@ -9,10 +9,10 @@ type Mesh interface {
 }
 
 type Obj struct {
-	Name        string
-	Vertices    []float32
-	Coordinates []float32
-	Normals     []float32
+	Name     string
+	Vertices []float32
+	Uvs      []float32
+	Normals  []float32
 
 	VertexIndices []uint16
 	UvIndices     []uint16

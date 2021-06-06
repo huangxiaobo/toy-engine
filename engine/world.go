@@ -5,10 +5,9 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 	_ "image/png"
-
-	"toy/pkg/engine/camera"
-	"toy/pkg/engine/light"
-	"toy/pkg/engine/logger"
+	"toy/engine/camera"
+	"toy/engine/light"
+	"toy/engine/logger"
 )
 
 const (

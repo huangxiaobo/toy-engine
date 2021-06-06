@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 
-	"toy/pkg/engine"
-	"toy/pkg/engine/logger"
+	"toy/engine"
+	"toy/engine/logger"
 )
 
 func LoadObj(objFile string, obj *engine.Obj) error {
@@ -46,7 +46,7 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 			if cnt != 2 || err != nil {
 				logger.Fatal("read tang failed, cnt: %s, err: %s", cnt, err)
 			}
-			obj.Coordinates = append(obj.Coordinates, vec2[0], vec2[1])
+			obj.Uvs = append(obj.Uvs, vec2[0], vec2[1])
 		case "vn":
 			var vec3 mgl32.Vec3
 			// vn x y z

@@ -49,8 +49,8 @@ func NewProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error)
 func CompileShader(source string, shaderType uint32) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
 
-	csources, free := gl.Strs(source)
-	gl.ShaderSource(shader, 1, csources, nil)
+	csource, free := gl.Strs(source)
+	gl.ShaderSource(shader, 1, csource, nil)
 	free()
 	gl.CompileShader(shader)
 

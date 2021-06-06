@@ -4,8 +4,8 @@ import (
 	_ "image/png"
 	"log"
 	"runtime"
-	"toy/pkg/engine"
-	"toy/pkg/engine/mesh"
+	"toy/engine"
+	"toy/engine/mesh"
 )
 
 func init() {

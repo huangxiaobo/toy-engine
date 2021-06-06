@@ -6,11 +6,10 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 	"io/ioutil"
-	"toy/pkg/engine/loader"
-	"toy/pkg/engine/shader"
-
-	"toy/pkg/engine"
-	"toy/pkg/engine/logger"
+	"toy/engine"
+	"toy/engine/loader"
+	"toy/engine/logger"
+	"toy/engine/shader"
 )
 
 type Cube struct {
@@ -95,7 +94,7 @@ func (cube *Cube) Init(w *engine.World) {
 	// uv buff
 	gl.GenBuffers(1, &cube.tbo)
 	gl.BindBuffer(gl.ARRAY_BUFFER, cube.tbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(cube.obj.Coordinates)*2, gl.Ptr(&cube.obj.Coordinates[0]), gl.STATIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, len(cube.obj.Uvs)*2, gl.Ptr(&cube.obj.Uvs[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	// index buff
