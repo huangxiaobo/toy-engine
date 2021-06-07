@@ -20,15 +20,11 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 	}
 	defer file.Close()
 
-	//var vertices []*mgl32.Vec3 // vertices
-	//var normals []*mgl32.Vec3  // normals
-	//var uvs []*mgl32.Vec2      // uvs
-
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		tokens := strings.Split(line, " ")
-		fmt.Println(line)
+
 		switch tokens[0] {
 		case "v":
 			var vec3 mgl32.Vec3

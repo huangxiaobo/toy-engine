@@ -1,11 +1,8 @@
 package mesh
 
 import (
-	"fmt"
 	"github.com/go-gl/gl/v4.1-core/gl"
-	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
-	"io/ioutil"
 	"toy/engine"
 	"toy/engine/loader"
 	"toy/engine/logger"
@@ -21,7 +18,7 @@ type Cube struct {
 	model mgl32.Mat4
 
 	obj               engine.Obj
-	program           uint32
+	shader            *shader.Shader
 	projectionUniform int32
 	viewUniform       int32
 	modelUniform      int32
@@ -31,18 +28,19 @@ type Cube struct {
 	nbo               uint32
 	tbo               uint32
 	vertAttrib        uint32
+	normalAttrib      uint32
 }
 
 func (cube *Cube) Init(w *engine.World) {
 	if cube.ObjFilePath == "" {
-		cube.ObjFilePath = "./resource/cube.obj"
+		cube.ObjFilePath = "./resource/cube/cube.obj"
 	}
 
 	if cube.VsFilePath == "" {
-		cube.VsFilePath = "./resource/cube.vs"
+		cube.VsFilePath = "./resource/cube/cube.vs"
 	}
 	if cube.FsFilePath == "" {
-		cube.FsFilePath = "./resource/cube.fs"
+		cube.FsFilePath = "./resource/cube/cube.fs"
 	}
 
 	if err := loader.LoadObj(cube.ObjFilePath, &cube.obj); err != nil {
@@ -50,30 +48,20 @@ func (cube *Cube) Init(w *engine.World) {
 		return
 	}
 
-	vsData, err := ioutil.ReadFile(cube.VsFilePath)
-	if err != nil {
-		fmt.Println(err)
-	}
-	logger.Info(string(vsData))
-	fsData, err := ioutil.ReadFile(cube.FsFilePath)
-	if err != nil {
-		fmt.Println(err)
-	}
-	logger.Info(string(fsData))
-
-	cube.program, err = shader.NewProgram(string(vsData), string(fsData))
-	if err != nil {
-		panic(err)
+	cube.shader = &shader.Shader{VsFilePath: cube.VsFilePath, FsFilePath: cube.FsFilePath}
+	if err := cube.shader.Init(); err != nil {
+		logger.Error(err)
+		return
 	}
 
-	gl.UseProgram(cube.program)
+	program := cube.shader.Use()
 
 	// Shader
-	cube.projectionUniform = gl.GetUniformLocation(cube.program, gl.Str("projection\x00"))
-	cube.viewUniform = gl.GetUniformLocation(cube.program, gl.Str("view\x00"))
-	cube.modelUniform = gl.GetUniformLocation(cube.program, gl.Str("model\x00"))
+	cube.projectionUniform = gl.GetUniformLocation(program, gl.Str("projection\x00"))
+	cube.viewUniform = gl.GetUniformLocation(program, gl.Str("view\x00"))
+	cube.modelUniform = gl.GetUniformLocation(program, gl.Str("model\x00"))
 
-	gl.BindFragDataLocation(cube.program, 0, gl.Str("color\x00"))
+	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
 	// Configure the vertex data
 	gl.GenVertexArrays(1, &cube.vao)
@@ -104,18 +92,19 @@ func (cube *Cube) Init(w *engine.World) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	//// Get an index for the attribute from the shader
-	cube.vertAttrib = uint32(gl.GetAttribLocation(cube.program, gl.Str("position\x00")))
+	cube.vertAttrib = uint32(gl.GetAttribLocation(program, gl.Str("position\x00")))
+	cube.normalAttrib = uint32(gl.GetAttribLocation(program, gl.Str("normal\x00")))
 
 	// Unbind the buffer
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 	gl.EnableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
-	cube.model = mgl32.Ident4().Mul(6)
+	cube.model = mgl32.Ident4()
 }
 
 func (cube *Cube) Update(elapsed float64) {
-	cube.model = mgl32.HomogRotate3DX(float32(elapsed)).Mul4(mgl32.HomogRotate3DY(float32(glfw.GetTime())))
+	//cube.model = mgl32.HomogRotate3DX(float32(elapsed)).Mul4(mgl32.HomogRotate3DY(float32(glfw.GetTime())))
 }
 
 func (cube *Cube) Render(w *engine.World) {
@@ -128,15 +117,21 @@ func (cube *Cube) Render(w *engine.World) {
 	)
 	view := w.Camera.GetViewMatrix()
 
+	program := cube.shader.Program
 	// Shader
-	gl.UseProgram(cube.program)
+	gl.UseProgram(program)
 
 	gl.UniformMatrix4fv(cube.projectionUniform, 1, false, &projection[0])
 	gl.UniformMatrix4fv(cube.viewUniform, 1, false, &view[0])
 	gl.UniformMatrix4fv(cube.modelUniform, 1, false, &cube.model[0])
 
-	gl.BindFragDataLocation(cube.program, 0, gl.Str("color\x00"))
-	gl.PointSize(10)
+	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
+	lightPosAttrib := gl.GetUniformLocation(program, gl.Str("lightPos\x00"))
+	gl.Uniform3fv(lightPosAttrib, 1, &w.Light.Position[0])
+	lightColorAttrib := gl.GetUniformLocation(program, gl.Str("lightColor\x00"))
+	gl.Uniform3fv(lightColorAttrib, 1, &w.Light.Color[0])
+	viewPosAttrib := gl.GetUniformLocation(program, gl.Str("viewPos\x00"))
+	gl.Uniform3fv(viewPosAttrib, 1, &w.Camera.Position[0])
 
 	// 开启顶点数组
 	gl.BindVertexArray(cube.vao)
@@ -152,6 +147,17 @@ func (cube *Cube) Render(w *engine.World) {
 		nil,             // offset of first element
 	)
 
+	gl.BindBuffer(gl.ARRAY_BUFFER, cube.nbo)
+	gl.EnableVertexAttribArray(cube.normalAttrib)
+	gl.VertexAttribPointer(
+		cube.normalAttrib, // attribute index
+		3,                 // number of elements per vertex, here (x,y,z)
+		gl.FLOAT,          // the type of each element
+		false,             // take our values as-is
+		0,                 // no extra data between each position
+		nil,               // offset of first element
+	)
+
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, cube.ebo)
 	gl.DrawElements(
 		gl.TRIANGLES,                       // mode
@@ -160,10 +166,14 @@ func (cube *Cube) Render(w *engine.World) {
 		nil,                                // element array buffer offset
 	)
 
+	gl.PointSize(10)
 	gl.DrawElements(
 		gl.POINTS,                          // mode
 		int32(len(cube.obj.VertexIndices)), // count
 		gl.UNSIGNED_SHORT,                  // type
 		nil,                                // element array buffer offset
 	)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.EnableVertexAttribArray(0)
+	gl.BindVertexArray(0)
 }

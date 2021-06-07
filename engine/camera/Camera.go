@@ -55,7 +55,6 @@ func (c *Camera) Init(position mgl32.Vec3, front mgl32.Vec3) {
 
 func (c *Camera) GetViewMatrix() mgl32.Mat4 {
 	return mgl32.LookAtV(c.Position, c.Position.Add(c.Front), c.Up)
-	//return mgl32.LookAtV(mgl32.Vec3{0.0, 0.0, 10.0}, mgl32.Vec3{0.0, 0.0, 0.0}, mgl32.Vec3{0.0, 1.0, 0.0})
 }
 
 func (c *Camera) ProcessKeyboard(direction int, deltaTime float32) {

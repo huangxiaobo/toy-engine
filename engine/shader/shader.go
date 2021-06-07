@@ -2,22 +2,53 @@ package shader
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strings"
+	"toy/engine/logger"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 )
 
 type Shader struct {
+	VsFilePath string
+	FsFilePath string
+	Program    uint32
 }
 
-func NewProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
+func (s *Shader) Init() error {
+	if s.VsFilePath == "" {
+		s.VsFilePath = "./resource/cube.vs"
+	}
+	if s.FsFilePath == "" {
+		s.FsFilePath = "./resource/cube.fs"
+	}
+
+	vsData, err := ioutil.ReadFile(s.VsFilePath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	logger.Info(string(vsData))
+	fsData, err := ioutil.ReadFile(s.FsFilePath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	logger.Info(string(fsData))
+
+	s.Program, err = s.NewProgram(string(vsData), string(fsData))
+	if err != nil {
+		panic(err)
+	}
+	return nil
+}
+
+func (s *Shader) NewProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
 	// 加载并编译shader
-	vertexShader, err := CompileShader(vertexShaderSource, gl.VERTEX_SHADER)
+	vertexShader, err := s.CompileShader(vertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
 		return 0, err
 	}
 
-	fragmentShader, err := CompileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	fragmentShader, err := s.CompileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
 	if err != nil {
 		return 0, err
 	}
@@ -46,7 +77,7 @@ func NewProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error)
 	return program, nil
 }
 
-func CompileShader(source string, shaderType uint32) (uint32, error) {
+func (s *Shader) CompileShader(source string, shaderType uint32) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
 
 	csource, free := gl.Strs(source)
@@ -67,4 +98,9 @@ func CompileShader(source string, shaderType uint32) (uint32, error) {
 	}
 
 	return shader, nil
+}
+
+func (s *Shader) Use() uint32 {
+	gl.UseProgram(s.Program)
+	return s.Program
 }

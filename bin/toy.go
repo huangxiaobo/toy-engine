@@ -22,11 +22,15 @@ func main() {
 	}
 	defer world.Destroy()
 
+	world.AddRenderObj(&mesh.Axis{
+		Name: "axis",
+	})
+
 	world.AddRenderObj(&mesh.Cube{
 		Name:        "cube",
-		ObjFilePath: "./resource/cube.obj",
-		VsFilePath:  "./resource/cube.vs",
-		FsFilePath:  "./resource/cube.fs",
+		ObjFilePath: "./resource/cube/cube.obj",
+		VsFilePath:  "./resource/cube/cube.vs",
+		FsFilePath:  "./resource/cube/cube.fs",
 	})
 
 	world.Run()

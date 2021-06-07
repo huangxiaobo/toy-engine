@@ -17,7 +17,7 @@ const (
 
 type World struct {
 	window     *glfw.Window
-	light      *light.Light
+	Light      *light.Light
 	renderObjs []Mesh
 	Camera     *camera.Camera
 }
@@ -68,8 +68,12 @@ func (w *World) Init() error {
 	w.initGLFW()
 	w.initGL()
 
+	// 初始化摄像机
 	w.Camera = new(camera.Camera)
-	w.Camera.Init(mgl32.Vec3{0.0, 0.0, 10.0}, mgl32.Vec3{0.0, 0.0, -10.0})
+	w.Camera.Init(mgl32.Vec3{10.0, 10.0, 10.0}, mgl32.Vec3{-10.0, -10.0, -10.0})
+
+	// 初始化灯光
+	w.Light = &light.Light{Position: mgl32.Vec3{0.0, 0.0, 10.0}, Color: mgl32.Vec3{0.8, 0.8, 0.8}}
 
 	return nil
 }
