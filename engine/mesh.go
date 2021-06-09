@@ -15,6 +15,4 @@ type Obj struct {
 	Normals  []float32
 
 	VertexIndices []uint16
-	UvIndices     []uint16
-	NormalIndices []uint16
 }

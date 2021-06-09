@@ -13,6 +13,19 @@ import (
 	"toy/engine/logger"
 )
 
+type Face struct {
+	s []string
+}
+
+type InterObj struct {
+	Name     string
+	Vertices []mgl32.Vec3
+	Uvs      []mgl32.Vec2
+	Normals  []mgl32.Vec3
+
+	Faces []Face
+}
+
 func LoadObj(objFile string, obj *engine.Obj) error {
 	file, err := os.Open(objFile)
 	if err != nil {
@@ -20,10 +33,12 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 	}
 	defer file.Close()
 
+	interObj := InterObj{}
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		tokens := strings.Split(line, " ")
+		tokens := strings.SplitN(line, " ", 2)
 
 		switch tokens[0] {
 		case "v":
@@ -34,7 +49,7 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 				logger.Fatal("read vert failed, cnt: %s, err: %s", cnt, err)
 			}
 
-			obj.Vertices = append(obj.Vertices, vec3[0], vec3[1], vec3[2])
+			interObj.Vertices = append(interObj.Vertices, vec3)
 		case "vt":
 			var vec2 mgl32.Vec2
 			// vt u v [w]
@@ -42,7 +57,7 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 			if cnt != 2 || err != nil {
 				logger.Fatal("read tang failed, cnt: %s, err: %s", cnt, err)
 			}
-			obj.Uvs = append(obj.Uvs, vec2[0], vec2[1])
+			interObj.Uvs = append(interObj.Uvs, vec2)
 		case "vn":
 			var vec3 mgl32.Vec3
 			// vn x y z
@@ -50,22 +65,69 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 			if cnt != 3 || err != nil {
 				logger.Fatal("read normal failed, cnt: %s, err: %s", cnt, err)
 			}
-			obj.Normals = append(obj.Normals, vec3[0], vec3[1], vec3[2])
+			interObj.Normals = append(interObj.Normals, vec3)
 		case "f":
-			var v1, v2, v3 [3]uint16
-			// f v1[/vt1][/vn1] v2[/vt2][/vn2] v3[/vt3][/vn3] ...
-			cnt, err := fmt.Sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d",
-				&v1[0], &v1[1], &v1[2],
-				&v2[0], &v2[1], &v2[2],
-				&v3[0], &v3[1], &v3[2],
-			)
-			if cnt != 9 || err != nil {
-				logger.Fatal("read normal failed, cnt: %s, err: %s", cnt, err)
-			}
-			obj.VertexIndices = append(obj.VertexIndices, v1[0]-1, v2[0]-1, v3[0]-1)
-			obj.UvIndices = append(obj.UvIndices, v1[1]-1, v2[1]-1, v3[1]-1)
-			obj.NormalIndices = append(obj.NormalIndices, v1[2]-1, v2[2]-1, v3[2]-1)
+			interObj.Faces = append(interObj.Faces, Face{strings.Split(tokens[1], " ")})
 		}
 	}
+
+	var vmap = make(map[string]int32)
+	var vcnt = 0
+
+	for _, face := range interObj.Faces {
+		fmt.Println(face)
+		for _, item := range face.s {
+			var v, t, n int32 = -1, -1, -1
+
+			switch strings.Count(item, "/") {
+			case 0:
+				fmt.Sscanf(item, "%d", &v)
+			case 1:
+				fmt.Sscanf(item, "%d/%d", &v, &t)
+			case 2:
+				fmt.Sscanf(item, "%d/%d/%d", &v, &t, &n)
+			}
+			n -= 1
+			t -= 1
+			v -= 1
+			fmt.Printf("v: %d, t: %d, n: %d\n", v, t, n)
+			vertexKey := fmt.Sprintf("%d/%d/%d", v, t, n)
+			if idx, ok := vmap[vertexKey]; !ok {
+				vmap[vertexKey] = int32(vcnt)
+				vcnt += 1
+
+				obj.Vertices = append(obj.Vertices, interObj.Vertices[v].X(), interObj.Vertices[v].Y(), interObj.Vertices[v].Z())
+				if t >= 0 {
+					obj.Uvs = append(obj.Uvs, interObj.Uvs[t].X(), interObj.Uvs[t].Y())
+				}
+				if n >= 0 {
+					obj.Normals = append(obj.Normals, interObj.Normals[n].X(), interObj.Normals[n].Y(), interObj.Normals[n].Z())
+				}
+
+			} else {
+				ni := idx * 3
+
+				if n >= 0 && len(obj.Normals) > int(ni+2) {
+					var n1 = mgl32.Vec3{
+						obj.Normals[ni],
+						obj.Normals[ni+1],
+						obj.Normals[ni+2],
+					}
+					var n2 = mgl32.Vec3{
+						interObj.Normals[n].X(),
+						interObj.Normals[n].Y(),
+						interObj.Normals[n].Z(),
+					}
+
+					n2 = n2.Add(n1).Normalize()
+
+					obj.Normals[ni], obj.Normals[ni+1], obj.Normals[ni+2] = n2.X(), n2.Y(), n2.Z()
+				}
+			}
+			obj.VertexIndices = append(obj.VertexIndices, uint16(vmap[vertexKey]))
+		}
+
+	}
+
 	return nil
 }

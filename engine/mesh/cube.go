@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 	"toy/engine"
 	"toy/engine/loader"
@@ -104,7 +105,7 @@ func (cube *Cube) Init(w *engine.World) {
 }
 
 func (cube *Cube) Update(elapsed float64) {
-	//cube.model = mgl32.HomogRotate3DX(float32(elapsed)).Mul4(mgl32.HomogRotate3DY(float32(glfw.GetTime())))
+	cube.model = mgl32.HomogRotate3DX(float32(elapsed)).Mul4(mgl32.HomogRotate3DY(float32(glfw.GetTime())))
 }
 
 func (cube *Cube) Render(w *engine.World) {
