@@ -27,10 +27,7 @@ func main() {
 	})
 
 	world.AddRenderObj(&mesh.Cube{
-		Name:        "cube",
-		ObjFilePath: "./resource/cube/cube.obj",
-		VsFilePath:  "./resource/cube/cube.vs",
-		FsFilePath:  "./resource/cube/cube.fs",
+		Name: "cube",
 	})
 
 	world.Run()

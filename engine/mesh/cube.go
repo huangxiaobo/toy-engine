@@ -38,10 +38,10 @@ func (cube *Cube) Init(w *engine.World) {
 	}
 
 	if cube.VsFilePath == "" {
-		cube.VsFilePath = "./resource/cube/cube.vs"
+		cube.VsFilePath = "./resource/cube/cube.vert"
 	}
 	if cube.FsFilePath == "" {
-		cube.FsFilePath = "./resource/cube/cube.fs"
+		cube.FsFilePath = "./resource/cube/cube.frag"
 	}
 
 	if err := loader.LoadObj(cube.ObjFilePath, &cube.obj); err != nil {

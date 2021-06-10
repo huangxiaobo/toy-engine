@@ -39,10 +39,10 @@ type Axis struct {
 
 func (axis *Axis) Init(w *engine.World) {
 	if axis.VsFilePath == "" {
-		axis.VsFilePath = "./resource/axis/axis.vs"
+		axis.VsFilePath = "./resource/axis/axis.vert"
 	}
 	if axis.FsFilePath == "" {
-		axis.FsFilePath = "./resource/axis/axis.fs"
+		axis.FsFilePath = "./resource/axis/axis.frag"
 	}
 
 	axis.shader = &shader.Shader{VsFilePath: axis.VsFilePath, FsFilePath: axis.FsFilePath}
