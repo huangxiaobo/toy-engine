@@ -24,7 +24,7 @@ void main() {
     vec3 L = lightpos.xyz - P.xyz;
 
     // 计算散射
-    vec3 diffuse = max(dot(N, L), 0.0) * vec3(0.06, 0.04, 0.01);
+    vec3 diffuse = max(dot(N, L), 0.0) * vec3(0.06, 0.04, 0.11);
     fcolour = vec4(diffuse, 1.0);
 
     gl_Position = projection * view * model * vec4(position, 1);

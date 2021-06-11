@@ -8,7 +8,7 @@ type Mesh interface {
 	Render(w *World)
 }
 
-type Obj struct {
+type MeshData struct {
 	Name     string
 	Vertices []float32
 	Uvs      []float32

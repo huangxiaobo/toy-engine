@@ -26,7 +26,7 @@ type InterObj struct {
 	Faces []Face
 }
 
-func LoadObj(objFile string, obj *engine.Obj) error {
+func LoadWavefrontObj(objFile string, obj *engine.MeshData) error {
 	file, err := os.Open(objFile)
 	if err != nil {
 		log.Fatal(err)
@@ -75,7 +75,6 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 	var vcnt = 0
 
 	for _, face := range interObj.Faces {
-		fmt.Println(face)
 		for _, item := range face.s {
 			var v, t, n int32 = -1, -1, -1
 
@@ -90,7 +89,6 @@ func LoadObj(objFile string, obj *engine.Obj) error {
 			n -= 1
 			t -= 1
 			v -= 1
-			fmt.Printf("v: %d, t: %d, n: %d\n", v, t, n)
 			vertexKey := fmt.Sprintf("%d/%d/%d", v, t, n)
 			if idx, ok := vmap[vertexKey]; !ok {
 				vmap[vertexKey] = int32(vcnt)

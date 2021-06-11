@@ -23,11 +23,16 @@ func main() {
 	defer world.Destroy()
 
 	world.AddRenderObj(&mesh.Axis{
-		Name: "axis",
+		Name:       "axis",
+		VsFilePath: "./resource/axis/axis.vert",
+		FsFilePath: "./resource/axis/axis.frag",
 	})
 
-	world.AddRenderObj(&mesh.Cube{
-		Name: "cube",
+	world.AddRenderObj(&mesh.WavefrontObject{
+		Name:         "cube",
+		ObjFilePath:  "./resource/cube/cube.obj",
+		VertFilePath: "./resource/cube/cube.vert",
+		FragFilePath: "./resource/cube/cube.frag",
 	})
 
 	world.Run()

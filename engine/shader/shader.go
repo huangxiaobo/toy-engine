@@ -2,37 +2,26 @@ package shader
 
 import (
 	"fmt"
+	"github.com/go-gl/gl/v4.1-core/gl"
 	"io/ioutil"
 	"strings"
-	"toy/engine/logger"
-
-	"github.com/go-gl/gl/v4.1-core/gl"
 )
 
 type Shader struct {
-	VsFilePath string
-	FsFilePath string
-	Program    uint32
+	VertFilePath string
+	FragFilePath string
+	Program      uint32
 }
 
 func (s *Shader) Init() error {
-	if s.VsFilePath == "" {
-		s.VsFilePath = "./resource/cube.vs"
-	}
-	if s.FsFilePath == "" {
-		s.FsFilePath = "./resource/cube.fs"
-	}
-
-	vsData, err := ioutil.ReadFile(s.VsFilePath)
+	vsData, err := ioutil.ReadFile(s.VertFilePath)
 	if err != nil {
 		fmt.Println(err)
 	}
-	logger.Info(string(vsData))
-	fsData, err := ioutil.ReadFile(s.FsFilePath)
+	fsData, err := ioutil.ReadFile(s.FragFilePath)
 	if err != nil {
 		fmt.Println(err)
 	}
-	logger.Info(string(fsData))
 
 	s.Program, err = s.NewProgram(string(vsData), string(fsData))
 	if err != nil {

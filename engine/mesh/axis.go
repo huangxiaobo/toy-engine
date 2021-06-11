@@ -38,14 +38,7 @@ type Axis struct {
 }
 
 func (axis *Axis) Init(w *engine.World) {
-	if axis.VsFilePath == "" {
-		axis.VsFilePath = "./resource/axis/axis.vert"
-	}
-	if axis.FsFilePath == "" {
-		axis.FsFilePath = "./resource/axis/axis.frag"
-	}
-
-	axis.shader = &shader.Shader{VsFilePath: axis.VsFilePath, FsFilePath: axis.FsFilePath}
+	axis.shader = &shader.Shader{VertFilePath: axis.VsFilePath, FragFilePath: axis.FsFilePath}
 	if err := axis.shader.Init(); err != nil {
 		logger.Error(err)
 		return
