@@ -127,7 +127,7 @@ func (cube *Cube) Render(w *engine.World) {
 	gl.UniformMatrix4fv(cube.modelUniform, 1, false, &cube.model[0])
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
-	lightPosAttrib := gl.GetUniformLocation(program, gl.Str("lightPos\x00"))
+	lightPosAttrib := gl.GetUniformLocation(program, gl.Str("lightpos\x00"))
 	gl.Uniform3fv(lightPosAttrib, 1, &w.Light.Position[0])
 	lightColorAttrib := gl.GetUniformLocation(program, gl.Str("lightColor\x00"))
 	gl.Uniform3fv(lightColorAttrib, 1, &w.Light.Color[0])
