@@ -45,3 +45,8 @@ uniform前面不要有空行 有空行
 ## 坐标系
 
 OpenGL是右手坐标系
+
+
+## 字体
+https://stackoverflow.com/questions/34455925/render-truetype-fonts-with-opengl
+https://github.com/golang/freetype/blob/master/example/freetype/main.go

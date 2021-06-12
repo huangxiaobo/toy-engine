@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	WindowWidth  = 800
-	WindowHeight = 600
+	WindowWidth  = 800.0
+	WindowHeight = 600.0
 )
 
 type World struct {
@@ -20,6 +20,7 @@ type World struct {
 	Light      *light.Light
 	renderObjs []Mesh
 	Camera     *camera.Camera
+	Font       *Font
 }
 
 func (w *World) initGLFW() {
@@ -75,6 +76,10 @@ func (w *World) Init() error {
 	// 初始化灯光
 	w.Light = &light.Light{Position: mgl32.Vec3{0.0, 0.0, 10.0}, Color: mgl32.Vec3{0.8, 0.8, 0.8}}
 
+	// Font
+	w.Font = &Font{}
+	w.Font.Init()
+	w.Font.Load("./resource/font/微软雅黑.ttf", 16)
 	return nil
 }
 
@@ -100,6 +105,9 @@ func (w *World) Run() {
 			renderObj.Update(elapsed)
 			renderObj.Render(w)
 		}
+
+		// 字体
+		w.Font.Render("A", 0, 0, 16, mgl32.Vec4{1.0, 1.0, 1.0, 1.0})
 
 		// Maintenance
 		w.window.SwapBuffers()

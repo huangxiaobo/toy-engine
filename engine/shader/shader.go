@@ -3,8 +3,11 @@ package shader
 import (
 	"fmt"
 	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/mathgl/mgl32"
 	"io/ioutil"
+	"reflect"
 	"strings"
+	"toy/engine/logger"
 )
 
 type Shader struct {
@@ -67,6 +70,7 @@ func (s *Shader) NewProgram(vertexShaderSource, fragmentShaderSource string) (ui
 }
 
 func (s *Shader) CompileShader(source string, shaderType uint32) (uint32, error) {
+	fmt.Println(source)
 	shader := gl.CreateShader(shaderType)
 
 	csource, free := gl.Strs(source)
@@ -92,4 +96,32 @@ func (s *Shader) CompileShader(source string, shaderType uint32) (uint32, error)
 func (s *Shader) Use() uint32 {
 	gl.UseProgram(s.Program)
 	return s.Program
+}
+
+func (s *Shader) SetUniform(name string, value interface{}) {
+	loc := gl.GetUniformLocation(s.Program, gl.Str(name+"\x00"))
+	if loc < 0 {
+		return
+	}
+
+	getType := reflect.TypeOf(value)
+	getValue := reflect.ValueOf(value)
+
+	switch getType.Name() {
+	case "int":
+		gl.Uniform1i(loc, int32(getValue.Int()))
+	case "Vec3":
+		v := getValue.Interface().(mgl32.Vec3)
+		gl.Uniform3fv(loc, 1, &v[0])
+	case "Vec4":
+		v := getValue.Interface().(mgl32.Vec4)
+		gl.Uniform4fv(loc, 1, &v[0])
+	case "Mat4":
+		v := getValue.Interface().(mgl32.Mat4)
+		gl.UniformMatrix4fv(loc, 1, false, &v[0])
+
+	default:
+		logger.Info("Un-support type ", getType)
+	}
+
 }
