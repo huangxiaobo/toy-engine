@@ -5,6 +5,7 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 	"toy/engine"
+	"toy/engine/config"
 	"toy/engine/loader"
 	"toy/engine/logger"
 	"toy/engine/shader"
@@ -100,9 +101,11 @@ func (wfo *WavefrontObject) Update(elapsed float64) {
 
 func (wfo *WavefrontObject) Render(w *engine.World) {
 	// Render
+	width := float32(config.Config.WindowWidth)
+	height := float32(config.Config.WindowHeight)
 	projection := mgl32.Perspective(
 		mgl32.DegToRad(w.Camera.Zoom),
-		engine.WindowWidth/engine.WindowHeight,
+		width/height,
 		0.1,
 		100.0,
 	)

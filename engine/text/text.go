@@ -1,22 +1,24 @@
-package engine
+package text
 
 import (
 	"bufio"
 	"fmt"
+	"github.com/golang/freetype"
+	"golang.org/x/image/font"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/png"
 	"io/ioutil"
 	"log"
 	"os"
+	"toy/engine/config"
 	"toy/engine/logger"
+	"unicode/utf8"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/golang/freetype/truetype"
-	"golang.org/x/image/font"
-	"golang.org/x/image/math/fixed"
-
 	"toy/engine/shader"
 	"toy/engine/texture"
 )
@@ -58,7 +60,7 @@ func nextP2(a int) int {
 	return rval
 }
 
-type Font struct {
+type Text struct {
 	loaded  bool
 	vao     uint32
 	vbo     *VboData
@@ -69,14 +71,14 @@ type Font struct {
 	text string
 }
 
-func (f *Font) Init() {
+func (f *Text) Init() {
 	f.vbo = &VboData{}
-	f.text = "Welcome"
+	f.text = "引擎"
 }
 
 // Load a TrueType font from a file and generate a texture
 // with all important characters.
-func (f *Font) Load(path string, pix float32) {
+func (f *Text) Load(path string, pix float32) {
 	contents, err := ioutil.ReadFile(path)
 	if err != nil {
 		fmt.Println("Could not read font file: " + path)
@@ -91,19 +93,20 @@ func (f *Font) Load(path string, pix float32) {
 	// Create a texture for the characters
 	// Find the next power of 2 for the texture size
 	size := nextP2(int(pix * 16))
-	fg, bg := image.White, image.Transparent
+	fg, bg := image.White, image.Black
 	rgba := image.NewRGBA(image.Rect(0, 0, size, size))
 
 	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)
-	d := &font.Drawer{
-		Dst: rgba,
-		Src: fg,
-		Face: truetype.NewFace(fontFace, &truetype.Options{
-			Size:    float64(pix),
-			DPI:     72,
-			Hinting: font.HintingNone,
-		}),
-	}
+	ft := freetype.NewContext()
+	ft.SetDPI(72)
+	ft.SetFont(fontFace)
+	ft.SetFontSize(16)
+	ft.SetClip(rgba.Bounds())
+	ft.SetDst(rgba)
+	ft.SetSrc(fg)
+	ft.SetHinting(font.HintingFull)
+
+	ruler := color.RGBA{0xff, 0x22, 0x22, 0xff}
 
 	f.pix = pix
 	// Some GL preps
@@ -117,14 +120,25 @@ func (f *Font) Load(path string, pix float32) {
 	f.shader.Use()
 	f.shader.SetUniform("tex", 0)
 
+	//pt := freetype.Pt(0, 0+int(ft.PointToFixed(16)>>6))
+
 	// Create vertex data (and coordinates in the texture) for each character
-	for i, v := range f.text {
-		c := string(v)
-		x, y := i%16, i/16
+	charIdx := 0
+	charCnt := 0
+	for charIdx < len(f.text) {
+		c, n := utf8.DecodeRuneInString(f.text[charIdx:])
+		x, y := charCnt%16, charCnt/16
+
+		charIdx += n
+		charCnt += 1
 
 		// Draw the character on the texture
-		d.Dot = fixed.P(x*int(pix), (y+1)*int(pix))
-		d.DrawString(c)
+		pt := freetype.Pt(16*x, 16*y+int(ft.PointToFixed(16)>>6))
+		_, err := ft.DrawString(string(c), pt)
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
 		// Vertices
 		quads := []float32{
@@ -139,7 +153,7 @@ func (f *Font) Load(path string, pix float32) {
 			return float32(n) / 16.0
 		}
 		normY := func(n int) float32 {
-			return float32(n) / 12.0
+			return float32(n) / 16.0
 		}
 
 		// Texture coordinates (normalized)
@@ -157,6 +171,21 @@ func (f *Font) Load(path string, pix float32) {
 			f.vbo.AppendData(vQuads)
 			f.vbo.AppendData(vTexQuads)
 		}
+	}
+
+	for i := 0; i < 256; i++ {
+		rgba.Set(0, i, ruler)
+		rgba.Set(16, i, ruler)
+		rgba.Set(32, i, ruler)
+		rgba.Set(48, i, ruler)
+		rgba.Set(64, i, ruler)
+
+		rgba.Set(i, 0, ruler)
+		rgba.Set(i, 16, ruler)
+		rgba.Set(i, 32, ruler)
+		rgba.Set(i, 48, ruler)
+		rgba.Set(i, 64, ruler)
+
 	}
 
 	// Save that RGBA image to disk.
@@ -200,7 +229,7 @@ func (f *Font) Load(path string, pix float32) {
 }
 
 // Render a text using the font
-func (f *Font) Render(text string, x, y int, pix float32, color mgl32.Vec4) {
+func (f *Text) Render(text string, x, y int, pix float32, color mgl32.Vec4) {
 	if !f.loaded {
 		return
 	}
@@ -230,17 +259,22 @@ func (f *Font) Render(text string, x, y int, pix float32, color mgl32.Vec4) {
 		gl.PtrOffset(2*4), // offset of first element
 	)
 
+	width := float32(config.Config.WindowWidth)
+	height := float32(config.Config.WindowHeight)
+	projection := mgl32.Ortho2D(0, width, -10, height)
+
 	f.shader.Use()
-	f.shader.SetUniform("projection", mgl32.Ortho2D(0, WindowWidth, 0, WindowHeight))
+	f.shader.SetUniform("projection", projection)
 	f.shader.SetUniform("color", color)
 
 	f.Texture.Bind()
 
 	scale := pix / f.pix
-	for i := 0; i < len(f.text); i++ {
+
+	for i := 0; i < utf8.RuneCount([]byte(f.text)); i += 1 {
 		model := mgl32.Ident4().Mul4(mgl32.Scale3D(scale, scale, 0))
 
-		model = model.Add(mgl32.Translate3D(float32(x)+float32(i)*pix, float32(y), 0))
+		model = model.Add(mgl32.Translate3D(float32(x)+float32(i)*(pix+float32(16)), float32(y), 0))
 		f.shader.SetUniform("model", model)
 
 		gl.DrawArrays(gl.TRIANGLE_STRIP, int32((i)*4), 4)

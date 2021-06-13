@@ -6,13 +6,10 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	_ "image/png"
 	"toy/engine/camera"
+	"toy/engine/config"
 	"toy/engine/light"
 	"toy/engine/logger"
-)
-
-const (
-	WindowWidth  = 800.0
-	WindowHeight = 600.0
+	"toy/engine/text"
 )
 
 type World struct {
@@ -20,7 +17,7 @@ type World struct {
 	Light      *light.Light
 	renderObjs []Mesh
 	Camera     *camera.Camera
-	Font       *Font
+	Text       *text.Text
 }
 
 func (w *World) initGLFW() {
@@ -38,7 +35,7 @@ func (w *World) initGLFW() {
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
-	w.window, err = glfw.CreateWindow(WindowWidth, WindowHeight, "Cube", nil, nil)
+	w.window, err = glfw.CreateWindow(config.Config.WindowWidth, config.Config.WindowHeight, "Cube", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -76,10 +73,10 @@ func (w *World) Init() error {
 	// 初始化灯光
 	w.Light = &light.Light{Position: mgl32.Vec3{0.0, 0.0, 10.0}, Color: mgl32.Vec3{0.8, 0.8, 0.8}}
 
-	// Font
-	w.Font = &Font{}
-	w.Font.Init()
-	w.Font.Load("./resource/font/微软雅黑.ttf", 16)
+	// Text
+	w.Text = &text.Text{}
+	w.Text.Init()
+	w.Text.Load("./resource/font/微软雅黑.ttf", 16)
 	return nil
 }
 
@@ -107,7 +104,7 @@ func (w *World) Run() {
 		}
 
 		// 字体
-		w.Font.Render("A", 0, 0, 16, mgl32.Vec4{1.0, 1.0, 1.0, 1.0})
+		w.Text.Render("A", 0, 0, 16, mgl32.Vec4{1.0, 1.0, 1.0, 1.0})
 
 		// Maintenance
 		w.window.SwapBuffers()
