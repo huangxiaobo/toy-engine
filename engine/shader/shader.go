@@ -26,7 +26,7 @@ func (s *Shader) Init() error {
 		fmt.Println(err)
 	}
 
-	s.Program, err = s.NewProgram(string(vsData), string(fsData))
+	s.Program, err = s.NewProgram(string(vsData) + "\x00", string(fsData) + "\x00")
 	if err != nil {
 		panic(err)
 	}
