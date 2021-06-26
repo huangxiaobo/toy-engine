@@ -65,3 +65,6 @@ https://developer.apple.com/library/archive/documentation/TextFonts/Conceptual/C
 - 步进宽度 ( advanceX ): 相邻两个笔位置的水平距离 ( 字间距 )；
 - 字形宽度 (width) ： 字形的水平长度；
 - 字形高度 (height) ： 字形的垂直长度。
+
+## ScreenShots
+![屏幕截圖](https://github.com/huangxiaobo/ToyEngine/blob/master/screenshots/Screenshot%20from%202021-06-26%2017-22-03.png)
