@@ -104,7 +104,7 @@ func (w *World) Run() {
 		}
 
 		// 字体
-		w.Text.Render("A", 0, 0, 16, mgl32.Vec4{1.0, 1.0, 1.0, 1.0})
+		w.Text.Render(0, 50, mgl32.Vec4{1.0, 1.0, 1.0, 1.0})
 
 		// Maintenance
 		w.window.SwapBuffers()
