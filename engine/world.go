@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	_ "image/png"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -20,6 +21,8 @@ type World struct {
 	renderObjs []Mesh
 	Camera     *camera.Camera
 	Text       *text.Text
+
+	bRun bool
 }
 
 func (w *World) initGLFW() {
@@ -37,11 +40,20 @@ func (w *World) initGLFW() {
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
-	w.window, err = glfw.CreateWindow(config.Config.WindowWidth, config.Config.WindowHeight, "Cube", nil, nil)
+	w.window, err = glfw.CreateWindow(config.Config.WindowWidth, config.Config.WindowHeight, "Toy引擎", nil, nil)
 	if err != nil {
 		panic(err)
 	}
 	w.window.MakeContextCurrent()
+
+	w.window.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+		fmt.Println(key)
+		switch key {
+		case glfw.KeyEscape:
+			w.bRun = false
+
+		}
+	})
 
 }
 
@@ -96,6 +108,8 @@ func (w *World) Init() error {
 	w.Text = &text.Text{}
 	w.Text.Init()
 	w.Text.Load("./resource/font/微软雅黑.ttf", 16)
+
+	w.bRun = true
 	return nil
 }
 
@@ -129,6 +143,10 @@ func (w *World) Run() {
 		// Maintenance
 		w.window.SwapBuffers()
 		glfw.PollEvents()
+
+		if !w.bRun {
+			break
+		}
 	}
 }
 
