@@ -2,11 +2,13 @@ package shader
 
 import (
 	"fmt"
-	"github.com/go-gl/gl/v4.1-core/gl"
-	"github.com/go-gl/mathgl/mgl32"
 	"io/ioutil"
 	"reflect"
 	"strings"
+
+	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/mathgl/mgl32"
+
 	"toy/engine/logger"
 )
 
@@ -26,7 +28,7 @@ func (s *Shader) Init() error {
 		fmt.Println(err)
 	}
 
-	s.Program, err = s.NewProgram(string(vsData) + "\x00", string(fsData) + "\x00")
+	s.Program, err = s.NewProgram(string(vsData)+"\x00", string(fsData)+"\x00")
 	if err != nil {
 		panic(err)
 	}

@@ -4,8 +4,12 @@ import (
 	_ "image/png"
 	"log"
 	"runtime"
+
+	"github.com/go-gl/mathgl/mgl32"
+
 	"toy/engine"
 	"toy/engine/mesh"
+	"toy/engine/mesh/ground"
 )
 
 func init() {
@@ -22,17 +26,37 @@ func main() {
 	}
 	defer world.Destroy()
 
+	world.AddRenderObj(&ground.Ground{
+		WavefrontObject: mesh.WavefrontObject{
+			Name:         "ground",
+			ObjFilePath:  "./resource/model/ground.obj",
+			VertFilePath: "./resource/shader/v2/shader.vert",
+			FragFilePath: "./resource/shader/v2/shader.frag",
+		},
+	})
+
 	world.AddRenderObj(&mesh.Axis{
 		Name:       "axis",
-		VsFilePath: "./resource/axis/axis.vert",
-		FsFilePath: "./resource/axis/axis.frag",
+		VsFilePath: "./resource/shader/axis.vert",
+		FsFilePath: "./resource/shader/axis.frag",
 	})
 
 	world.AddRenderObj(&mesh.WavefrontObject{
 		Name:         "cube",
-		ObjFilePath:  "./resource/cube/cube.obj",
-		VertFilePath: "./resource/cube/cube.vert",
-		FragFilePath: "./resource/cube/cube.frag",
+		ObjFilePath:  "./resource/model/cube.obj",
+		VertFilePath: "./resource/shader/v0/shader.vert",
+		FragFilePath: "./resource/shader/v0/shader.frag",
+		Position: mgl32.Vec3{5, 0, -5},
+		Scale: mgl32.Vec3{2, 2, 2},
+	})
+
+	world.AddRenderObj(&mesh.WavefrontObject{
+		Name:         "icosphere",
+		ObjFilePath:  "./resource/model/icosphere.obj",
+		VertFilePath: "./resource/shader/v0/shader.vert",
+		FragFilePath: "./resource/shader/v0/shader.frag",
+		Position: mgl32.Vec3{-5, 0, 5},
+		Scale: mgl32.Vec3{4, 4, 4},
 	})
 
 	world.Run()

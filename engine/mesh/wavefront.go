@@ -2,8 +2,8 @@ package mesh
 
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
-	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
+
 	"toy/engine"
 	"toy/engine/config"
 	"toy/engine/loader"
@@ -17,7 +17,9 @@ type WavefrontObject struct {
 	VertFilePath string
 	FragFilePath string
 
-	model mgl32.Mat4
+	Position [3]float32
+	Scale    [3]float32
+	model    mgl32.Mat4
 
 	meshData          *engine.MeshData
 	shader            *shader.Shader
@@ -31,6 +33,9 @@ type WavefrontObject struct {
 	tbo               uint32
 	vertAttrib        uint32
 	normalAttrib      uint32
+
+	// Draw
+	DrawMode uint32
 }
 
 func (wfo *WavefrontObject) Init(w *engine.World) {
@@ -83,7 +88,7 @@ func (wfo *WavefrontObject) Init(w *engine.World) {
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(wfo.meshData.VertexIndices)*2, gl.Ptr(&wfo.meshData.VertexIndices[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	//// Get an index for the attribute from the shader
+	// // Get an index for the attribute from the shader
 	wfo.vertAttrib = uint32(gl.GetAttribLocation(program, gl.Str("position\x00")))
 	wfo.normalAttrib = uint32(gl.GetAttribLocation(program, gl.Str("normal\x00")))
 
@@ -93,10 +98,14 @@ func (wfo *WavefrontObject) Init(w *engine.World) {
 	gl.BindVertexArray(0)
 
 	wfo.model = mgl32.Ident4()
+	wfo.model = wfo.model.Mul4(mgl32.Scale3D(wfo.Scale[0], wfo.Scale[1], wfo.Scale[2]))
+	wfo.model = wfo.model.Add(mgl32.Translate3D(wfo.Position[0], wfo.Position[1], wfo.Position[2]))
+
+	wfo.DrawMode = gl.TRIANGLES
 }
 
 func (wfo *WavefrontObject) Update(elapsed float64) {
-	wfo.model = mgl32.HomogRotate3DX(float32(elapsed)).Mul4(mgl32.HomogRotate3DY(float32(glfw.GetTime())))
+	wfo.model = wfo.model.Mul4(mgl32.HomogRotate3DY(float32(elapsed)))
 }
 
 func (wfo *WavefrontObject) Render(w *engine.World) {
@@ -121,7 +130,7 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 	lightPosAttrib := gl.GetUniformLocation(program, gl.Str("lightpos\x00"))
-	gl.Uniform3fv(lightPosAttrib, 1, &w.Light.Position[0])
+	gl.Uniform4fv(lightPosAttrib, 1, &w.Light.Position[0])
 	lightColorAttrib := gl.GetUniformLocation(program, gl.Str("lightColor\x00"))
 	gl.Uniform3fv(lightColorAttrib, 1, &w.Light.Color[0])
 	viewPosAttrib := gl.GetUniformLocation(program, gl.Str("viewPos\x00"))
@@ -154,19 +163,19 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, wfo.ebo)
 	gl.DrawElements(
-		gl.TRIANGLES,                           // mode
+		wfo.DrawMode,                           // mode
 		int32(len(wfo.meshData.VertexIndices)), // count
 		gl.UNSIGNED_SHORT,                      // type
 		nil,                                    // element array buffer offset
 	)
 
-	gl.PointSize(10)
-	gl.DrawElements(
-		gl.POINTS,                              // mode
-		int32(len(wfo.meshData.VertexIndices)), // count
-		gl.UNSIGNED_SHORT,                      // type
-		nil,                                    // element array buffer offset
-	)
+	// gl.PointSize(10)
+	// gl.DrawElements(
+	// 	gl.POINTS,                              // mode
+	// 	int32(len(wfo.meshData.VertexIndices)), // count
+	// 	gl.UNSIGNED_SHORT,                      // type
+	// 	nil,                                    // element array buffer offset
+	// )
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 	gl.EnableVertexAttribArray(0)
 	gl.BindVertexArray(0)

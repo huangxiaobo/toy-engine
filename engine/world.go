@@ -1,10 +1,12 @@
 package engine
 
 import (
+	_ "image/png"
+
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
-	_ "image/png"
+
 	"toy/engine/camera"
 	"toy/engine/config"
 	"toy/engine/light"
@@ -59,6 +61,22 @@ func (w *World) initGL() {
 
 	gl.Enable(gl.SAMPLES)
 	glfw.WindowHint(glfw.Samples, 8)
+
+	// 只显示正面 , 不显示背面
+	gl.Enable(gl.CULL_FACE)
+
+	// 设置顺时针方向 CW : Clock Wind 顺时针方向
+	// 默认是 GL_CCW : Counter Clock Wind 逆时针方向
+	gl.FrontFace(gl.CCW)
+
+	// 设置线框模式
+	// 设置了该模式后 , 之后的所有图形都会变成线
+	gl.PolygonMode(gl.FRONT, gl.LINE)
+
+	// 设置点模式
+	// 设置了该模式后 , 之后的所有图形都会变成点
+	// glPolygonMode(GL_FRONT, GL_POINT);
+
 }
 
 func (w *World) Init() error {
@@ -71,7 +89,8 @@ func (w *World) Init() error {
 	w.Camera.Init(mgl32.Vec3{10.0, 10.0, 10.0}, mgl32.Vec3{-10.0, -10.0, -10.0})
 
 	// 初始化灯光
-	w.Light = &light.Light{Position: mgl32.Vec3{0.0, 0.0, 10.0}, Color: mgl32.Vec3{0.8, 0.8, 0.8}}
+	w.Light = &light.Light{Position: mgl32.Vec4{0, 5.0, 0, 0.0}, Color: mgl32.Vec3{0.8, 0.8, 0.8}}
+	w.Light.Init()
 
 	// Text
 	w.Text = &text.Text{}
@@ -92,6 +111,7 @@ func (w *World) Run() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		w.DrawAxis()
+		w.DrawLight()
 
 		// Update
 		time := glfw.GetTime()
@@ -113,7 +133,28 @@ func (w *World) Run() {
 }
 
 func (w *World) DrawAxis() {
-	//logger.Info("DrawAxis...")
+	// logger.Info("DrawAxis...")
+}
+
+func (w *World) DrawLight() {
+	// Render
+	width := float32(config.Config.WindowWidth)
+	height := float32(config.Config.WindowHeight)
+	projection := mgl32.Perspective(
+		mgl32.DegToRad(w.Camera.Zoom),
+		width/height,
+		0.1,
+		100.0,
+	)
+	view := w.Camera.GetViewMatrix()
+
+	model := mgl32.Ident4().Mul4(mgl32.Scale3D(1, 1, 1))
+
+	position := w.Light.Position
+	model = model.Add(mgl32.Translate3D(position.X(), position.Y(), position.Z()))
+
+	w.Light.Render(projection, view, model)
+
 }
 
 func (w *World) AddRenderObj(renderObj Mesh) {
