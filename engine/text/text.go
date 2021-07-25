@@ -3,9 +3,6 @@ package text
 import (
 	"bufio"
 	"fmt"
-	"github.com/golang/freetype"
-	"golang.org/x/image/font"
-	"golang.org/x/image/math/fixed"
 	"image"
 	"image/color"
 	"image/draw"
@@ -13,13 +10,19 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"unicode/utf8"
+
+	"github.com/golang/freetype"
+	"golang.org/x/image/font"
+	"golang.org/x/image/math/fixed"
+
 	"toy/engine/config"
 	"toy/engine/logger"
-	"unicode/utf8"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/golang/freetype/truetype"
+
 	"toy/engine/shader"
 	"toy/engine/texture"
 )
@@ -151,7 +154,7 @@ func (f *Text) Load(path string, pix float32) {
 	// Create a texture for the characters
 	// Find the next power of 2 for the texture size
 	size := nextP2(int(pix * FontSize))
-	fg, bg := image.White, image.Black
+	fg, bg := image.White, image.Transparent
 	rgba := image.NewRGBA(image.Rect(0, 0, size, size))
 
 	draw.Draw(rgba, rgba.Bounds(), bg, image.ZP, draw.Src)

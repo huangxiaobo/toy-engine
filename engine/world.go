@@ -75,7 +75,7 @@ func (w *World) initGL() {
 	glfw.WindowHint(glfw.Samples, 8)
 
 	// 只显示正面 , 不显示背面
-	gl.Enable(gl.CULL_FACE)
+	// gl.Enable(gl.CULL_FACE)
 
 	// 设置顺时针方向 CW : Clock Wind 顺时针方向
 	// 默认是 GL_CCW : Counter Clock Wind 逆时针方向
@@ -83,7 +83,7 @@ func (w *World) initGL() {
 
 	// 设置线框模式
 	// 设置了该模式后 , 之后的所有图形都会变成线
-	gl.PolygonMode(gl.FRONT, gl.LINE)
+	// gl.PolygonMode(gl.FRONT, gl.LINE)
 
 	// 设置点模式
 	// 设置了该模式后 , 之后的所有图形都会变成点

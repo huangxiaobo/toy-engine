@@ -40,9 +40,14 @@ type WavefrontObject struct {
 
 func (wfo *WavefrontObject) Init(w *engine.World) {
 	wfo.meshData = &engine.MeshData{}
-	if err := loader.LoadWavefrontObj(wfo.ObjFilePath, wfo.meshData); err != nil {
-		logger.Error(err)
-		return
+	switch wfo.Name {
+	case "ground":
+		wfo.meshData = GenGroundMeshData()
+	default:
+		if err := loader.LoadWavefrontObj(wfo.ObjFilePath, wfo.meshData); err != nil {
+			logger.Error(err)
+			return
+		}
 	}
 
 	wfo.shader = &shader.Shader{VertFilePath: wfo.VertFilePath, FragFilePath: wfo.FragFilePath}

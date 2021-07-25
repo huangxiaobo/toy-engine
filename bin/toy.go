@@ -29,9 +29,9 @@ func main() {
 	world.AddRenderObj(&ground.Ground{
 		WavefrontObject: mesh.WavefrontObject{
 			Name:         "ground",
-			ObjFilePath:  "./resource/model/ground.obj",
-			VertFilePath: "./resource/shader/v2/shader.vert",
-			FragFilePath: "./resource/shader/v2/shader.frag",
+			ObjFilePath:  "",
+			VertFilePath: "./resource/shader/ground/shader.vert",
+			FragFilePath: "./resource/shader/ground/shader.frag",
 		},
 	})
 
