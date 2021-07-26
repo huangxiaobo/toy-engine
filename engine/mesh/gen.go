@@ -42,12 +42,13 @@ func GenGroundMeshData() *engine.MeshData {
 	}
 
 	size := 2*xn + 1
-	for zi := 0; zi < zn*2; zi++ {
-		for xi := 0; xi < xn*2; xi++ {
+	for zi := 0; zi < size-1; zi++ {
+		for xi := 0; xi < size-1; xi++ {
 			v0 := zi*size + xi
 			v1 := v0 + 1
 			v2 := v0 + size
 			v3 := v2 + 1
+
 			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v0))
 			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v1))
 			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v2))

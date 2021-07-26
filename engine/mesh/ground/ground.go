@@ -11,11 +11,16 @@ type Ground struct {
 	mesh.WavefrontObject
 }
 
-func (wfo *Ground) Init(w *engine.World) {
-	wfo.WavefrontObject.Init(w)
-	wfo.DrawMode = gl.LINES
+func (g *Ground) Init(w *engine.World) {
+	g.WavefrontObject.Init(w)
 }
 
-func (wfo *Ground) Update(elapsed float64) {
+func (g *Ground) Update(elapsed float64) {
 
+}
+
+func (g *Ground) Render(w *engine.World) {
+	gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+	g.WavefrontObject.Render(w)
+	gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 }
