@@ -2,7 +2,7 @@
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-uniform vec4 lightpos;
+uniform vec4 gLightPos;
 
 in vec3 position;
 in vec3 normal;
@@ -21,7 +21,7 @@ void main() {
     // 将法线向量转化到直接坐标系
     vec3 N = normalize(normalmatrix * normal);
     // 计算光源到顶点的距离
-    vec3 L = lightpos.xyz - P.xyz;
+    vec3 L = gLightPos.xyz - P.xyz;
 
     // 计算散射
     vec3 diffuse = max(dot(N, L), 0.0) * vec3(0.06, 0.04, 0.11);

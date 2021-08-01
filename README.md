@@ -11,6 +11,7 @@ sudo apt install xorg-dev
 
 > https://www.opengl.org/archives/resources/code/samples/glut_examples/examples/examples.html
 > https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/7.4.camera_class/camera_class.cpp
+> https://ogldev.org/index.html
 
 obj格式
 > https://www.cs.cmu.edu/~mbz/personal/graphics/obj.html

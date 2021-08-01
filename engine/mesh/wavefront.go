@@ -26,13 +26,15 @@ type WavefrontObject struct {
 	projectionUniform int32
 	viewUniform       int32
 	modelUniform      int32
-	vao               uint32
-	vbo               uint32
-	ebo               uint32
-	nbo               uint32
-	tbo               uint32
-	vertAttrib        uint32
-	normalAttrib      uint32
+	wvpUniform               int32
+
+	vao          uint32
+	vbo          uint32
+	ebo          uint32
+	nbo          uint32
+	tbo          uint32
+	vertAttrib   uint32
+	normalAttrib uint32
 
 	// Draw
 	DrawMode uint32
@@ -62,6 +64,7 @@ func (wfo *WavefrontObject) Init(w *engine.World) {
 	wfo.projectionUniform = gl.GetUniformLocation(program, gl.Str("projection\x00"))
 	wfo.viewUniform = gl.GetUniformLocation(program, gl.Str("view\x00"))
 	wfo.modelUniform = gl.GetUniformLocation(program, gl.Str("model\x00"))
+	wfo.wvpUniform = gl.GetUniformLocation(program, gl.Str("gWVP\x00"))
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
@@ -124,6 +127,7 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 		100.0,
 	)
 	view := w.Camera.GetViewMatrix()
+	mvp := projection.Mul4(view).Mul4(mgl32.Ident4())
 
 	program := wfo.shader.Program
 	// Shader
@@ -132,13 +136,14 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 	gl.UniformMatrix4fv(wfo.projectionUniform, 1, false, &projection[0])
 	gl.UniformMatrix4fv(wfo.viewUniform, 1, false, &view[0])
 	gl.UniformMatrix4fv(wfo.modelUniform, 1, false, &wfo.model[0])
+	gl.UniformMatrix4fv(wfo.wvpUniform, 1, false, &mvp[0])
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
-	lightPosAttrib := gl.GetUniformLocation(program, gl.Str("lightpos\x00"))
+	lightPosAttrib := gl.GetUniformLocation(program, gl.Str("gLightPos\x00"))
 	gl.Uniform4fv(lightPosAttrib, 1, &w.Light.Position[0])
-	lightColorAttrib := gl.GetUniformLocation(program, gl.Str("lightColor\x00"))
+	lightColorAttrib := gl.GetUniformLocation(program, gl.Str("gLightColor\x00"))
 	gl.Uniform3fv(lightColorAttrib, 1, &w.Light.Color[0])
-	viewPosAttrib := gl.GetUniformLocation(program, gl.Str("viewPos\x00"))
+	viewPosAttrib := gl.GetUniformLocation(program, gl.Str("gViewPos\x00"))
 	gl.Uniform3fv(viewPosAttrib, 1, &w.Camera.Position[0])
 
 	// 开启顶点数组
