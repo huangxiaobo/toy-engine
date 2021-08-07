@@ -20,8 +20,8 @@ type PointLight struct {
 
 	AmbientIntensity float32
 	DiffuseIntensity float32
-	DiffuseColour    mgl32.Vec3
-	SpecularColour   mgl32.Vec3
+	DiffuseColor     mgl32.Vec3
+	SpecularColor    mgl32.Vec3
 	Atten            Attenuation
 
 	shader            *shader.Shader
@@ -73,17 +73,17 @@ func (light *PointLight) Init() {
 	gl.DisableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
-	light.SetDiffuseColour(1.0, .5, 0.0)   // color the light orange
-	light.SetSpecularColour(1.0, 1.0, 0.0) // yellow highlights
+	light.SetDiffuseColor(1.0, .5, 0.0)   // color the light orange
+	light.SetSpecularColor(1.0, 1.0, 0.0) // yellow highlights
 	// light.SetAttenuation(100, 1.0, 0.045, 0.0075);
 }
 
-func (light *PointLight) SetDiffuseColour(r, g, b float32) {
-	light.DiffuseColour = mgl32.Vec3{r, g, b}
+func (light *PointLight) SetDiffuseColor(r, g, b float32) {
+	light.DiffuseColor = mgl32.Vec3{r, g, b}
 }
 
-func (light *PointLight) SetSpecularColour(r, g, b float32) {
-	light.SpecularColour = mgl32.Vec3{r, g, b}
+func (light *PointLight) SetSpecularColor(r, g, b float32) {
+	light.SpecularColor = mgl32.Vec3{r, g, b}
 }
 
 func (light *PointLight) Update(elapsed float64) {

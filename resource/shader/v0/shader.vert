@@ -15,12 +15,22 @@ struct Light {
 
     float   AmbientIntensity;
     float   DiffuseIntensity;
-    vec3    DiffuseColour;
-    vec3    SpecularColour;
+    vec3    DiffuseColor;
+    vec3    SpecularColor;
     Attenuation Atten;
 };
 
 uniform Light gLight[1];
+
+// 材质结构体
+struct Material{
+    vec3 AmbientColor;//环境
+    vec3 DiffuseColor;//漫反射
+    vec3 SpecularColor;//镜面反射
+    float Shininess;//镜面反射光泽
+};
+
+uniform Material gMaterial;
 
 in vec3 position;
 in vec3 normal;
@@ -42,7 +52,7 @@ void main() {
     vec3 L = gLight[0].Position.xyz - P.xyz;
 
     // 计算散射
-    vec3 diffuse = max(dot(N, L), 0.0) * vec3(0.06, 0.04, 0.11);
+    vec3 diffuse = max(dot(N, L), 0.0) * gMaterial.DiffuseColor * gLight[0].Color;
     fcolour = vec4(diffuse, 1.0);
 
     gl_Position = projection * view * model * vec4(position, 1);

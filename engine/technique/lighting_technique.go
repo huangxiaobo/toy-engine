@@ -6,6 +6,7 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 
 	"toy/engine/light"
+	"toy/engine/material"
 	"toy/engine/shader"
 )
 
@@ -15,13 +16,20 @@ type LightUniform struct {
 
 	AmbientIntensity int32
 	DiffuseIntensity int32
-	DiffuseColour    int32
-	SpecularColour   int32
+	DiffuseColor     int32
+	SpecularColor    int32
 	Atten            struct {
 		Constant int32
 		Linear   int32
 		Exp      int32
 	}
+}
+
+type MaterialUniform struct {
+	AmbientColor  int32 // 环境
+	DiffuseColor  int32 // 漫反射
+	SpecularColor int32 // 镜面反射
+	Shininess     int32 // 镜面反射光泽
 }
 
 type LightingTechnique struct {
@@ -33,6 +41,8 @@ type LightingTechnique struct {
 	wvpUniform        int32
 
 	lightUniform [8]LightUniform
+
+	materialUniform MaterialUniform
 }
 
 func (t *LightingTechnique) Init(shader *shader.Shader) {
@@ -58,11 +68,11 @@ func (t *LightingTechnique) Init(shader *shader.Shader) {
 		name = fmt.Sprintf("gLight[%d].DiffuseIntensity", i)
 		t.lightUniform[i].DiffuseIntensity = t.GetUniformLocation(name)
 
-		name = fmt.Sprintf("gLight[%d].DiffuseColour", i)
-		t.lightUniform[i].DiffuseColour = t.GetUniformLocation(name)
+		name = fmt.Sprintf("gLight[%d].DiffuseColor", i)
+		t.lightUniform[i].DiffuseColor = t.GetUniformLocation(name)
 
-		name = fmt.Sprintf("gLight[%d].SpecularColour", i)
-		t.lightUniform[i].SpecularColour = t.GetUniformLocation(name)
+		name = fmt.Sprintf("gLight[%d].SpecularColor", i)
+		t.lightUniform[i].SpecularColor = t.GetUniformLocation(name)
 
 		name = fmt.Sprintf("gLight[%d].Atten.Constant", i)
 		t.lightUniform[i].Atten.Constant = t.GetUniformLocation(name)
@@ -73,6 +83,15 @@ func (t *LightingTechnique) Init(shader *shader.Shader) {
 		name = fmt.Sprintf("gLight[%d].Atten.Exp", i)
 		t.lightUniform[i].Atten.Exp = t.GetUniformLocation(name)
 	}
+
+	name = "gMaterial.DiffuseColor"
+	t.materialUniform.AmbientColor = t.GetUniformLocation(name)
+	name = "gMaterial.DiffuseColor"
+	t.materialUniform.DiffuseColor = t.GetUniformLocation(name)
+	name = "gMaterial.SpecularColor"
+	t.materialUniform.SpecularColor = t.GetUniformLocation(name)
+	name = "gMaterial.Shininess"
+	t.materialUniform.Shininess = t.GetUniformLocation(name)
 }
 
 func (t *LightingTechnique) SetPointLight(light *light.PointLight) {
@@ -85,4 +104,11 @@ func (t *LightingTechnique) SetPointLight(light *light.PointLight) {
 		gl.Uniform1f(t.lightUniform[i].Atten.Linear, light.Atten.Linear)
 		gl.Uniform1f(t.lightUniform[i].Atten.Exp, light.Atten.Exp)
 	}
+}
+
+func (t *LightingTechnique) SetMaterial(m *material.Material) {
+	gl.Uniform3f(t.materialUniform.AmbientColor, m.AmbientColor.X(), m.AmbientColor.Y(), m.AmbientColor.Z())
+	gl.Uniform3f(t.materialUniform.DiffuseColor, m.DiffuseColor.X(), m.DiffuseColor.Y(), m.DiffuseColor.Z())
+	gl.Uniform3f(t.materialUniform.SpecularColor, m.SpecularColor.X(), m.SpecularColor.Y(), m.SpecularColor.Z())
+	gl.Uniform1f(t.materialUniform.Shininess, m.Shininess)
 }

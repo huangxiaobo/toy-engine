@@ -8,6 +8,7 @@ import (
 	"toy/engine/config"
 	"toy/engine/loader"
 	"toy/engine/logger"
+	"toy/engine/material"
 	"toy/engine/shader"
 	"toy/engine/technique"
 )
@@ -24,6 +25,7 @@ type WavefrontObject struct {
 
 	meshData *engine.MeshData
 	shader   *shader.Shader
+	material *material.Material
 	effect   *technique.LightingTechnique
 
 	vao          uint32
@@ -61,6 +63,13 @@ func (wfo *WavefrontObject) Init(w *engine.World) {
 	// Effect
 	wfo.effect = &technique.LightingTechnique{}
 	wfo.effect.Init(wfo.shader)
+
+	// Material
+	wfo.material = &material.Material{}
+	wfo.material.AmbientColor = mgl32.Vec3{0.0, 0.0, 0.0}
+	wfo.material.DiffuseColor = mgl32.Vec3{0.1, 0.2, 0.3}
+	wfo.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
+	wfo.material.Shininess = 100
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
@@ -135,6 +144,7 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 	wfo.effect.SetEyeWorldPos(&w.Camera.Position)
 
 	wfo.effect.SetPointLight(w.Light)
+	wfo.effect.SetMaterial(wfo.material)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 	// 开启顶点数组
