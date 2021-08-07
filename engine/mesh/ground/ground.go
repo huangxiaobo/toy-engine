@@ -21,8 +21,8 @@ func (g *Ground) Update(elapsed float64) {
 }
 
 func (g *Ground) Render(w *engine.World) {
-	// gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
-	gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
+	gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+	// gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 	g.WavefrontObject.Render(w)
 	gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 }

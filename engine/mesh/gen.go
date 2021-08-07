@@ -60,3 +60,45 @@ func GenGroundMeshData() *engine.MeshData {
 
 	return meshData
 }
+
+func GenCubeMeshData(size float32) *engine.MeshData {
+	meshData := &engine.MeshData{}
+
+	vertices := []float32{
+		-1.0, +1.0, +1.0, // v0
+		-1.0, +1.0, -1.0, // v1
+		+1.0, +1.0, -1.0, // v2
+		+1.0, +1.0, +1.0, // v3
+
+		-1.0, -1.0, +1.0, // v0'
+		-1.0, -1.0, -1.0, // v1'
+		+1.0, -1.0, -1.0, // v2'
+		+1.0, -1.0, +1.0, // v3'
+	}
+
+	for i := 0; i <= 8*3; i += 3 {
+		x := vertices[i+0]
+		y := vertices[i+1]
+		z := vertices[i+2]
+
+		meshData.Vertices = append(meshData.Vertices, x)
+		meshData.Vertices = append(meshData.Vertices, y)
+		meshData.Vertices = append(meshData.Vertices, z)
+
+		meshData.Uvs = append(meshData.Uvs, 0.0)
+		meshData.Uvs = append(meshData.Uvs, 0.0)
+
+		meshData.Normals = append(meshData.Normals, 0.0)
+		meshData.Normals = append(meshData.Normals, 1.0)
+		meshData.Normals = append(meshData.Normals, 0.0)
+	}
+
+	meshData.VertexIndices = append(meshData.VertexIndices, uint16(0))
+	meshData.VertexIndices = append(meshData.VertexIndices, uint16(1))
+	meshData.VertexIndices = append(meshData.VertexIndices, uint16(2))
+	meshData.VertexIndices = append(meshData.VertexIndices, uint16(2))
+	meshData.VertexIndices = append(meshData.VertexIndices, uint16(1))
+	meshData.VertexIndices = append(meshData.VertexIndices, uint16(3))
+
+	return meshData
+}

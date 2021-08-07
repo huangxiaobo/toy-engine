@@ -2,7 +2,25 @@
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-uniform vec4 gLightPos;
+struct Attenuation
+{
+    float Constant;
+    float Linear;
+    float Exp;
+};
+
+struct Light {
+    vec3    Color;
+    vec3    Position;
+
+    float   AmbientIntensity;
+    float   DiffuseIntensity;
+    vec3    DiffuseColour;
+    vec3    SpecularColour;
+    Attenuation Atten;
+};
+
+uniform Light gLight[1];
 
 in vec3 position;
 in vec3 normal;
@@ -21,7 +39,7 @@ void main() {
     // 将法线向量转化到直接坐标系
     vec3 N = normalize(normalmatrix * normal);
     // 计算光源到顶点的距离
-    vec3 L = gLightPos.xyz - P.xyz;
+    vec3 L = gLight[0].Position.xyz - P.xyz;
 
     // 计算散射
     vec3 diffuse = max(dot(N, L), 0.0) * vec3(0.06, 0.04, 0.11);

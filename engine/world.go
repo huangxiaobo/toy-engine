@@ -17,7 +17,7 @@ import (
 
 type World struct {
 	window     *glfw.Window
-	Light      *light.Light
+	Light      *light.PointLight
 	renderObjs []Mesh
 	Camera     *camera.Camera
 	Text       *text.Text
@@ -101,7 +101,7 @@ func (w *World) Init() error {
 	w.Camera.Init(mgl32.Vec3{10.0, 10.0, 10.0}, mgl32.Vec3{-10.0, -10.0, -10.0})
 
 	// 初始化灯光
-	w.Light = &light.Light{Position: mgl32.Vec4{0, 5.0, 0, 0.0}, Color: mgl32.Vec3{0.8, 0.8, 0.8}}
+	w.Light = &light.PointLight{Position: mgl32.Vec4{0, 5.0, 0, 0.0}, Color: mgl32.Vec3{0.8, 0.8, 0.8}}
 	w.Light.Init()
 
 	// Text
@@ -126,7 +126,6 @@ func (w *World) Run() {
 
 		w.DrawAxis()
 		w.DrawLight()
-
 		// Update
 		time := glfw.GetTime()
 		elapsed := time - previousTime

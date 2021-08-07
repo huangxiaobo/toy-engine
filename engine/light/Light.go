@@ -8,14 +8,21 @@ import (
 	"toy/engine/shader"
 )
 
-type Light struct {
-	Position  mgl32.Vec4
-	Direction mgl32.Vec3
-	Color     mgl32.Vec3
+type Attenuation struct {
+	Constant float32
+	Linear   float32
+	Exp      float32
+}
 
-	DiffuseColour  mgl32.Vec3
-	SpecularColour mgl32.Vec3
-	Attenuation    mgl32.Vec3
+type PointLight struct {
+	Color    mgl32.Vec3
+	Position mgl32.Vec4
+
+	AmbientIntensity float32
+	DiffuseIntensity float32
+	DiffuseColour    mgl32.Vec3
+	SpecularColour   mgl32.Vec3
+	Atten            Attenuation
 
 	shader            *shader.Shader
 	projectionUniform int32
@@ -32,7 +39,7 @@ var vertices = []float32{
 	0.0, 0.0, 0.0,
 }
 
-func (light *Light) Init() {
+func (light *PointLight) Init() {
 	light.shader = &shader.Shader{VertFilePath: "./resource/shader/light.vert", FragFilePath: "./resource/shader/light.frag"}
 	if err := light.shader.Init(); err != nil {
 		logger.Error(err)
@@ -71,18 +78,18 @@ func (light *Light) Init() {
 	// light.SetAttenuation(100, 1.0, 0.045, 0.0075);
 }
 
-func (light *Light) SetDiffuseColour(r, g, b float32) {
+func (light *PointLight) SetDiffuseColour(r, g, b float32) {
 	light.DiffuseColour = mgl32.Vec3{r, g, b}
 }
 
-func (light *Light) SetSpecularColour(r, g, b float32) {
+func (light *PointLight) SetSpecularColour(r, g, b float32) {
 	light.SpecularColour = mgl32.Vec3{r, g, b}
 }
 
-func (light *Light) Update(elapsed float64) {
+func (light *PointLight) Update(elapsed float64) {
 }
 
-func (light *Light) Render(projection mgl32.Mat4, view mgl32.Mat4, model mgl32.Mat4) {
+func (light *PointLight) Render(projection mgl32.Mat4, view mgl32.Mat4, model mgl32.Mat4) {
 
 	program := light.shader.Program
 	// Shader

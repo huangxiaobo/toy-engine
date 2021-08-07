@@ -9,6 +9,7 @@ import (
 	"toy/engine/loader"
 	"toy/engine/logger"
 	"toy/engine/shader"
+	"toy/engine/technique"
 )
 
 type WavefrontObject struct {
@@ -21,12 +22,9 @@ type WavefrontObject struct {
 	Scale    [3]float32
 	model    mgl32.Mat4
 
-	meshData          *engine.MeshData
-	shader            *shader.Shader
-	projectionUniform int32
-	viewUniform       int32
-	modelUniform      int32
-	wvpUniform               int32
+	meshData *engine.MeshData
+	shader   *shader.Shader
+	effect   *technique.LightingTechnique
 
 	vao          uint32
 	vbo          uint32
@@ -60,11 +58,9 @@ func (wfo *WavefrontObject) Init(w *engine.World) {
 
 	program := wfo.shader.Use()
 
-	// Shader
-	wfo.projectionUniform = gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	wfo.viewUniform = gl.GetUniformLocation(program, gl.Str("view\x00"))
-	wfo.modelUniform = gl.GetUniformLocation(program, gl.Str("model\x00"))
-	wfo.wvpUniform = gl.GetUniformLocation(program, gl.Str("gWVP\x00"))
+	// Effect
+	wfo.effect = &technique.LightingTechnique{}
+	wfo.effect.Init(wfo.shader)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
@@ -131,26 +127,24 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 
 	program := wfo.shader.Program
 	// Shader
-	gl.UseProgram(program)
+	wfo.effect.Enable()
+	wfo.effect.SetProjectMatrix(&projection)
+	wfo.effect.SetViewMatrix(&view)
+	wfo.effect.SetModelMatrix(&wfo.model)
+	wfo.effect.SetWVP(&mvp)
+	wfo.effect.SetEyeWorldPos(&w.Camera.Position)
 
-	gl.UniformMatrix4fv(wfo.projectionUniform, 1, false, &projection[0])
-	gl.UniformMatrix4fv(wfo.viewUniform, 1, false, &view[0])
-	gl.UniformMatrix4fv(wfo.modelUniform, 1, false, &wfo.model[0])
-	gl.UniformMatrix4fv(wfo.wvpUniform, 1, false, &mvp[0])
+	wfo.effect.SetPointLight(w.Light)
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
-	lightPosAttrib := gl.GetUniformLocation(program, gl.Str("gLightPos\x00"))
-	gl.Uniform4fv(lightPosAttrib, 1, &w.Light.Position[0])
-	lightColorAttrib := gl.GetUniformLocation(program, gl.Str("gLightColor\x00"))
-	gl.Uniform3fv(lightColorAttrib, 1, &w.Light.Color[0])
-	viewPosAttrib := gl.GetUniformLocation(program, gl.Str("gViewPos\x00"))
-	gl.Uniform3fv(viewPosAttrib, 1, &w.Camera.Position[0])
-
 	// 开启顶点数组
 	gl.BindVertexArray(wfo.vao)
 
+	// 绑定数组缓冲器
 	gl.BindBuffer(gl.ARRAY_BUFFER, wfo.vbo)
+	// 启动顶点属性编辑
 	gl.EnableVertexAttribArray(wfo.vertAttrib)
+	// 设置顶点属性
 	gl.VertexAttribPointer(
 		wfo.vertAttrib, // attribute index
 		3,              // number of elements per vertex, here (x,y,z)
@@ -170,8 +164,9 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 		0,                // no extra data between each position
 		nil,              // offset of first element
 	)
-
+	// 绑定数组缓冲器
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, wfo.ebo)
+	// 根据指定索引绘制
 	gl.DrawElements(
 		wfo.DrawMode,                           // mode
 		int32(len(wfo.meshData.VertexIndices)), // count
@@ -179,14 +174,8 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 		nil,                                    // element array buffer offset
 	)
 
-	// gl.PointSize(10)
-	// gl.DrawElements(
-	// 	gl.POINTS,                              // mode
-	// 	int32(len(wfo.meshData.VertexIndices)), // count
-	// 	gl.UNSIGNED_SHORT,                      // type
-	// 	nil,                                    // element array buffer offset
-	// )
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.EnableVertexAttribArray(0)
+	gl.DisableVertexAttribArray(wfo.vertAttrib)
+	gl.DisableVertexAttribArray(wfo.normalAttrib)
 	gl.BindVertexArray(0)
 }
