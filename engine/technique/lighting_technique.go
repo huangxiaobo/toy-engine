@@ -84,7 +84,7 @@ func (t *LightingTechnique) Init(shader *shader.Shader) {
 		t.lightUniform[i].Atten.Exp = t.GetUniformLocation(name)
 	}
 
-	name = "gMaterial.DiffuseColor"
+	name = "gMaterial.AmbientColor"
 	t.materialUniform.AmbientColor = t.GetUniformLocation(name)
 	name = "gMaterial.DiffuseColor"
 	t.materialUniform.DiffuseColor = t.GetUniformLocation(name)

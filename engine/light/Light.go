@@ -75,6 +75,8 @@ func (light *PointLight) Init() {
 
 	light.SetDiffuseColor(1.0, .5, 0.0)   // color the light orange
 	light.SetSpecularColor(1.0, 1.0, 0.0) // yellow highlights
+	light.DiffuseIntensity = 0.25
+	light.AmbientIntensity = 0.25
 	// light.SetAttenuation(100, 1.0, 0.045, 0.0075);
 }
 

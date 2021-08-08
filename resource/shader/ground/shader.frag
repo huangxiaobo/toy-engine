@@ -42,35 +42,42 @@ out vec4 color;
 
 void main() {
 
+    vec4 AmbientColor = vec4(0, 0, 0, 0);
     vec4 DiffuseColor = vec4(0, 0, 0, 0);
     vec4 SpecularColor = vec4(0, 0, 0, 0);
-    float gMatSpecularIntensity = 100;
 
 
-    vec3 Normal = normalize(Normal0);
+    vec3 N = normalize(Normal0);
 
     // 计算光源到顶点的距离
     vec3 L = gLight[0].Position.xyz - WorldPos0.xyz;
 
     // g
-    vec3 LightDirection = normalize(gLight[0].Position.xyz - WorldPos0.xyz);
+    vec3 LightDirection = WorldPos0.xyz - gLight[0].Position.xyz;
+    float LightDistance = length(LightDirection);
+    LightDirection = normalize(LightDirection);
 
-    // 计算散射 漫反射
-    vec3 diffuse = max(dot(Normal, L), 0.0) * gLight[0].DiffuseColor * gMaterial.DiffuseColor;
 
-    float DiffuseFactor = dot(Normal, LightDirection);
+    // Ambient
+    AmbientColor.xyz = gMaterial.AmbientColor;
+
+    float DiffuseFactor = dot(N, -LightDirection);
+
     if (DiffuseFactor > 0) {
-        vec3 VertexToEye =normalize(gViewPos.xyz - WorldPos0.xyz);
-        vec3 LightReflect = normalize(reflect(LightDirection, Normal));
+        // 漫反射光照
+        DiffuseColor = vec4(gLight[0].Color, 1.0f) * gLight[0].DiffuseIntensity * DiffuseFactor;
+
+        // 计算眼睛观察方向
+        vec3 VertexToEye = normalize(gViewPos - WorldPos0);
+        // 计算反射光方向
+        vec3 LightReflect = normalize(reflect(LightDirection, N));
+        // 计算反射光与观测方向的夹角
         float SpecularFactor = dot(VertexToEye, LightReflect);
+        // 计算镜面反射强度
         if (SpecularFactor > 0) {
             SpecularFactor = pow(SpecularFactor, gMaterial.Shininess);
-            SpecularColor = vec4(gMaterial.SpecularColor * gMaterial.Shininess * SpecularFactor, 1.0f);
-        } else {
-            SpecularColor = vec4(1.0, 0.0, 0.0, 1.0);
+            SpecularColor = vec4(gLight[0].Color * gMaterial.Shininess * SpecularFactor, 1.0f);
         }
-    } else {
-        SpecularColor = vec4(0.0, 0.0, 1.0, 1.0);
     }
-    color = vec4(diffuse + gMaterial.SpecularColor, 1.0);
+    color = vec4(AmbientColor.xyz + DiffuseColor.xyz + SpecularColor.xyz, 1.0);
 }

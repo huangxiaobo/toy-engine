@@ -22,7 +22,6 @@ void main() {
 
     // 模型矩阵
     mat4 mv_matrix = view * model;
-//    mat3 normalmatrix = mat3(transpose(inverse(mv_matrix)));
     mat3 normalmatrix = mat3(transpose(inverse(model)));
 
     // 计算顶点在世界坐标系的位置
