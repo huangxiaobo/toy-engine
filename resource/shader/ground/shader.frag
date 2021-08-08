@@ -47,19 +47,20 @@ void main() {
     vec4 SpecularColor = vec4(0, 0, 0, 0);
 
 
+    vec3 P = WorldPos0.xyz;
     vec3 N = normalize(Normal0);
 
     // 计算光源到顶点的距离
     vec3 L = gLight[0].Position.xyz - WorldPos0.xyz;
 
-    // g
+    //
     vec3 LightDirection = WorldPos0.xyz - gLight[0].Position.xyz;
     float LightDistance = length(LightDirection);
     LightDirection = normalize(LightDirection);
 
 
     // Ambient
-    AmbientColor.xyz = gMaterial.AmbientColor;
+    AmbientColor.xyz = gLight[0].Color * gMaterial.AmbientColor;
 
     float DiffuseFactor = dot(N, -LightDirection);
 

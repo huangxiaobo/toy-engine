@@ -44,8 +44,8 @@ func main() {
 	world.AddRenderObj(&mesh.WavefrontObject{
 		Name:         "cube",
 		ObjFilePath:  "./resource/model/cube.obj",
-		VertFilePath: "./resource/shader/v0/shader.vert",
-		FragFilePath: "./resource/shader/v0/shader.frag",
+		VertFilePath: "./resource/shader/v2/shader.vert",
+		FragFilePath: "./resource/shader/v2/shader.frag",
 		Position: mgl32.Vec3{5, 0, -5},
 		Scale: mgl32.Vec3{2, 2, 2},
 	})
@@ -53,8 +53,8 @@ func main() {
 	world.AddRenderObj(&mesh.WavefrontObject{
 		Name:         "icosphere",
 		ObjFilePath:  "./resource/model/icosphere.obj",
-		VertFilePath: "./resource/shader/v0/shader.vert",
-		FragFilePath: "./resource/shader/v0/shader.frag",
+		VertFilePath: "./resource/shader/v2/shader.vert",
+		FragFilePath: "./resource/shader/v2/shader.frag",
 		Position: mgl32.Vec3{-5, 0, 5},
 		Scale: mgl32.Vec3{4, 4, 4},
 	})

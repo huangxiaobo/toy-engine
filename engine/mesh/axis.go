@@ -3,10 +3,13 @@ package mesh
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
+
 	"toy/engine"
 	"toy/engine/config"
 	"toy/engine/logger"
+	"toy/engine/material"
 	"toy/engine/shader"
+	"toy/engine/technique"
 )
 
 var axisVertices = []float32{
@@ -28,7 +31,10 @@ type Axis struct {
 
 	model mgl32.Mat4
 
-	shader            *shader.Shader
+	shader   *shader.Shader
+	material *material.Material
+	effect   *technique.LightingTechnique
+
 	projectionUniform int32
 	viewUniform       int32
 	modelUniform      int32
@@ -47,12 +53,16 @@ func (axis *Axis) Init(w *engine.World) {
 
 	program := axis.shader.Use()
 
-	// Shader
-	axis.projectionUniform = gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	axis.viewUniform = gl.GetUniformLocation(program, gl.Str("view\x00"))
-	axis.modelUniform = gl.GetUniformLocation(program, gl.Str("model\x00"))
+	// Effect
+	axis.effect = &technique.LightingTechnique{}
+	axis.effect.Init(axis.shader)
 
-	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
+	// Material
+	axis.material = &material.Material{}
+	axis.material.AmbientColor = mgl32.Vec3{0.05, 0.1, 0.05}
+	axis.material.DiffuseColor = mgl32.Vec3{0.1, 0.2, 0.3}
+	axis.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
+	axis.material.Shininess = 2
 
 	// Configure the vertex data
 	gl.GenVertexArrays(1, &axis.vao)
@@ -64,7 +74,7 @@ func (axis *Axis) Init(w *engine.World) {
 	gl.BufferData(gl.ARRAY_BUFFER, len(axisVertices)*4, gl.Ptr(&axisVertices[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	//// Get an index for the attribute from the shader
+	// Get an index for the attribute from the shader
 	axis.vertAttrib = uint32(gl.GetAttribLocation(program, gl.Str("position\x00")))
 
 	// Unbind the buffer
@@ -90,15 +100,16 @@ func (axis *Axis) Render(w *engine.World) {
 	)
 	view := w.Camera.GetViewMatrix()
 
-	program := axis.shader.Program
 	// Shader
-	gl.UseProgram(program)
+	axis.effect.Enable()
+	axis.effect.SetProjectMatrix(&projection)
+	axis.effect.SetViewMatrix(&view)
+	axis.effect.SetModelMatrix(&axis.model)
+	// axis.effect.SetWVP(&mvp)
+	axis.effect.SetEyeWorldPos(&w.Camera.Position)
 
-	gl.UniformMatrix4fv(axis.projectionUniform, 1, false, &projection[0])
-	gl.UniformMatrix4fv(axis.viewUniform, 1, false, &view[0])
-	gl.UniformMatrix4fv(axis.modelUniform, 1, false, &axis.model[0])
-
-	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
+	axis.effect.SetPointLight(w.Light)
+	axis.effect.SetMaterial(axis.material)
 
 	// 开启顶点数组
 	gl.BindVertexArray(axis.vao)
@@ -119,7 +130,7 @@ func (axis *Axis) Render(w *engine.World) {
 	gl.DrawArrays(gl.LINES, 0, 6)
 
 	gl.UseProgram(0)
-	//gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	//gl.EnableVertexAttribArray(0)
-	//gl.BindVertexArray(0)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.DisableVertexAttribArray(0)
+	gl.BindVertexArray(0)
 }

@@ -66,12 +66,12 @@ func (wfo *WavefrontObject) Init(w *engine.World) {
 
 	// Material
 	wfo.material = &material.Material{}
-	wfo.material.AmbientColor = mgl32.Vec3{0.07, 0.1, 0.02}
+	wfo.material.AmbientColor = mgl32.Vec3{0.05, 0.1, 0.05}
 	wfo.material.DiffuseColor = mgl32.Vec3{0.1, 0.2, 0.3}
 	wfo.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
-	wfo.material.Shininess = 10
+	wfo.material.Shininess = 2
 
-	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
+	// gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
 	// Configure the vertex data
 	gl.GenVertexArrays(1, &wfo.vao)
