@@ -1,12 +1,8 @@
 package camera
 
 import (
-	"math"
-
 	"github.com/go-gl/mathgl/mgl32"
 )
-
-var CameraMovement int32
 
 const (
 	FORWARD  int = 0
@@ -18,8 +14,8 @@ const (
 // Default camera values
 const (
 	YAW         float32 = -90.0
-	PITCH       float32 = 0.0
-	SPEED               = 2.5
+	PITCH       float32 = -45.0
+	SPEED               = 0.025
 	SENSITIVITY         = 0.1
 	ZOOM                = 45.0
 )
@@ -27,14 +23,12 @@ const (
 type Camera struct {
 	// camera attributes
 	Position mgl32.Vec3
-	Front    mgl32.Vec3
-	Right    mgl32.Vec3
-	Up       mgl32.Vec3
-	WorldUp  mgl32.Vec3
+	Target   mgl32.Vec3
 
-	// euler angles
-	Yaw   float32
-	Pitch float32
+	Front   mgl32.Vec3
+	Right   mgl32.Vec3
+	Up      mgl32.Vec3
+	WorldUp mgl32.Vec3
 
 	// camera options
 	MovementSpeed    float32
@@ -42,52 +36,36 @@ type Camera struct {
 	Zoom             float32
 }
 
-func (c *Camera) Init(position mgl32.Vec3, front mgl32.Vec3) {
+func (c *Camera) Init(position mgl32.Vec3, target mgl32.Vec3) {
 	c.Position = position
-	c.Front = front
+	c.Target = target
+
+	c.Front = c.Target.Sub(c.Position).Normalize()
 	c.Up = mgl32.Vec3{0.0, 1.0, 0.0}
 	c.WorldUp = mgl32.Vec3{0.0, 1.0, 0.0}
-	c.Yaw = YAW
-	c.Pitch = PITCH
-	c.Zoom = ZOOM
+	c.MovementSpeed = SPEED
 
+	c.Zoom = ZOOM
 }
 
 func (c *Camera) GetViewMatrix() mgl32.Mat4 {
-	return mgl32.LookAtV(c.Position, c.Position.Add(c.Front), c.Up)
+	return mgl32.LookAtV(c.Position, c.Target, c.Up)
 }
 
-func (c *Camera) ProcessKeyboard(direction int, deltaTime float32) {
-	velocity := c.MovementSpeed * deltaTime
+func (c *Camera) ProcessKeyboard(direction int, deltaTime float64) {
+	c.Front = c.Target.Sub(c.Position).Normalize()
+
+	velocity := c.MovementSpeed * float32(deltaTime)
 	switch direction {
 	case FORWARD:
-		c.Position = c.Position.Add(c.Front.Mul(velocity))
+		c.Position = mgl32.HomogRotate3DX(-velocity).Mul4x1(c.Position.Vec4(0)).Vec3()
 	case BACKWARD:
-		c.Position = c.Position.Sub(c.Front.Mul(velocity))
+		c.Position = mgl32.HomogRotate3DX(+velocity).Mul4x1(c.Position.Vec4(0)).Vec3()
 	case LEFT:
-		c.Position = c.Position.Sub(c.Right.Mul(velocity))
+		c.Position = mgl32.HomogRotate3DY(-0.1).Mul4x1(c.Position.Vec4(0)).Vec3()
 	case RIGHT:
-		c.Position = c.Position.Add(c.Right.Mul(velocity))
+		c.Position = mgl32.HomogRotate3DY(+0.1).Mul4x1(c.Position.Vec4(0)).Vec3()
 	}
-}
-
-func (c *Camera) ProcessMouseMovement(xOffset float32, yOffset float32, constrainPitch bool) {
-	xOffset = xOffset * c.MouseSensitivity
-	yOffset = yOffset * c.MouseSensitivity
-
-	c.Yaw += xOffset
-	c.Pitch += yOffset
-
-	if constrainPitch {
-		if c.Pitch > 89.0 {
-			c.Pitch = 89.0
-		}
-		if c.Pitch < -89.0 {
-			c.Pitch = -89.0
-		}
-	}
-
-	c.updateCameraVectors()
 }
 
 func (c *Camera) ProcessMouseScroll(yOffset float32) {
@@ -98,16 +76,4 @@ func (c *Camera) ProcessMouseScroll(yOffset float32) {
 	if c.Zoom > 45.0 {
 		c.Zoom = 45.0
 	}
-}
-
-func (c *Camera) updateCameraVectors() {
-	var front mgl32.Vec3
-	front[0] = float32(math.Cos(float64(mgl32.DegToRad(c.Yaw))) * math.Cos(float64(mgl32.DegToRad(c.Pitch))))
-	front[1] = float32(math.Sin(float64(mgl32.DegToRad(c.Pitch))))
-	front[2] = float32(math.Sin(float64(mgl32.DegToRad(c.Yaw))) * math.Cos(float64(mgl32.DegToRad(c.Pitch))))
-
-	c.Front = front.Normalize()
-	c.Right = c.Front.Cross(c.WorldUp).Normalize()
-	c.Up = c.Right.Cross(c.Front).Normalize()
-
 }

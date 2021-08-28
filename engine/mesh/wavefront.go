@@ -132,14 +132,15 @@ func (wfo *WavefrontObject) Render(w *engine.World) {
 		100.0,
 	)
 	view := w.Camera.GetViewMatrix()
-	mvp := projection.Mul4(view).Mul4(mgl32.Ident4())
+	model := wfo.model
+	mvp := projection.Mul4(view).Mul4(model)
 
 	program := wfo.shader.Program
 	// Shader
 	wfo.effect.Enable()
 	wfo.effect.SetProjectMatrix(&projection)
 	wfo.effect.SetViewMatrix(&view)
-	wfo.effect.SetModelMatrix(&wfo.model)
+	wfo.effect.SetModelMatrix(&model)
 	wfo.effect.SetWVP(&mvp)
 	wfo.effect.SetEyeWorldPos(&w.Camera.Position)
 

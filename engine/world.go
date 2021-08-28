@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"fmt"
 	_ "image/png"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -46,13 +45,33 @@ func (w *World) initGLFW() {
 	}
 	w.window.MakeContextCurrent()
 
+	previousTime = glfw.GetTime()
 	w.window.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-		fmt.Println(key)
+		if action != glfw.Press {
+			return
+		}
+
 		switch key {
 		case glfw.KeyEscape:
 			w.bRun = false
-
+		case glfw.KeyLeft:
+			if w.Camera != nil {
+				w.Camera.ProcessKeyboard(camera.LEFT, glfw.GetTime()-previousTime)
+			}
+		case glfw.KeyRight:
+			if w.Camera != nil {
+				w.Camera.ProcessKeyboard(camera.RIGHT, glfw.GetTime()-previousTime)
+			}
+		case glfw.KeyUp:
+			if w.Camera != nil {
+				w.Camera.ProcessKeyboard(camera.FORWARD, glfw.GetTime()-previousTime)
+			}
+		case glfw.KeyDown:
+			if w.Camera != nil {
+				w.Camera.ProcessKeyboard(camera.BACKWARD, glfw.GetTime()-previousTime)
+			}
 		}
+		previousTime = glfw.GetTime()
 	})
 
 }
@@ -98,10 +117,10 @@ func (w *World) Init() error {
 
 	// 初始化摄像机
 	w.Camera = new(camera.Camera)
-	w.Camera.Init(mgl32.Vec3{10.0, 10.0, 10.0}, mgl32.Vec3{-10.0, -10.0, -10.0})
+	w.Camera.Init(mgl32.Vec3{0.0, 10.0, 10.0}, mgl32.Vec3{-0.0, -0.0, -0.0})
 
 	// 初始化灯光
-	w.Light = &light.PointLight{Position: mgl32.Vec4{0, 5.0, 0, 0.0}, Color: mgl32.Vec3{1.0, 1.0, 1.0}}
+	w.Light = &light.PointLight{Position: mgl32.Vec4{0, 10.0, 0, 0.0}, Color: mgl32.Vec3{1.0, 1.0, 1.0}}
 	w.Light.Init()
 
 	// Text
