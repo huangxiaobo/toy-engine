@@ -16,15 +16,15 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
-	"toy/engine/config"
-	"toy/engine/logger"
+	"github/huangxiaobo/ToyEngine/engine/config"
+	"github/huangxiaobo/ToyEngine/engine/logger"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/golang/freetype/truetype"
 
-	"toy/engine/shader"
-	"toy/engine/texture"
+	"github/huangxiaobo/ToyEngine/engine/shader"
+	"github/huangxiaobo/ToyEngine/engine/texture"
 )
 
 type VboData struct {

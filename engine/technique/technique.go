@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 
-	"toy/engine/shader"
+	"github/huangxiaobo/ToyEngine/engine/shader"
 )
 
 type Technique struct {

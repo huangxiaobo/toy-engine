@@ -4,8 +4,8 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 
-	"toy/engine/logger"
-	"toy/engine/shader"
+	"github/huangxiaobo/ToyEngine/engine/logger"
+	"github/huangxiaobo/ToyEngine/engine/shader"
 )
 
 type Attenuation struct {

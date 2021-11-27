@@ -5,9 +5,9 @@ import (
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 
-	"toy/engine/light"
-	"toy/engine/material"
-	"toy/engine/shader"
+	"github/huangxiaobo/ToyEngine/engine/light"
+	"github/huangxiaobo/ToyEngine/engine/material"
+	"github/huangxiaobo/ToyEngine/engine/shader"
 )
 
 type LightUniform struct {

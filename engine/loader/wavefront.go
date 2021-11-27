@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 
-	"toy/engine"
-	"toy/engine/logger"
+	"github/huangxiaobo/ToyEngine/engine"
+	"github/huangxiaobo/ToyEngine/engine/logger"
 )
 
 type Face struct {
@@ -72,10 +72,8 @@ func LoadWavefrontObj(objFile string, obj *engine.MeshData) error {
 		}
 	}
 
-
 	var vmap = make(map[string]int32)
 	var vcnt = 0
-
 
 	for _, face := range interObj.Faces {
 		for _, item := range face.s {
@@ -122,11 +120,10 @@ func LoadWavefrontObj(objFile string, obj *engine.MeshData) error {
 
 	}
 
-
 	return nil
 }
 
-func atoi(s string) int32  {
+func atoi(s string) int32 {
 	if len(s) > 0 {
 		i, _ := strconv.Atoi(s)
 		return int32(i)
@@ -135,7 +132,7 @@ func atoi(s string) int32  {
 }
 
 func getVertexTextureNormalIndex(face string) (v, t, n int32) {
-	v, t, n  = -1, -1, -1
+	v, t, n = -1, -1, -1
 	vals := strings.Split(face, "/")
 	if len(vals) > 0 {
 		v = atoi(vals[0])
