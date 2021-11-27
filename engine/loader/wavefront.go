@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-gl/mathgl/mgl32"
 
-	"github/huangxiaobo/ToyEngine/engine"
-	"github/huangxiaobo/ToyEngine/engine/logger"
+	"github/huangxiaobo/toy-engine/engine"
+	"github/huangxiaobo/toy-engine/engine/logger"
 )
 
 type Face struct {

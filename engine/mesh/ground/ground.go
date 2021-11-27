@@ -4,8 +4,8 @@ import (
 	// "github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/gl/v4.1-core/gl"
 
-	"github/huangxiaobo/ToyEngine/engine"
-	"github/huangxiaobo/ToyEngine/engine/mesh"
+	"github/huangxiaobo/toy-engine/engine"
+	"github/huangxiaobo/toy-engine/engine/mesh"
 )
 
 type Ground struct {

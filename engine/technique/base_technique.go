@@ -6,7 +6,7 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 
-	"github/huangxiaobo/ToyEngine/engine/shader"
+	"github/huangxiaobo/toy-engine/engine/shader"
 )
 
 type BaseTechnique struct {
