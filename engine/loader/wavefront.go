@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -71,21 +72,15 @@ func LoadWavefrontObj(objFile string, obj *engine.MeshData) error {
 		}
 	}
 
+
 	var vmap = make(map[string]int32)
 	var vcnt = 0
 
+
 	for _, face := range interObj.Faces {
 		for _, item := range face.s {
-			var v, t, n int32 = -1, -1, -1
-
-			switch strings.Count(item, "/") {
-			case 0:
-				fmt.Sscanf(item, "%d", &v)
-			case 1:
-				fmt.Sscanf(item, "%d/%d", &v, &t)
-			case 2:
-				fmt.Sscanf(item, "%d/%d/%d", &v, &t, &n)
-			}
+			// var v, t, n int32 = -1, -1, -1
+			v, t, n := getVertexTextureNormalIndex(item)
 			n -= 1
 			t -= 1
 			v -= 1
@@ -127,5 +122,29 @@ func LoadWavefrontObj(objFile string, obj *engine.MeshData) error {
 
 	}
 
+
 	return nil
+}
+
+func atoi(s string) int32  {
+	if len(s) > 0 {
+		i, _ := strconv.Atoi(s)
+		return int32(i)
+	}
+	return -1
+}
+
+func getVertexTextureNormalIndex(face string) (v, t, n int32) {
+	v, t, n  = -1, -1, -1
+	vals := strings.Split(face, "/")
+	if len(vals) > 0 {
+		v = atoi(vals[0])
+	}
+	if len(vals) > 1 {
+		t = atoi(vals[1])
+	}
+	if len(vals) > 2 {
+		n = atoi(vals[2])
+	}
+	return v, t, n
 }

@@ -90,11 +90,12 @@ func (wfo *WavefrontObject) Init(w *engine.World) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	// uv buff
-	gl.GenBuffers(1, &wfo.tbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, wfo.tbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(wfo.meshData.Uvs)*2, gl.Ptr(&wfo.meshData.Uvs[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
+	if len(wfo.meshData.Uvs) > 0 {
+		gl.GenBuffers(1, &wfo.tbo)
+		gl.BindBuffer(gl.ARRAY_BUFFER, wfo.tbo)
+		gl.BufferData(gl.ARRAY_BUFFER, len(wfo.meshData.Uvs)*2, gl.Ptr(&wfo.meshData.Uvs[0]), gl.STATIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	}
 	// index buff
 	gl.GenBuffers(1, &wfo.ebo)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, wfo.ebo)
