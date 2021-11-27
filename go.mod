@@ -1,4 +1,4 @@
-module github/huangxiaobo/toy-engine
+module github.com/huangxiaobo/toy-engine
 
 go 1.12
 
