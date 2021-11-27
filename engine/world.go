@@ -7,11 +7,11 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 
-	"github/huangxiaobo/toy-engine/engine/camera"
-	"github/huangxiaobo/toy-engine/engine/config"
-	"github/huangxiaobo/toy-engine/engine/light"
-	"github/huangxiaobo/toy-engine/engine/logger"
-	"github/huangxiaobo/toy-engine/engine/text"
+	"github.com/huangxiaobo/toy-engine/engine/camera"
+	"github.com/huangxiaobo/toy-engine/engine/config"
+	"github.com/huangxiaobo/toy-engine/engine/light"
+	"github.com/huangxiaobo/toy-engine/engine/logger"
+	"github.com/huangxiaobo/toy-engine/engine/text"
 )
 
 type World struct {

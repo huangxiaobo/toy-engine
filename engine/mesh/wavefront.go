@@ -4,13 +4,13 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 
-	"github/huangxiaobo/toy-engine/engine"
-	"github/huangxiaobo/toy-engine/engine/config"
-	"github/huangxiaobo/toy-engine/engine/loader"
-	"github/huangxiaobo/toy-engine/engine/logger"
-	"github/huangxiaobo/toy-engine/engine/material"
-	"github/huangxiaobo/toy-engine/engine/shader"
-	"github/huangxiaobo/toy-engine/engine/technique"
+	"github.com/huangxiaobo/toy-engine/engine"
+	"github.com/huangxiaobo/toy-engine/engine/config"
+	"github.com/huangxiaobo/toy-engine/engine/loader"
+	"github.com/huangxiaobo/toy-engine/engine/logger"
+	"github.com/huangxiaobo/toy-engine/engine/material"
+	"github.com/huangxiaobo/toy-engine/engine/shader"
+	"github.com/huangxiaobo/toy-engine/engine/technique"
 )
 
 type WavefrontObject struct {

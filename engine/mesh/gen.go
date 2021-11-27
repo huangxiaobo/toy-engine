@@ -1,7 +1,7 @@
 package mesh
 
 import (
-	"github/huangxiaobo/toy-engine/engine"
+	"github.com/huangxiaobo/toy-engine/engine"
 )
 
 /*
