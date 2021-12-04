@@ -31,17 +31,17 @@ func (t *BaseTechnique) Init(shader *shader.Shader) {
 	fmt.Printf("project: %d view: %d, view: %d wvp: %d\n", t.projectionUniform, t.viewUniform, t.modelUniform, t.wvpUniform)
 }
 
-// 设置模型-视图矩阵
+// SetWVP 设置模型-视图矩阵
 func (t *BaseTechnique) SetWVP(WVP *mgl32.Mat4) {
 	gl.UniformMatrix4fv(t.wvpUniform, 1, false, &((*WVP)[0]))
 }
 
-// 设置世界坐标系变换矩阵
+// SetWorldMatrix 设置世界坐标系变换矩阵
 func (t *BaseTechnique) SetWorldMatrix(WorldInverse *mgl32.Mat4) {
 
 }
 
-// 设置世界坐标系变换矩阵
+// SetProjectMatrix 设置世界坐标系变换矩阵
 func (t *BaseTechnique) SetProjectMatrix(ProjectMatrix *mgl32.Mat4) {
 	gl.UniformMatrix4fv(t.projectionUniform, 1, false, &((*ProjectMatrix)[0]))
 }
@@ -54,7 +54,7 @@ func (t *BaseTechnique) SetModelMatrix(ModelMatrix *mgl32.Mat4) {
 	gl.UniformMatrix4fv(t.modelUniform, 1, false, &((*ModelMatrix)[0]))
 }
 
-// 设置纹理单元
+// SetTextureUnit 设置纹理单元
 func (t *BaseTechnique) SetTextureUnit(TextureUnit uint32) {
 
 }

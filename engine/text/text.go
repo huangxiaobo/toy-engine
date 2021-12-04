@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"unicode/utf8"
 
 	"github.com/golang/freetype"
@@ -265,7 +266,7 @@ func (f *Text) Load(path string, pix float32) {
 	}
 
 	// Save that RGBA image to disk.
-	outFile, err := os.Create("./output/out.png")
+	outFile, err := os.Create(filepath.Join(os.TempDir(), "./out.png"))
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
