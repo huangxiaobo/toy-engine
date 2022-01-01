@@ -1,16 +1,15 @@
-
 package main
 
 import (
-_ "image/png"
-"log"
-"runtime"
+	_ "image/png"
+	"log"
+	"runtime"
 
-"github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl32"
 
-"github.com/huangxiaobo/toy-engine/engine"
-"github.com/huangxiaobo/toy-engine/engine/mesh"
-"github.com/huangxiaobo/toy-engine/engine/mesh/ground"
+	"github.com/huangxiaobo/toy-engine/engine"
+	"github.com/huangxiaobo/toy-engine/engine/mesh"
+	"github.com/huangxiaobo/toy-engine/engine/mesh/ground"
 )
 
 func init() {
@@ -23,7 +22,7 @@ func main() {
 	world := new(engine.World)
 	err := world.Init()
 	if err != nil {
-		log.Fatalln("failed to initialize glfw:", err)
+		log.Fatalln("failed to initialize world:", err)
 	}
 	defer world.Destroy()
 
@@ -43,22 +42,13 @@ func main() {
 	})
 
 	world.AddRenderObj(&mesh.WavefrontObject{
-		Name:         "cube",
+		Name:         "icosphere",
 		ObjFilePath:  "./resource/model/icosphere.obj",
 		VertFilePath: "./resource/shader/v2/shader.vert",
 		FragFilePath: "./resource/shader/v2/shader.frag",
-		Position: mgl32.Vec3{5, 0, -5},
-		Scale: mgl32.Vec3{50, 50, 50},
+		Position:     mgl32.Vec3{5, 0, -5},
+		Scale:        mgl32.Vec3{5, 5, 5},
 	})
-
-	// world.AddRenderObj(&mesh.WavefrontObject{
-	// 	Name:         "icosphere",
-	// 	ObjFilePath:  "./resource/model/icosphere.obj",
-	// 	VertFilePath: "./resource/shader/v2/shader.vert",
-	// 	FragFilePath: "./resource/shader/v2/shader.frag",
-	// 	Position: mgl32.Vec3{-5, 0, 5},
-	// 	Scale: mgl32.Vec3{4, 4, 4},
-	// })
 
 	world.Run()
 }

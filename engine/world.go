@@ -1,21 +1,21 @@
 package engine
 
 import (
+	"github.com/huangxiaobo/toy-engine/engine/platforms"
+	"github.com/huangxiaobo/toy-engine/engine/text"
 	_ "image/png"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
-	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/huangxiaobo/toy-engine/engine/camera"
 	"github.com/huangxiaobo/toy-engine/engine/config"
 	"github.com/huangxiaobo/toy-engine/engine/light"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
-	"github.com/huangxiaobo/toy-engine/engine/text"
 )
 
 type World struct {
-	window     *glfw.Window
+	platform   *platforms.SDL
 	Light      *light.PointLight
 	renderObjs []Mesh
 	Camera     *camera.Camera
@@ -24,55 +24,15 @@ type World struct {
 	bRun bool
 }
 
-func (w *World) initGLFW() {
+func (w *World) initSDL() {
+	var err error
 
-	var err error = nil
-	if err := glfw.Init(); err != nil {
-		logger.Fatal("failed to initialize glfw:", err)
-	}
-
-	previousTime := glfw.GetTime()
-	logger.Info(previousTime)
-
-	glfw.WindowHint(glfw.Resizable, glfw.False)
-	glfw.WindowHint(glfw.ContextVersionMajor, 4)
-	glfw.WindowHint(glfw.ContextVersionMinor, 1)
-	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
-	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
-	w.window, err = glfw.CreateWindow(config.Config.WindowWidth, config.Config.WindowHeight, "Toy引擎", nil, nil)
+	windowWidth := config.Config.WindowWidth
+	windowHeight := config.Config.WindowHeight
+	w.platform, err = platforms.NewSDL(platforms.SDLClientAPIOpenGL4, windowWidth, windowHeight)
 	if err != nil {
 		panic(err)
 	}
-	w.window.MakeContextCurrent()
-
-	previousTime = glfw.GetTime()
-	w.window.SetKeyCallback(func(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-		if action != glfw.Press {
-			return
-		}
-
-		switch key {
-		case glfw.KeyEscape:
-			w.bRun = false
-		case glfw.KeyLeft:
-			if w.Camera != nil {
-				w.Camera.ProcessKeyboard(camera.LEFT, glfw.GetTime()-previousTime)
-			}
-		case glfw.KeyRight:
-			if w.Camera != nil {
-				w.Camera.ProcessKeyboard(camera.RIGHT, glfw.GetTime()-previousTime)
-			}
-		case glfw.KeyUp:
-			if w.Camera != nil {
-				w.Camera.ProcessKeyboard(camera.FORWARD, glfw.GetTime()-previousTime)
-			}
-		case glfw.KeyDown:
-			if w.Camera != nil {
-				w.Camera.ProcessKeyboard(camera.BACKWARD, glfw.GetTime()-previousTime)
-			}
-		}
-		previousTime = glfw.GetTime()
-	})
 
 }
 
@@ -91,7 +51,6 @@ func (w *World) initGL() {
 	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 
 	gl.Enable(gl.SAMPLES)
-	glfw.WindowHint(glfw.Samples, 8)
 
 	// 只显示正面 , 不显示背面
 	// gl.Enable(gl.CULL_FACE)
@@ -112,7 +71,7 @@ func (w *World) initGL() {
 
 func (w *World) Init() error {
 
-	w.initGLFW()
+	w.initSDL()
 	w.initGL()
 
 	// 初始化摄像机
@@ -124,31 +83,28 @@ func (w *World) Init() error {
 	w.Light.Init()
 
 	// Text
-	w.Text = &text.Text{}
-	w.Text.Init()
-	w.Text.Load("./resource/font/微软雅黑.ttf", 16)
+	w.Text, _ = text.NewText("Toy引擎", 32)
 
 	w.bRun = true
 	return nil
 }
 
 func (w *World) Destroy() {
-
-	glfw.Terminate()
+	w.platform.Dispose()
 }
 
 func (w *World) Run() {
-	previousTime := glfw.GetTime()
-	for !w.window.ShouldClose() {
+
+	for !w.platform.ShouldStop() {
+		w.platform.ProcessEvents()
+
 		gl.ClearColor(0.0, 0.0, 0.0, 0.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		w.DrawAxis()
 		w.DrawLight()
 		// Update
-		time := glfw.GetTime()
-		elapsed := time - previousTime
-		previousTime = time
+		elapsed := 0.01
 
 		for _, renderObj := range w.renderObjs {
 			renderObj.Update(elapsed)
@@ -159,12 +115,8 @@ func (w *World) Run() {
 		w.Text.Render(0, 50, mgl32.Vec4{1.0, 1.0, 1.0, 1.0})
 
 		// Maintenance
-		w.window.SwapBuffers()
-		glfw.PollEvents()
+		w.platform.PostRender()
 
-		if !w.bRun {
-			break
-		}
 	}
 }
 

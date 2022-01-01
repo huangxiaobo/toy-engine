@@ -2,6 +2,7 @@ package texture
 
 import (
 	"fmt"
+	"github.com/veandco/go-sdl2/sdl"
 	_ "golang.org/x/image/bmp"
 	"image"
 	"image/draw"
@@ -100,6 +101,29 @@ func NewTextureFromRGBA(rgba *image.RGBA) *Texture {
 		gl.RGBA,
 		gl.UNSIGNED_BYTE,
 		gl.Ptr(rgba.Pix))
+
+	return tex
+}
+
+func NewTextureFromSDLSurface(surface *sdl.Surface) *Texture {
+	tex := &Texture{}
+	gl.GenTextures(1, &tex.tid)
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, tex.tid)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TexImage2D(
+		gl.TEXTURE_2D,
+		0,
+		gl.RGBA,
+		int32(surface.W),
+		int32(surface.H),
+		0,
+		gl.RGBA,
+		gl.UNSIGNED_BYTE,
+		gl.Ptr(surface.Pixels()))
 
 	return tex
 }
