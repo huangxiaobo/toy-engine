@@ -72,7 +72,6 @@ func (s *Shader) NewProgram(vertexShaderSource, fragmentShaderSource string) (ui
 }
 
 func (s *Shader) CompileShader(source string, shaderType uint32) (uint32, error) {
-	fmt.Println(source)
 	shader := gl.CreateShader(shaderType)
 
 	csource, free := gl.Strs(source)

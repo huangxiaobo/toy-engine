@@ -7,6 +7,7 @@ if exist .\output (
     md output
 )
 
+del /f /s /q .\output\*.*
 xcopy .\lib\*.* .\output\ /y
 
 go build -o output/toy-engine.exe main.go

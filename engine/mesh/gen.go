@@ -1,9 +1,5 @@
 package mesh
 
-import (
-	"github.com/huangxiaobo/toy-engine/engine"
-)
-
 /*
         v2            v3
         -------------.
@@ -17,16 +13,19 @@ import (
 	(V0， V1， V2), (V2，V1， V2)
 */
 
-func GenGroundMeshData() *engine.MeshData {
-	meshData := &engine.MeshData{}
+func GenGroundMeshData() *WavefrontMesh {
+	meshData := &WavefrontMesh{}
 
-	xn := 20
-	zn := 20
-	for zi := -zn; zi <= zn; zi++ {
-		for xi := -xn; xi <= xn; xi++ {
-			x := float32(xi)
+	x_num := 10
+	x_strip := 2
+	z_num := 10
+	z_strip := 2
+
+	for zi := -z_num; zi <= z_num; zi += 1 {
+		for xi := -x_num; xi <= x_num; xi += 1 {
+			x := float32((xi) * x_strip)
 			y := float32(0.0)
-			z := float32(zi)
+			z := float32((zi) * z_strip)
 
 			meshData.Vertices = append(meshData.Vertices, x)
 			meshData.Vertices = append(meshData.Vertices, y)
@@ -41,28 +40,31 @@ func GenGroundMeshData() *engine.MeshData {
 		}
 	}
 
-	size := 2*xn + 1
-	for zi := 0; zi < size-1; zi++ {
-		for xi := 0; xi < size-1; xi++ {
-			v0 := zi*size + xi
+	x_row_num := 2*x_num + 1
+	z_row_num := 2*z_num + 1
+
+	for zi := 0; zi < z_row_num-1; zi++ {
+		for xi := 0; xi < x_row_num-1; xi++ {
+			v0 := zi*x_row_num + xi
 			v1 := v0 + 1
-			v2 := v0 + size
+			v2 := v0 + x_row_num
 			v3 := v2 + 1
 
 			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v0))
-			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v1))
-			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v2))
 			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v2))
 			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v1))
+			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v1))
+			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v2))
 			meshData.VertexIndices = append(meshData.VertexIndices, uint16(v3))
+
 		}
 	}
 
 	return meshData
 }
 
-func GenCubeMeshData(size float32) *engine.MeshData {
-	meshData := &engine.MeshData{}
+func GenCubeMeshData(size float32) *WavefrontMesh {
+	meshData := &WavefrontMesh{}
 
 	vertices := []float32{
 		-1.0, +1.0, +1.0, // v0

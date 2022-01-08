@@ -1,193 +1,155 @@
 package mesh
 
 import (
-	"github.com/go-gl/gl/v4.1-core/gl"
+	"bufio"
+	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/go-gl/mathgl/mgl32"
 
-	"github.com/huangxiaobo/toy-engine/engine"
-	"github.com/huangxiaobo/toy-engine/engine/config"
-	"github.com/huangxiaobo/toy-engine/engine/loader"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
-	"github.com/huangxiaobo/toy-engine/engine/material"
-	"github.com/huangxiaobo/toy-engine/engine/shader"
-	"github.com/huangxiaobo/toy-engine/engine/technique"
 )
 
-type WavefrontObject struct {
-	Name         string
-	ObjFilePath  string
-	VertFilePath string
-	FragFilePath string
-
-	Position [3]float32
-	Scale    [3]float32
-	model    mgl32.Mat4
-
-	meshData *engine.MeshData
-	shader   *shader.Shader
-	material *material.Material
-	effect   *technique.LightingTechnique
-
-	vao          uint32
-	vbo          uint32
-	ebo          uint32
-	nbo          uint32
-	tbo          uint32
-	vertAttrib   uint32
-	normalAttrib uint32
-
-	// Draw
-	DrawMode uint32
+type Face struct {
+	s []string
 }
 
-func (wfo *WavefrontObject) Init(w *engine.World) {
-	wfo.meshData = &engine.MeshData{}
-	switch wfo.Name {
-	case "ground":
-		wfo.meshData = GenGroundMeshData()
-	default:
-		if err := loader.LoadWavefrontObj(wfo.ObjFilePath, wfo.meshData); err != nil {
-			logger.Error(err)
-			return
+type interObj struct {
+	Name     string
+	Vertices []mgl32.Vec3
+	Uvs      []mgl32.Vec2
+	Normals  []mgl32.Vec3
+
+	Faces []Face
+}
+
+type WavefrontMesh struct {
+	Vertices []float32
+	Uvs      []float32
+	Normals  []float32
+
+	VertexIndices []uint16
+}
+
+func LoadObj(objFile string) (*WavefrontMesh, error) {
+	file, err := os.Open(objFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	interObj := interObj{}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		tokens := strings.SplitN(line, " ", 2)
+
+		switch tokens[0] {
+		case "v":
+			var vec3 mgl32.Vec3
+			// v x y z
+			cnt, err := fmt.Sscanf(line, "v %f %f %f", &vec3[0], &vec3[1], &vec3[2])
+			if cnt != 3 || err != nil {
+				logger.Fatal("read vert failed, cnt: %s, err: %s", cnt, err)
+			}
+
+			interObj.Vertices = append(interObj.Vertices, vec3)
+		case "vt":
+			var vec2 mgl32.Vec2
+			// vt u v [w]
+			cnt, err := fmt.Sscanf(line, "vt %f %f", &vec2[0], &vec2[1])
+			if cnt != 2 || err != nil {
+				logger.Fatal("read tang failed, cnt: %s, err: %s", cnt, err)
+			}
+			interObj.Uvs = append(interObj.Uvs, vec2)
+		case "vn":
+			var vec3 mgl32.Vec3
+			// vn x y z
+			cnt, err := fmt.Sscanf(line, "vn %f %f %f", &vec3[0], &vec3[1], &vec3[2])
+			if cnt != 3 || err != nil {
+				logger.Fatal("read normal failed, cnt: %s, err: %s", cnt, err)
+			}
+			interObj.Normals = append(interObj.Normals, vec3)
+		case "f":
+			interObj.Faces = append(interObj.Faces, Face{strings.Split(tokens[1], " ")})
 		}
 	}
 
-	wfo.shader = &shader.Shader{VertFilePath: wfo.VertFilePath, FragFilePath: wfo.FragFilePath}
-	if err := wfo.shader.Init(); err != nil {
-		logger.Error(err)
-		return
+	obj := &WavefrontMesh{}
+	var vmap = make(map[string]int32)
+	var vcnt = 0
+
+	for _, face := range interObj.Faces {
+		for _, item := range face.s {
+			// var v, t, n int32 = -1, -1, -1
+			v, t, n := getVertexTextureNormalIndex(item)
+			n -= 1
+			t -= 1
+			v -= 1
+			vertexKey := fmt.Sprintf("%d/%d/%d", v, t, n)
+			if idx, ok := vmap[vertexKey]; !ok {
+				vmap[vertexKey] = int32(vcnt)
+				vcnt += 1
+
+				obj.Vertices = append(obj.Vertices, interObj.Vertices[v].X(), interObj.Vertices[v].Y(), interObj.Vertices[v].Z())
+				if t >= 0 {
+					obj.Uvs = append(obj.Uvs, interObj.Uvs[t].X(), interObj.Uvs[t].Y())
+				}
+				if n >= 0 {
+					obj.Normals = append(obj.Normals, interObj.Normals[n].X(), interObj.Normals[n].Y(), interObj.Normals[n].Z())
+				}
+
+			} else {
+				ni := idx * 3
+
+				if n >= 0 && len(obj.Normals) > int(ni+2) {
+					var n1 = mgl32.Vec3{
+						obj.Normals[ni],
+						obj.Normals[ni+1],
+						obj.Normals[ni+2],
+					}
+					var n2 = mgl32.Vec3{
+						interObj.Normals[n].X(),
+						interObj.Normals[n].Y(),
+						interObj.Normals[n].Z(),
+					}
+
+					n2 = n2.Add(n1).Normalize()
+
+					obj.Normals[ni], obj.Normals[ni+1], obj.Normals[ni+2] = n2.X(), n2.Y(), n2.Z()
+				}
+			}
+			obj.VertexIndices = append(obj.VertexIndices, uint16(vmap[vertexKey]))
+		}
+
 	}
 
-	program := wfo.shader.Use()
+	return obj, nil
+}
 
-	// Effect
-	wfo.effect = &technique.LightingTechnique{}
-	wfo.effect.Init(wfo.shader)
-
-	// Material
-	wfo.material = &material.Material{}
-	wfo.material.AmbientColor = mgl32.Vec3{0.05, 0.1, 0.05}
-	wfo.material.DiffuseColor = mgl32.Vec3{0.1, 0.2, 0.3}
-	wfo.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
-	wfo.material.Shininess = 2
-
-	// gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
-
-	// Configure the vertex data
-	gl.GenVertexArrays(1, &wfo.vao)
-	gl.BindVertexArray(wfo.vao)
-
-	// vert buff
-	gl.GenBuffers(1, &wfo.vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, wfo.vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(wfo.meshData.Vertices)*4, gl.Ptr(&wfo.meshData.Vertices[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
-	// normal buff
-	gl.GenBuffers(1, &wfo.nbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, wfo.nbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(wfo.meshData.Normals)*4, gl.Ptr(&wfo.meshData.Normals[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
-	// uv buff
-	if len(wfo.meshData.Uvs) > 0 {
-		gl.GenBuffers(1, &wfo.tbo)
-		gl.BindBuffer(gl.ARRAY_BUFFER, wfo.tbo)
-		gl.BufferData(gl.ARRAY_BUFFER, len(wfo.meshData.Uvs)*2, gl.Ptr(&wfo.meshData.Uvs[0]), gl.STATIC_DRAW)
-		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+func atoi(s string) int32 {
+	if len(s) > 0 {
+		i, _ := strconv.Atoi(s)
+		return int32(i)
 	}
-	// index buff
-	gl.GenBuffers(1, &wfo.ebo)
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, wfo.ebo)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(wfo.meshData.VertexIndices)*2, gl.Ptr(&wfo.meshData.VertexIndices[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
-	// // Get an index for the attribute from the shader
-	wfo.vertAttrib = uint32(gl.GetAttribLocation(program, gl.Str("position\x00")))
-	wfo.normalAttrib = uint32(gl.GetAttribLocation(program, gl.Str("normal\x00")))
-
-	// Unbind the buffer
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.EnableVertexAttribArray(0)
-	gl.BindVertexArray(0)
-
-	wfo.model = mgl32.Ident4()
-	wfo.model = wfo.model.Mul4(mgl32.Scale3D(wfo.Scale[0], wfo.Scale[1], wfo.Scale[2]))
-	wfo.model = wfo.model.Add(mgl32.Translate3D(wfo.Position[0], wfo.Position[1], wfo.Position[2]))
-
-	wfo.DrawMode = gl.TRIANGLES
+	return -1
 }
 
-func (wfo *WavefrontObject) Update(elapsed float64) {
-	wfo.model = wfo.model.Mul4(mgl32.HomogRotate3DY(float32(elapsed)))
-}
-
-func (wfo *WavefrontObject) Render(w *engine.World) {
-	// Render
-	width := float32(config.Config.WindowWidth)
-	height := float32(config.Config.WindowHeight)
-	projection := mgl32.Perspective(
-		mgl32.DegToRad(w.Camera.Zoom),
-		width/height,
-		0.1,
-		100.0,
-	)
-	view := w.Camera.GetViewMatrix()
-	model := wfo.model
-	mvp := projection.Mul4(view).Mul4(model)
-
-	program := wfo.shader.Program
-	// Shader
-	wfo.effect.Enable()
-	wfo.effect.SetProjectMatrix(&projection)
-	wfo.effect.SetViewMatrix(&view)
-	wfo.effect.SetModelMatrix(&model)
-	wfo.effect.SetWVP(&mvp)
-	wfo.effect.SetEyeWorldPos(&w.Camera.Position)
-
-	wfo.effect.SetPointLight(w.Light)
-	wfo.effect.SetMaterial(wfo.material)
-
-	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
-	// 开启顶点数组
-	gl.BindVertexArray(wfo.vao)
-
-	// 绑定数组缓冲器
-	gl.BindBuffer(gl.ARRAY_BUFFER, wfo.vbo)
-	// 启动顶点属性编辑
-	gl.EnableVertexAttribArray(wfo.vertAttrib)
-	// 设置顶点属性
-	gl.VertexAttribPointer(
-		wfo.vertAttrib, // attribute index
-		3,              // number of elements per vertex, here (x,y,z)
-		gl.FLOAT,       // the type of each element
-		false,          // take our values as-is
-		0,              // no extra data between each position
-		nil,            // offset of first element
-	)
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, wfo.nbo)
-	gl.EnableVertexAttribArray(wfo.normalAttrib)
-	gl.VertexAttribPointer(
-		wfo.normalAttrib, // attribute index
-		3,                // number of elements per vertex, here (x,y,z)
-		gl.FLOAT,         // the type of each element
-		false,            // take our values as-is
-		0,                // no extra data between each position
-		nil,              // offset of first element
-	)
-	// 绑定数组缓冲器
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, wfo.ebo)
-	// 根据指定索引绘制
-	gl.DrawElements(
-		wfo.DrawMode,                           // mode
-		int32(len(wfo.meshData.VertexIndices)), // count
-		gl.UNSIGNED_SHORT,                      // type
-		nil,                                    // element array buffer offset
-	)
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.DisableVertexAttribArray(wfo.vertAttrib)
-	gl.DisableVertexAttribArray(wfo.normalAttrib)
-	gl.BindVertexArray(0)
+func getVertexTextureNormalIndex(face string) (v, t, n int32) {
+	v, t, n = -1, -1, -1
+	vals := strings.Split(face, "/")
+	if len(vals) > 0 {
+		v = atoi(vals[0])
+	}
+	if len(vals) > 1 {
+		t = atoi(vals[1])
+	}
+	if len(vals) > 2 {
+		n = atoi(vals[2])
+	}
+	return v, t, n
 }

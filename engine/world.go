@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/huangxiaobo/toy-engine/engine/model"
 	"github.com/huangxiaobo/toy-engine/engine/platforms"
 	"github.com/huangxiaobo/toy-engine/engine/text"
 	_ "image/png"
@@ -17,7 +18,7 @@ import (
 type World struct {
 	platform   *platforms.SDL
 	Light      *light.PointLight
-	renderObjs []Mesh
+	renderObjs []model.RenderObj
 	Camera     *camera.Camera
 	Text       *text.Text
 
@@ -76,7 +77,7 @@ func (w *World) Init() error {
 
 	// 初始化摄像机
 	w.Camera = new(camera.Camera)
-	w.Camera.Init(mgl32.Vec3{0.0, 10.0, 10.0}, mgl32.Vec3{-0.0, -0.0, -0.0})
+	w.Camera.Init(mgl32.Vec3{0.0, 50.0, 50.0}, mgl32.Vec3{-0.0, -0.0, -0.0})
 
 	// 初始化灯光
 	w.Light = &light.PointLight{Position: mgl32.Vec4{0, 10.0, 0, 0.0}, Color: mgl32.Vec3{1.0, 1.0, 1.0}}
@@ -98,8 +99,18 @@ func (w *World) Run() {
 	for !w.platform.ShouldStop() {
 		w.platform.ProcessEvents()
 
-		gl.ClearColor(0.0, 0.0, 0.0, 0.0)
+		gl.ClearColor(0.8, 0.85, 0.85, 0.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+		projection := mgl32.Perspective(
+			mgl32.DegToRad(w.Camera.Zoom),
+			float32(config.Config.WindowHeight/config.Config.WindowHeight),
+			0.1,
+			100.0,
+		)
+		view := w.Camera.GetViewMatrix()
+		model := mgl32.Ident4()
+		//mvp := projection.Mul4(view).Mul4(model)
 
 		w.DrawAxis()
 		w.DrawLight()
@@ -108,7 +119,7 @@ func (w *World) Run() {
 
 		for _, renderObj := range w.renderObjs {
 			renderObj.Update(elapsed)
-			renderObj.Render(w)
+			renderObj.Render(projection, model, view, &w.Camera.Position, w.Light)
 		}
 
 		// 字体
@@ -125,7 +136,7 @@ func (w *World) DrawAxis() {
 }
 
 func (w *World) DrawLight() {
-	// Render
+	// RenderObj
 	width := float32(config.Config.WindowWidth)
 	height := float32(config.Config.WindowHeight)
 	projection := mgl32.Perspective(
@@ -145,7 +156,6 @@ func (w *World) DrawLight() {
 
 }
 
-func (w *World) AddRenderObj(renderObj Mesh) {
+func (w *World) AddRenderObj(renderObj model.RenderObj) {
 	w.renderObjs = append(w.renderObjs, renderObj)
-	renderObj.Init(w)
 }

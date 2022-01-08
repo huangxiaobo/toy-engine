@@ -1,15 +1,13 @@
 package main
 
 import (
+	"github.com/go-gl/mathgl/mgl32"
+	"github.com/huangxiaobo/toy-engine/engine/model"
 	_ "image/png"
 	"log"
 	"runtime"
 
-	"github.com/go-gl/mathgl/mgl32"
-
 	"github.com/huangxiaobo/toy-engine/engine"
-	"github.com/huangxiaobo/toy-engine/engine/mesh"
-	"github.com/huangxiaobo/toy-engine/engine/mesh/ground"
 )
 
 func init() {
@@ -26,29 +24,37 @@ func main() {
 	}
 	defer world.Destroy()
 
-	world.AddRenderObj(&ground.Ground{
-		WavefrontObject: mesh.WavefrontObject{
-			Name:         "ground",
-			ObjFilePath:  "",
-			VertFilePath: "./resource/shader/ground/shader.vert",
-			FragFilePath: "./resource/shader/ground/shader.frag",
-		},
-	})
+	//var obj *model.Model
+	ground, _ := model.NewGround(
+		"ground",
+		"",
+		false,
+		"./resource/shader/ground/shader.vert",
+		"./resource/shader/ground/shader.frag",
+	)
+	ground.SetScale(mgl32.Vec3{1, 1, 1})
+	//obj.DrawMode = model.DRAW_MODEL_LINES
+	world.AddRenderObj(&ground)
 
-	world.AddRenderObj(&mesh.Axis{
-		Name:       "axis",
-		VsFilePath: "./resource/shader/axis.vert",
-		FsFilePath: "./resource/shader/axis.frag",
-	})
+	//obj, _ := model.NewModel(
+	//	"./resource/model/",
+	//	"icosphere.obj",
+	//	false,
+	//	"./resource/shader/v2/shader.vert",
+	//	"./resource/shader/v2/shader.frag",
+	//)
+	//obj.SetScale(mgl32.Vec3{10, 10, 10})
+	//world.AddRenderObj(&obj)
 
-	world.AddRenderObj(&mesh.WavefrontObject{
-		Name:         "icosphere",
-		ObjFilePath:  "./resource/model/icosphere.obj",
-		VertFilePath: "./resource/shader/v2/shader.vert",
-		FragFilePath: "./resource/shader/v2/shader.frag",
-		Position:     mgl32.Vec3{5, 0, -5},
-		Scale:        mgl32.Vec3{5, 5, 5},
-	})
+	//obj, _ = model.NewRenderObj(
+	//	"icosphere",
+	//	"./resource/model/icosphere.obj",
+	//	"./resource/shader/v2/shader.vert",
+	//	"./resource/shader/v2/shader.frag",
+	//)
+	//obj.SetScale(mgl32.Vec3{10, 10, 10})
+	//obj.SetPostion(mgl32.Vec3{0, 10, 0})
+	//world.AddRenderObj(obj)
 
 	world.Run()
 }

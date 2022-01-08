@@ -81,4 +81,5 @@ void main() {
         }
     }
     color = vec4(AmbientColor.xyz + DiffuseColor.xyz + SpecularColor.xyz, 1.0);
+    color.g = 1.0;
 }
