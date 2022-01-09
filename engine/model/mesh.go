@@ -3,6 +3,7 @@ package model
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
 	"strconv"
 	"sync"
@@ -48,6 +49,7 @@ func (m *Mesh) setup() {
 	dummy := m.Vertices[0]
 	structSize := int(unsafe.Sizeof(dummy))
 	structSize32 := int32(structSize)
+	logger.Error("structSize: ", structSize, " structSize32: ", structSize32)
 
 	// Configure the vertex data
 	gl.GenVertexArrays(1, &m.vao)
@@ -56,10 +58,11 @@ func (m *Mesh) setup() {
 
 	gl.BindVertexArray(m.vao)
 
-	// vert buff
+	// vert buff 复制顶点数组到缓冲中供OpenGL使用
 	gl.BindBuffer(gl.ARRAY_BUFFER, m.vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(m.Vertices)*structSize, gl.Ptr(m.Vertices), gl.STATIC_DRAW)
 
+	// indic buff, 复制索引数组到缓冲中供OpenGL使用
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ebo)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(m.Indices)*GL_FLOAT32_SIZE, gl.Ptr(m.Indices), gl.STATIC_DRAW)
 
@@ -128,11 +131,6 @@ func (m *Mesh) draw(program uint32) {
 		// And finally bind the texture
 		gl.BindTexture(gl.TEXTURE_2D, m.Textures[i].Id)
 	}
-
-	//positionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	//texcoordUniform := gl.GetUniformLocation(program, gl.Str("texcoord\x00"))
-	//fmt.Printf("draw  mesh, program: %d vao: %d\n", program, m.vao)
-	//fmt.Printf("draw  program: %d, positionUniform: %d texcoordUniform: %d\n", program, positionUniform, texcoordUniform)
 
 	// Draw mesh
 	gl.BindVertexArray(m.vao)

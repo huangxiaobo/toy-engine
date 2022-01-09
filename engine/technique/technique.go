@@ -25,6 +25,11 @@ func (t *Technique) Enable() bool {
 	return true
 }
 
+func (t *Technique) Disable() bool {
+	t.ShaderObj.UnUse()
+	return true
+}
+
 func (t *Technique) GetUniformLocation(pUniformName string) int32 {
 	Location := gl.GetUniformLocation(t.ShaderObj.Program, gl.Str(fmt.Sprintf("%s\x00", pUniformName)))
 

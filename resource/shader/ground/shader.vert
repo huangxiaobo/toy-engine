@@ -6,8 +6,8 @@ uniform mat4 gWVP;
 uniform mat4 gWorld;
 
 
-in vec3 position;
-in vec3 normal;
+layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 normal;
 
 
 out vec3 WorldPos0;

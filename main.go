@@ -24,10 +24,8 @@ func main() {
 	}
 	defer world.Destroy()
 
-	//var obj *model.Model
 	ground, _ := model.NewGround(
 		"ground",
-		"",
 		false,
 		"./resource/shader/ground/shader.vert",
 		"./resource/shader/ground/shader.frag",
@@ -35,6 +33,16 @@ func main() {
 	ground.SetScale(mgl32.Vec3{1, 1, 1})
 	//obj.DrawMode = model.DRAW_MODEL_LINES
 	world.AddRenderObj(&ground)
+
+	point, _ := model.NewPoint(
+		"point",
+		false,
+		"./resource/shader/ground/shader.vert",
+		"./resource/shader/ground/shader.frag",
+	)
+	point.SetScale(mgl32.Vec3{1, 1, 1})
+	//obj.DrawMode = model.DRAW_MODEL_LINES
+	world.AddRenderObj(&point)
 
 	//obj, _ := model.NewModel(
 	//	"./resource/model/",

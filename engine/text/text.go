@@ -3,7 +3,6 @@ package text
 import (
 	"fmt"
 	"github.com/huangxiaobo/toy-engine/engine/config"
-	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 
@@ -54,9 +53,7 @@ func (v *VboData) AppendData(d []float32) {
 }
 
 func (v *VboData) UploadData(val uint32) {
-	logger.Info(val)
 	gl.BufferData(gl.ARRAY_BUFFER, len(v.data)*4, gl.Ptr(&v.data[0]), gl.STATIC_DRAW)
-	fmt.Printf("data: %v\n", v.data)
 }
 
 func nextP2(a int32) int32 {

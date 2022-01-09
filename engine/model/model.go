@@ -1,7 +1,6 @@
 package model
 
 import (
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -13,8 +12,6 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
 	assimp "github.com/rishabh-bector/assimp-golang"
-	"os"
-	"strings"
 	"sync"
 )
 
@@ -25,7 +22,6 @@ type Model struct {
 	GammaCorrection bool
 	BasePath        string
 	FileName        string
-	GobName         string
 
 	material *material.Material
 	effect   *technique.LightingTechnique
@@ -37,25 +33,19 @@ type Model struct {
 	DrawMode uint32
 }
 
-func NewModel(b, f string, g bool, vertFile, fragFile string) (Model, error) {
-	t := strings.Split(f, ".")
-	gf := t[0] + ".gob"
+func NewModel(f string, g bool, vertFile, fragFile string) (Model, error) {
+
 	m := Model{
-		BasePath:        b,
 		FileName:        f,
-		GobName:         gf,
 		GammaCorrection: g,
+
+		model: mgl32.Ident4(),
 	}
 	m.texturesLoaded = make(map[string]texture.Texture)
-	gobFile := b + gf
-	if _, err := os.Stat(gobFile); os.IsNotExist(err) {
-		if err := m.loadModel(); err != nil {
-			panic(err)
-		}
-		m.Export()
-	} else {
-		m.Import()
+	if err := m.loadModel(); err != nil {
+		panic(err)
 	}
+
 	m.effect = &technique.LightingTechnique{}
 
 	// Material
@@ -73,41 +63,6 @@ func NewModel(b, f string, g bool, vertFile, fragFile string) (Model, error) {
 	m.effect.ShaderObj = s
 
 	return m, nil
-}
-
-func (m *Model) Export() error {
-	// export a gob file
-	f := m.BasePath + m.GobName
-
-	dataFile, err := os.Create(f)
-	if err != nil {
-		return err
-	}
-	defer dataFile.Close()
-
-	dataEncoder := gob.NewEncoder(dataFile)
-	dataEncoder.Encode(m)
-
-	return nil
-}
-
-func (m *Model) Import() error {
-	f := m.BasePath + m.GobName
-	dataFile, err := os.Open(f)
-
-	if err != nil {
-		return err
-	}
-	defer dataFile.Close()
-
-	dataDecoder := gob.NewDecoder(dataFile)
-	if err := dataDecoder.Decode(&m); err != nil {
-		return err
-	}
-
-	fmt.Printf("Creating model from gob file: %s\n", f)
-	m.initGL()
-	return nil
 }
 
 func (m *Model) Dispose() {
@@ -171,7 +126,7 @@ func (m *Model) processNode(n *assimp.Node, s *assimp.Scene) {
 
 	}
 
-	// After we've processed all of the meshes (if any) we then recursively process each of the children nodes
+	// After we've processed all the meshes (if any) we then recursively process each of the children nodes
 	c := n.Children()
 	for j := 0; j < len(c); j++ {
 		go func(n *assimp.Node, s *assimp.Scene) {
@@ -253,7 +208,7 @@ func (m *Model) ProcessAssimpMesh(mesh *assimp.Mesh) []Vertex {
 
 func (m *Model) processMeshVertices(mesh *assimp.Mesh) []Vertex {
 	// Walk through each of the mesh's vertices
-	vertices := []Vertex{}
+	var vertices []Vertex
 
 	positions := mesh.Vertices()
 
@@ -391,10 +346,11 @@ func (m *Model) Update(elapsed float64) {
 
 func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, light *light.PointLight) {
 	// RenderObj
+	m.model = mgl32.Ident4()
 	model = model.Mul4(m.model)
 	mvp := projection.Mul4(view).Mul4(model)
 
-	// Shader
+	// Effect
 	m.effect.Enable()
 	m.effect.SetProjectMatrix(&projection)
 	m.effect.SetViewMatrix(&view)
@@ -405,55 +361,12 @@ func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Ve
 	m.effect.SetPointLight(light)
 	m.effect.SetMaterial(m.material)
 
+	gl.BindFragDataLocation(m.effect.ShaderObj.Program, 0, gl.Str("color\x00"))
+
 	for _, mesh := range m.Meshes {
 		mesh.draw(m.effect.ShaderObj.Program)
 	}
-
-	//gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
-
-	// // Get an index for the attribute from the shader
-	//program := m.effect.ShaderObj.Program
-	//m.meshData.VertAttrib = uint32(gl.GetAttribLocation(program, gl.Str("position\x00")))
-	//m.meshData.NormalAttrib = uint32(gl.GetAttribLocation(program, gl.Str("normal\x00")))
-
-	// 绑定数组缓冲器
-	//gl.BindBuffer(gl.ARRAY_BUFFER, m.meshData.vbo)
-	//// 启动顶点属性编辑
-	//gl.EnableVertexAttribArray(m.meshData.VertAttrib)
-	//// 设置顶点属性
-	//gl.VertexAttribPointer(
-	//	m.meshData.VertAttrib, // attribute index
-	//	3,                     // number of elements per vertex, here (x,y,z)
-	//	gl.FLOAT,              // the type of each element
-	//	false,                 // take our values as-is
-	//	0,                     // no extra data between each position
-	//	nil,                   // offset of first element
-	//)
-
-	//gl.BindBuffer(gl.ARRAY_BUFFER, m.meshData.Nbo)
-	//gl.EnableVertexAttribArray(m.meshData.NormalAttrib)
-	//gl.VertexAttribPointer(
-	//	m.meshData.NormalAttrib, // attribute index
-	//	3,                       // number of elements per vertex, here (x,y,z)
-	//	gl.FLOAT,                // the type of each element
-	//	false,                   // take our values as-is
-	//	0,                       // no extra data between each position
-	//	nil,                     // offset of first element
-	//)
-	// 绑定数组缓冲器
-	//gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.meshData.ebo)
-	// 根据指定索引绘制
-	//gl.DrawElements(
-	//	gl.TRIANGLES,                   // mode
-	//	int32(len(m.meshData.Indices)), // count
-	//	gl.UNSIGNED_SHORT,              // type
-	//	nil,                            // element array buffer offset
-	//)
-
-	//gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	//gl.DisableVertexAttribArray(m.meshData.VertAttrib)
-	//gl.DisableVertexAttribArray(m.meshData.NormalAttrib)
-	//gl.BindVertexArray(0)
+	m.effect.Disable()
 }
 
 func (m *Model) textureFromFile(f string) uint32 {
@@ -465,6 +378,7 @@ func (m *Model) textureFromFile(f string) uint32 {
 	}
 }
 
+// RenderObj 可渲染對象
 type RenderObj interface {
 	Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, light *light.PointLight)
 	Update(elapsed float64)

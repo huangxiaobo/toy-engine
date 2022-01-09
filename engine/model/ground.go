@@ -1,35 +1,28 @@
 package model
 
 import (
-	"fmt"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/material"
 	"github.com/huangxiaobo/toy-engine/engine/shader"
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
-	"strings"
 )
 
 type Ground struct {
 	Model
 }
 
-func NewGround(b, f string, g bool, vertFile, fragFile string) (Model, error) {
-	t := strings.Split(f, ".")
-	gf := t[0] + ".gob"
+func NewGround(f string, g bool, vertFile, fragFile string) (Model, error) {
 	m := Model{
-		BasePath:        b,
 		FileName:        f,
-		GobName:         gf,
 		GammaCorrection: g,
+
+		model: mgl32.Ident4(),
 	}
 	m.texturesLoaded = make(map[string]texture.Texture)
-	m.Meshes = GenGroundMesh()
+	GenGroundMesh(&m)
 	for i := 0; i < len(m.Meshes); i++ {
-		for _, v := range m.Meshes[i].Vertices {
-			fmt.Printf("%+v\n", v)
-		}
 		m.Meshes[i].setup()
 	}
 
@@ -55,12 +48,12 @@ func NewGround(b, f string, g bool, vertFile, fragFile string) (Model, error) {
 	return m, nil
 }
 
-func GenGroundMesh() []Mesh {
+func GenGroundMesh(m *Model) {
 	mesh := Mesh{}
 
-	var x_num = 1
+	var x_num = 20
 	var x_strip float32 = 10
-	var z_num = 1
+	var z_num = 20
 	var z_strip float32 = 10
 
 	for zi := -z_num; zi <= z_num; zi += 1 {
@@ -95,5 +88,5 @@ func GenGroundMesh() []Mesh {
 		}
 	}
 
-	return []Mesh{mesh}
+	m.Meshes = append(m.Meshes, mesh)
 }

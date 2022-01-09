@@ -99,6 +99,11 @@ func (s *Shader) Use() uint32 {
 	return s.Program
 }
 
+func (s *Shader) UnUse() uint32 {
+	gl.UseProgram(0)
+	return 0
+}
+
 func (s *Shader) SetUniform(name string, value interface{}) {
 	loc := gl.GetUniformLocation(s.Program, gl.Str(name+"\x00"))
 	if loc < 0 {

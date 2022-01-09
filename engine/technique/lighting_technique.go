@@ -45,8 +45,8 @@ type LightingTechnique struct {
 	materialUniform MaterialUniform
 }
 
-func (t *LightingTechnique) Init(shader *shader.Shader) {
-	t.BaseTechnique.Init(shader)
+func (t *LightingTechnique) Init(s *shader.Shader) {
+	t.BaseTechnique.Init(s)
 
 	// Shader
 	t.projectionUniform = t.GetUniformLocation("projection")

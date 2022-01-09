@@ -62,7 +62,7 @@ func (w *World) initGL() {
 
 	// 设置线框模式
 	// 设置了该模式后 , 之后的所有图形都会变成线
-	// gl.PolygonMode(gl.FRONT, gl.LINE)
+	//gl.PolygonMode(gl.FRONT, gl.LINE)
 
 	// 设置点模式
 	// 设置了该模式后 , 之后的所有图形都会变成点
@@ -112,7 +112,7 @@ func (w *World) Run() {
 		model := mgl32.Ident4()
 		//mvp := projection.Mul4(view).Mul4(model)
 
-		w.DrawAxis()
+		//w.DrawAxis()
 		w.DrawLight()
 		// Update
 		elapsed := 0.01
