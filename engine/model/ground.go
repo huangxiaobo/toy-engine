@@ -8,21 +8,25 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/shader"
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
+	"path/filepath"
 )
 
 type Ground struct {
 	Model
 }
 
-func NewGround(f string, g bool, vertFile, fragFile string) (Ground, error) {
+func NewGround(f string) (Ground, error) {
+	f, _ = filepath.Abs(f)
+
 	m := Ground{
 		Model{
-			FileName:        f,
-			GammaCorrection: g,
-
-			model: mgl32.Ident4(),
+			BasePath: filepath.Dir(f),
+			model:    mgl32.Ident4(),
 		},
 	}
+
+	xm := m.loadXml(f)
+
 	m.texturesLoaded = make(map[string]texture.Texture)
 	GenGroundMesh(&m)
 	for i := 0; i < len(m.Meshes); i++ {
@@ -38,7 +42,10 @@ func NewGround(f string, g bool, vertFile, fragFile string) (Ground, error) {
 	m.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
 	m.material.Shininess = 2
 
-	s := &shader.Shader{VertFilePath: vertFile, FragFilePath: fragFile}
+	s := &shader.Shader{
+		VertFilePath: filepath.Join(m.BasePath, xm.XmlShader.VertFile),
+		FragFilePath: filepath.Join(m.BasePath, xm.XmlShader.FragFile),
+	}
 	if err := s.Init(); err != nil {
 		logger.Error(err)
 		panic("errr")

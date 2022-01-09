@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<model>
+    <mesh name="bunny">
+        <file>./bunny.obj</file>
+    </mesh>
+    <shader>
+        <vert>./shader.vert</vert>
+        <frag>./shader.frag</frag>
+    </shader>
+    <gammacorrection>false</gammacorrection>
+</model>

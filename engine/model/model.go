@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -12,6 +13,8 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
 	assimp "github.com/rishabh-bector/assimp-golang"
+	"io/ioutil"
+	"path/filepath"
 	"sync"
 )
 
@@ -33,14 +36,31 @@ type Model struct {
 	DrawMode uint32
 }
 
-func NewModel(f string, g bool, vertFile, fragFile string) (Model, error) {
+type XmlModel struct {
+	XMLName         xml.Name  `xml:"model"`
+	XMLMesh         XmlMesh   `xml:"mesh"`
+	XmlShader       XmlShader `xml:"shader"`
+	GammaCorrection bool      `xml:"gammacorrection"`
+}
+
+type XmlMesh struct {
+	File string `xml:"file"` // Mesh file
+}
+type XmlShader struct {
+	VertFile string `xml:"vert"`
+	FragFile string `xml:"frag"`
+}
+
+func NewModel(f string) (Model, error) {
+	f, _ = filepath.Abs(f)
 
 	m := Model{
-		FileName:        f,
-		GammaCorrection: g,
-
-		model: mgl32.Ident4(),
+		BasePath: filepath.Dir(f),
+		model:    mgl32.Ident4(),
 	}
+
+	xm := m.loadXml(f)
+
 	m.texturesLoaded = make(map[string]texture.Texture)
 	if err := m.loadModel(); err != nil {
 		panic(err)
@@ -55,7 +75,10 @@ func NewModel(f string, g bool, vertFile, fragFile string) (Model, error) {
 	m.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
 	m.material.Shininess = 2
 
-	s := &shader.Shader{VertFilePath: vertFile, FragFilePath: fragFile}
+	s := &shader.Shader{
+		VertFilePath: filepath.Join(m.BasePath, xm.XmlShader.VertFile),
+		FragFilePath: filepath.Join(m.BasePath, xm.XmlShader.FragFile),
+	}
 	if err := s.Init(); err != nil {
 		logger.Error(err)
 		panic("errr")
@@ -71,6 +94,25 @@ func (m *Model) Dispose() {
 		gl.DeleteBuffers(1, &m.Meshes[i].vbo)
 		gl.DeleteBuffers(1, &m.Meshes[i].ebo)
 	}
+}
+
+func (m *Model) loadXml(f string) *XmlModel {
+	data, err := ioutil.ReadFile(f)
+	if err != nil {
+		panic(err)
+	}
+
+	xm := &XmlModel{}
+	err = xml.Unmarshal(data, &xm)
+	if err != nil {
+		fmt.Printf("error: %xm", err)
+		panic(err)
+	}
+
+	m.FileName = xm.XMLMesh.File
+	m.GammaCorrection = xm.GammaCorrection
+
+	return xm
 }
 
 // Loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.

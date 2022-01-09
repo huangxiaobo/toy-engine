@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<model>
+    <mesh name="ground">
+        <file></file>
+    </mesh>
+    <shader>
+        <vert>./shader.vert</vert>
+        <frag>./shader.frag</frag>
+    </shader>
+    <gammacorrection>false</gammacorrection>
+</model>
