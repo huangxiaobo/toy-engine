@@ -44,25 +44,14 @@ func main() {
 	//obj.DrawMode = model.DRAW_MODEL_LINES
 	world.AddRenderObj(&point)
 
-	//obj, _ := model.NewModel(
-	//	"./resource/model/",
-	//	"icosphere.obj",
-	//	false,
-	//	"./resource/shader/v2/shader.vert",
-	//	"./resource/shader/v2/shader.frag",
-	//)
-	//obj.SetScale(mgl32.Vec3{10, 10, 10})
-	//world.AddRenderObj(&obj)
-
-	//obj, _ = model.NewRenderObj(
-	//	"icosphere",
-	//	"./resource/model/icosphere.obj",
-	//	"./resource/shader/v2/shader.vert",
-	//	"./resource/shader/v2/shader.frag",
-	//)
-	//obj.SetScale(mgl32.Vec3{10, 10, 10})
-	//obj.SetPostion(mgl32.Vec3{0, 10, 0})
-	//world.AddRenderObj(obj)
+	obj, _ := model.NewModel(
+		"./resource/model/icosphere.obj",
+		false,
+		"./resource/shader/v2/shader.vert",
+		"./resource/shader/v2/shader.frag",
+	)
+	obj.SetScale(mgl32.Vec3{10, 10, 10})
+	world.AddRenderObj(&obj)
 
 	world.Run()
 }

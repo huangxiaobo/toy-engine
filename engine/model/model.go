@@ -60,7 +60,7 @@ func NewModel(f string, g bool, vertFile, fragFile string) (Model, error) {
 		logger.Error(err)
 		panic("errr")
 	}
-	m.effect.ShaderObj = s
+	m.effect.Init(s)
 
 	return m, nil
 }
@@ -344,9 +344,12 @@ func (m *Model) Update(elapsed float64) {
 	//m.model = m.model.Mul4(mgl32.HomogRotate3DY(float32(elapsed)))
 }
 
+func (m *Model) PreRender() {
+	gl.PolygonMode(gl.FRONT, gl.LINE)
+}
+
 func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, light *light.PointLight) {
 	// RenderObj
-	m.model = mgl32.Ident4()
 	model = model.Mul4(m.model)
 	mvp := projection.Mul4(view).Mul4(model)
 
@@ -369,6 +372,10 @@ func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Ve
 	m.effect.Disable()
 }
 
+func (m *Model) PostRender() {
+	gl.PolygonMode(gl.FRONT, gl.LINE)
+}
+
 func (m *Model) textureFromFile(f string) uint32 {
 	//Generate texture ID and load texture data
 	if tex, err := texture.NewTexture(gl.REPEAT, gl.REPEAT, gl.LINEAR_MIPMAP_LINEAR, gl.LINEAR, f); err != nil {
@@ -382,4 +389,6 @@ func (m *Model) textureFromFile(f string) uint32 {
 type RenderObj interface {
 	Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, light *light.PointLight)
 	Update(elapsed float64)
+	PreRender()
+	PostRender()
 }

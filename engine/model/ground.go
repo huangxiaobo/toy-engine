@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/material"
@@ -13,12 +14,14 @@ type Ground struct {
 	Model
 }
 
-func NewGround(f string, g bool, vertFile, fragFile string) (Model, error) {
-	m := Model{
-		FileName:        f,
-		GammaCorrection: g,
+func NewGround(f string, g bool, vertFile, fragFile string) (Ground, error) {
+	m := Ground{
+		Model{
+			FileName:        f,
+			GammaCorrection: g,
 
-		model: mgl32.Ident4(),
+			model: mgl32.Ident4(),
+		},
 	}
 	m.texturesLoaded = make(map[string]texture.Texture)
 	GenGroundMesh(&m)
@@ -42,25 +45,22 @@ func NewGround(f string, g bool, vertFile, fragFile string) (Model, error) {
 	}
 	m.effect.Init(s)
 
-	//vertAttrib := uint32(gl.GetAttribLocation(s.Program, gl.Str("position\x00")))
-	//normalAttrib := uint32(gl.GetAttribLocation(s.Program, gl.Str("normal\x00")))
-
 	return m, nil
 }
 
-func GenGroundMesh(m *Model) {
+func GenGroundMesh(m *Ground) {
 	mesh := Mesh{}
 
-	var x_num = 20
-	var x_strip float32 = 10
-	var z_num = 20
-	var z_strip float32 = 10
+	var xNum = 20
+	var xStrip float32 = 10
+	var zNum = 20
+	var zStrip float32 = 10
 
-	for zi := -z_num; zi <= z_num; zi += 1 {
-		for xi := -x_num; xi <= x_num; xi += 1 {
-			x := float32(xi) * x_strip
+	for zi := -zNum; zi <= zNum; zi += 1 {
+		for xi := -xNum; xi <= xNum; xi += 1 {
+			x := float32(xi) * xStrip
 			y := float32(0.0)
-			z := float32(zi) * z_strip
+			z := float32(zi) * zStrip
 
 			v := Vertex{
 				Position:  mgl32.Vec3{x, y, z},
@@ -73,14 +73,14 @@ func GenGroundMesh(m *Model) {
 		}
 	}
 
-	x_row_num := uint32(2*x_num + 1)
-	z_row_num := uint32(2*z_num + 1)
+	xRowNum := uint32(2*xNum + 1)
+	zRowNum := uint32(2*zNum + 1)
 	var zi, xi uint32
-	for zi = 0; zi < z_row_num-1; zi++ {
-		for xi = 0; xi < x_row_num-1; xi++ {
-			v0 := uint32(zi*x_row_num + xi)
+	for zi = 0; zi < zRowNum-1; zi++ {
+		for xi = 0; xi < xRowNum-1; xi++ {
+			v0 := uint32(zi*xRowNum + xi)
 			v1 := uint32(v0 + 1)
-			v2 := uint32(v0 + x_row_num)
+			v2 := uint32(v0 + xRowNum)
 			v3 := uint32(v2 + 1)
 
 			mesh.Indices = append(mesh.Indices, v0, v2, v1, v1, v2, v3)
@@ -89,4 +89,12 @@ func GenGroundMesh(m *Model) {
 	}
 
 	m.Meshes = append(m.Meshes, mesh)
+}
+
+func (m *Ground) PreRender() {
+	gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+}
+
+func (m *Ground) PostRender() {
+	gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 }

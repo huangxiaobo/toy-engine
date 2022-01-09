@@ -3,7 +3,6 @@ package model
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
 	"strconv"
 	"sync"
@@ -27,11 +26,11 @@ type Mesh struct {
 	Indices  []uint32
 	Textures []texture.Texture
 
+	DrawMode uint32
+
 	vao uint32
 	vbo uint32
 	ebo uint32
-
-	BasePath string
 }
 
 func NewMesh(v []Vertex, i []uint32, t []texture.Texture) Mesh {
@@ -49,7 +48,6 @@ func (m *Mesh) setup() {
 	dummy := m.Vertices[0]
 	structSize := int(unsafe.Sizeof(dummy))
 	structSize32 := int32(structSize)
-	logger.Error("structSize: ", structSize, " structSize32: ", structSize32)
 
 	// Configure the vertex data
 	gl.GenVertexArrays(1, &m.vao)
@@ -137,7 +135,7 @@ func (m *Mesh) draw(program uint32) {
 	gl.DrawElements(gl.TRIANGLES, int32(len(m.Indices)), gl.UNSIGNED_INT, gl.PtrOffset(0))
 	gl.BindVertexArray(0)
 
-	// Always good practice to set everything back to defaults once configured.
+	// Always good practice to set everything back to default once configured.
 	for i = 0; i < uint32(len(m.Textures)); i++ {
 		gl.ActiveTexture(gl.TEXTURE0 + i)
 		gl.BindTexture(gl.TEXTURE_2D, 0)

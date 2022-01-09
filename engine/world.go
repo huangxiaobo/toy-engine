@@ -119,7 +119,9 @@ func (w *World) Run() {
 
 		for _, renderObj := range w.renderObjs {
 			renderObj.Update(elapsed)
+			renderObj.PreRender()
 			renderObj.Render(projection, model, view, &w.Camera.Position, w.Light)
+			renderObj.PostRender()
 		}
 
 		// 字体
