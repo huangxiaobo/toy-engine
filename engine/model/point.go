@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/material"
@@ -13,12 +14,14 @@ type Point struct {
 	Model
 }
 
-func NewPoint(f string, g bool, vertFile, fragFile string) (Model, error) {
-	m := Model{
-		FileName:        f,
-		GammaCorrection: g,
+func NewPoint(f string, g bool, vertFile, fragFile string) (Point, error) {
+	m := Point{
+		Model{
+			FileName:        f,
+			GammaCorrection: g,
 
-		model: mgl32.Ident4(),
+			model: mgl32.Ident4(),
+		},
 	}
 	m.texturesLoaded = make(map[string]texture.Texture)
 	GenPointMesh(&m)
@@ -45,7 +48,7 @@ func NewPoint(f string, g bool, vertFile, fragFile string) (Model, error) {
 	return m, nil
 }
 
-func GenPointMesh(m *Model) {
+func GenPointMesh(m *Point) {
 	mesh := Mesh{}
 
 	v0 := Vertex{
@@ -75,4 +78,13 @@ func GenPointMesh(m *Model) {
 	mesh.Indices = append(mesh.Indices, 0, 1, 2)
 
 	m.Meshes = append(m.Meshes, mesh)
+}
+
+func (m *Point) PreRender() {
+	gl.PointSize(30)
+	gl.PolygonMode(gl.FRONT_AND_BACK, gl.POINT)
+}
+
+func (m *Point) PostRender() {
+	gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 }
