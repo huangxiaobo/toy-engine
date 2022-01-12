@@ -80,7 +80,7 @@ func (w *World) Init() error {
 	w.Camera.Init(mgl32.Vec3{0.0, 50.0, 50.0}, mgl32.Vec3{-0.0, -0.0, -0.0})
 
 	// 初始化灯光
-	w.Light = &light.PointLight{Position: mgl32.Vec4{0, 10.0, 0, 0.0}, Color: mgl32.Vec3{1.0, 1.0, 1.0}}
+	w.Light = &light.PointLight{Position: mgl32.Vec4{0, 50.0, 0, 0.0}, Color: mgl32.Vec3{1.0, 1.0, 1.0}}
 	w.Light.Init()
 
 	// Text

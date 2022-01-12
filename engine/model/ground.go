@@ -37,10 +37,10 @@ func NewGround(f string) (Ground, error) {
 
 	// Material
 	m.material = &material.Material{}
-	m.material.AmbientColor = mgl32.Vec3{0.05, 0.1, 0.05}
-	m.material.DiffuseColor = mgl32.Vec3{0.1, 0.2, 0.3}
-	m.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
-	m.material.Shininess = 2
+	m.material.AmbientColor = mgl32.Vec3{xm.XMLMaterial.Ambientcolor.R, xm.XMLMaterial.Ambientcolor.G, xm.XMLMaterial.Ambientcolor.B}
+	m.material.DiffuseColor = mgl32.Vec3{xm.XMLMaterial.Diffusecolor.R, xm.XMLMaterial.Diffusecolor.G, xm.XMLMaterial.Diffusecolor.B}
+	m.material.SpecularColor = mgl32.Vec3{xm.XMLMaterial.Specularcolor.R, xm.XMLMaterial.Specularcolor.G, xm.XMLMaterial.Specularcolor.B}
+	m.material.Shininess = xm.XMLMaterial.Shininess
 
 	s := &shader.Shader{
 		VertFilePath: filepath.Join(m.BasePath, xm.XmlShader.VertFile),

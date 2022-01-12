@@ -30,7 +30,6 @@ func main() {
 	world.AddRenderObj(&ground)
 
 	obj, _ := model.NewModel("./resource/model/bunny/bunny.xml")
-	obj.SetScale(mgl32.Vec3{10, 10, 10})
 	world.AddRenderObj(&obj)
 
 	world.Run()

@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <model>
+    <postion>
+        <x>0</x>
+        <y>0</y>
+        <z>0</z>
+    </postion>
+    <scale>
+        <x>8</x>
+        <y>8</y>
+        <z>8</z>
+    </scale>
     <mesh name="bunny">
         <file>./bunny.obj</file>
     </mesh>
@@ -8,4 +18,22 @@
         <frag>./shader.frag</frag>
     </shader>
     <gammacorrection>false</gammacorrection>
+    <material>
+        <ambient>
+            <r>0.15</r>
+            <g>0.15</g>
+            <b>0.15</b>
+        </ambient>
+        <diffuse>
+            <r>0.45</r>
+            <g>0.45</g>
+            <b>0.05</b>
+        </diffuse>
+        <specular>
+            <r>0.20</r>
+            <g>0.05</g>
+            <b>0.05</b>
+        </specular>
+        <shininess>2</shininess>
+    </material>
 </model>

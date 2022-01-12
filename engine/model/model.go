@@ -37,10 +37,13 @@ type Model struct {
 }
 
 type XmlModel struct {
-	XMLName         xml.Name  `xml:"model"`
-	XMLMesh         XmlMesh   `xml:"mesh"`
-	XmlShader       XmlShader `xml:"shader"`
-	GammaCorrection bool      `xml:"gammacorrection"`
+	XMLName         xml.Name    `xml:"model"`
+	XMLPostion      XmlPostion  `xml:"postion"`
+	XMLScale        XmlScale    `xml:"scale"`
+	XMLMesh         XmlMesh     `xml:"mesh"`
+	XmlShader       XmlShader   `xml:"shader"`
+	GammaCorrection bool        `xml:"gammacorrection"`
+	XMLMaterial     XmlMaterial `xml:"material"`
 }
 
 type XmlMesh struct {
@@ -49,6 +52,31 @@ type XmlMesh struct {
 type XmlShader struct {
 	VertFile string `xml:"vert"`
 	FragFile string `xml:"frag"`
+}
+
+type XmlMaterial struct {
+	Ambientcolor  XmlColor `xml:"ambient"`
+	Diffusecolor  XmlColor `xml:"diffuse"`
+	Specularcolor XmlColor `xml:"specular"`
+	Shininess     float32  `xml:"shininess"`
+}
+
+type XmlColor struct {
+	R float32 `xml:"r"`
+	G float32 `xml:"g"`
+	B float32 `xml:"b"`
+}
+
+type XmlPostion struct {
+	X float32 `xml:"x"`
+	Y float32 `xml:"y"`
+	Z float32 `xml:"z"`
+}
+
+type XmlScale struct {
+	X float32 `xml:"x"`
+	Y float32 `xml:"y"`
+	Z float32 `xml:"z"`
 }
 
 func NewModel(f string) (Model, error) {
@@ -70,10 +98,10 @@ func NewModel(f string) (Model, error) {
 
 	// Material
 	m.material = &material.Material{}
-	m.material.AmbientColor = mgl32.Vec3{0.05, 0.1, 0.05}
-	m.material.DiffuseColor = mgl32.Vec3{0.1, 0.2, 0.3}
-	m.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
-	m.material.Shininess = 2
+	m.material.AmbientColor = mgl32.Vec3{xm.XMLMaterial.Ambientcolor.R, xm.XMLMaterial.Ambientcolor.G, xm.XMLMaterial.Ambientcolor.B}
+	m.material.DiffuseColor = mgl32.Vec3{xm.XMLMaterial.Diffusecolor.R, xm.XMLMaterial.Diffusecolor.G, xm.XMLMaterial.Diffusecolor.B}
+	m.material.SpecularColor = mgl32.Vec3{xm.XMLMaterial.Specularcolor.R, xm.XMLMaterial.Specularcolor.G, xm.XMLMaterial.Specularcolor.B}
+	m.material.Shininess = xm.XMLMaterial.Shininess
 
 	s := &shader.Shader{
 		VertFilePath: filepath.Join(m.BasePath, xm.XmlShader.VertFile),
@@ -84,6 +112,12 @@ func NewModel(f string) (Model, error) {
 		panic("errr")
 	}
 	m.effect.Init(s)
+
+	m.position = mgl32.Vec3{xm.XMLPostion.X, xm.XMLPostion.Y, xm.XMLPostion.Z}
+	m.scale = mgl32.Vec3{xm.XMLScale.X, xm.XMLScale.Y, xm.XMLScale.Z}
+
+	m.SetPostion(m.position)
+	m.SetScale(m.scale)
 
 	return m, nil
 }
@@ -383,7 +417,7 @@ func (m *Model) SetPostion(p mgl32.Vec3) {
 }
 
 func (m *Model) Update(elapsed float64) {
-	//m.model = m.model.Mul4(mgl32.HomogRotate3DY(float32(elapsed)))
+	m.model = m.model.Mul4(mgl32.HomogRotate3DY(float32(elapsed)))
 }
 
 func (m *Model) PreRender() {
