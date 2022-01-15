@@ -2,6 +2,11 @@ package engine
 
 import (
 	"fmt"
+	_ "image/png"
+	"os"
+	"reflect"
+	"time"
+
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/huangxiaobo/toy-engine/engine/model"
@@ -9,10 +14,6 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/text"
 	"github.com/huangxiaobo/toy-engine/engine/window"
 	"github.com/inkyblackness/imgui-go/v4"
-	_ "image/png"
-	"os"
-	"reflect"
-	"time"
 
 	"github.com/huangxiaobo/toy-engine/engine/camera"
 	"github.com/huangxiaobo/toy-engine/engine/config"

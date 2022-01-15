@@ -15,7 +15,7 @@ var WindowMaterial = struct {
 	content  string
 }{
 	visible:  false,
-	flags:    WindowFlags{noResize: true},
+	flags:    WindowFlags{noResize: true, noMenu: true, noCollapse: true},
 	datsList: make([]string, 0),
 	dataDict: make(map[string]interface{}, 0),
 }
