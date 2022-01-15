@@ -12,20 +12,23 @@ import (
 )
 
 type Ground struct {
-	Model
+	*Model
 }
 
 func NewGround(f string) (Ground, error) {
 	f, _ = filepath.Abs(f)
 
 	m := Ground{
-		Model{
+		Model: &Model{
 			BasePath: filepath.Dir(f),
 			model:    mgl32.Ident4(),
 		},
 	}
 
 	xm := m.loadXml(f)
+
+	m.Name = xm.XMLAlias
+	m.Id = xm.XMLId
 
 	m.texturesLoaded = make(map[string]texture.Texture)
 	GenGroundMesh(&m)
@@ -58,10 +61,10 @@ func NewGround(f string) (Ground, error) {
 func GenGroundMesh(m *Ground) {
 	mesh := Mesh{}
 
-	var xNum = 20
-	var xStrip float32 = 10
-	var zNum = 20
-	var zStrip float32 = 10
+	var xNum = 50
+	var xStrip float32 = 5
+	var zNum = 50
+	var zStrip float32 = 5
 
 	for zi := -zNum; zi <= zNum; zi += 1 {
 		for xi := -xNum; xi <= xNum; xi += 1 {

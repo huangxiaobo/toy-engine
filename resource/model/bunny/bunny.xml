@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <model>
+    <name>bunny</name>
+    <id>9128d629-c651-4688-85ad-11bc3e6c2293</id>
     <postion>
         <x>0</x>
         <y>0</y>

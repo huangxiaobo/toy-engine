@@ -26,11 +26,13 @@ type Model struct {
 	BasePath        string
 	FileName        string
 
+	Name     string
+	Id       string
 	material *material.Material
 	effect   *technique.LightingTechnique
 
-	position mgl32.Vec3
-	scale    mgl32.Vec3
+	Position mgl32.Vec3
+	Scale    mgl32.Vec3
 	model    mgl32.Mat4
 
 	DrawMode uint32
@@ -38,6 +40,8 @@ type Model struct {
 
 type XmlModel struct {
 	XMLName         xml.Name    `xml:"model"`
+	XMLAlias        string      `xml:"name"`
+	XMLId           string      `xml:"id"`
 	XMLPostion      XmlPostion  `xml:"postion"`
 	XMLScale        XmlScale    `xml:"scale"`
 	XMLMesh         XmlMesh     `xml:"mesh"`
@@ -89,6 +93,9 @@ func NewModel(f string) (Model, error) {
 
 	xm := m.loadXml(f)
 
+	m.Name = xm.XMLAlias
+	m.Id = xm.XMLId
+
 	m.texturesLoaded = make(map[string]texture.Texture)
 	if err := m.loadModel(); err != nil {
 		panic(err)
@@ -113,11 +120,11 @@ func NewModel(f string) (Model, error) {
 	}
 	m.effect.Init(s)
 
-	m.position = mgl32.Vec3{xm.XMLPostion.X, xm.XMLPostion.Y, xm.XMLPostion.Z}
-	m.scale = mgl32.Vec3{xm.XMLScale.X, xm.XMLScale.Y, xm.XMLScale.Z}
+	m.Position = mgl32.Vec3{xm.XMLPostion.X, xm.XMLPostion.Y, xm.XMLPostion.Z}
+	m.Scale = mgl32.Vec3{xm.XMLScale.X, xm.XMLScale.Y, xm.XMLScale.Z}
 
-	m.SetPostion(m.position)
-	m.SetScale(m.scale)
+	m.SetPostion(m.Position)
+	m.SetScale(m.Scale)
 
 	return m, nil
 }
@@ -407,8 +414,8 @@ func (m *Model) loadMaterialTextures(ms *assimp.Material, tm assimp.TextureMappi
 }
 
 func (m *Model) SetScale(scale mgl32.Vec3) {
-	m.scale = scale
-	m.model = m.model.Mul4(mgl32.Scale3D(m.scale[0], m.scale[1], m.scale[2]))
+	m.Scale = scale
+	m.model = m.model.Mul4(mgl32.Scale3D(m.Scale[0], m.Scale[1], m.Scale[2]))
 }
 
 func (m *Model) SetPostion(p mgl32.Vec3) {

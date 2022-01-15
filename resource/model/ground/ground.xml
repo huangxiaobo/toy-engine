@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <model>
+    <name>ground</name>
+    <id>fd8a5eff-32c4-40e4-acfb-5a517c731867</id>
     <postion>
         <x>0</x>
         <y>0</y>
