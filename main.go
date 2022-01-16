@@ -1,13 +1,12 @@
 package main
 
 import (
-	"github.com/go-gl/mathgl/mgl32"
-	"github.com/huangxiaobo/toy-engine/engine/model"
-	_ "image/png"
-	"log"
-	"runtime"
-
 	"github.com/huangxiaobo/toy-engine/engine"
+	"github.com/huangxiaobo/toy-engine/engine/window"
+	"github.com/therecipe/qt/widgets"
+	_ "image/png"
+	"os"
+	"runtime"
 )
 
 func init() {
@@ -18,19 +17,13 @@ func init() {
 func main() {
 
 	world := new(engine.World)
-	err := world.Init()
-	if err != nil {
-		log.Fatalln("failed to initialize world:", err)
-	}
+
 	defer world.Destroy()
 
-	ground, _ := model.NewGround("./resource/model/ground/ground.xml")
-	ground.SetScale(mgl32.Vec3{1, 1, 1})
-	//obj.DrawMode = model.DRAW_MODEL_LINES
-	world.AddRenderObj(&ground)
+	widgets.NewQApplication(len(os.Args), os.Args)
 
-	obj, _ := model.NewModel("./resource/model/bunny/bunny.xml")
-	world.AddRenderObj(&obj)
+	window.SetupUi(world)
 
-	world.Run()
+	widgets.QApplication_Exec()
+
 }
