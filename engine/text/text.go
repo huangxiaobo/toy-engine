@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	FontFile = "./resource/font/微软雅黑.ttf"
+	FontFile = "./assets/font/微软雅黑.ttf"
 )
 
 type VboData struct {
@@ -186,7 +186,7 @@ func NewText(content string, pix float32) (*Text, error) {
 	f.vbo.Create()
 	f.vbo.Bind()
 
-	f.shader = &shader.Shader{VertFilePath: "./resource/font/font.vert", FragFilePath: "./resource/font/font.frag"}
+	f.shader = &shader.Shader{VertFilePath: "./assets/font/font.vert", FragFilePath: "./assets/font/font.frag"}
 	f.shader.Init()
 	f.shader.Use()
 	f.shader.SetUniform("tex", 0)
