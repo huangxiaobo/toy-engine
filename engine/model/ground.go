@@ -4,13 +4,6 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/huangxiaobo/toy-engine/engine/config"
-	"github.com/huangxiaobo/toy-engine/engine/logger"
-	"github.com/huangxiaobo/toy-engine/engine/material"
-	"github.com/huangxiaobo/toy-engine/engine/shader"
-	"github.com/huangxiaobo/toy-engine/engine/technique"
-	"github.com/huangxiaobo/toy-engine/engine/texture"
-	"os"
-	"path/filepath"
 )
 
 type Ground struct {
@@ -18,46 +11,34 @@ type Ground struct {
 }
 
 func NewGround(xmlModel config.XmlModel) (Ground, error) {
-	cwd, _ := os.Getwd()
-	m := Ground{
-		Model: &Model{
-			BasePath: filepath.Join(cwd, "resource/model", xmlModel.XMLAlias),
-			model:    mgl32.Ident4(),
-		},
+
+	m, _ := NewModel(xmlModel)
+	g := Ground{
+		Model: &m,
 	}
 
-	m.Name = xmlModel.XMLAlias
-	m.Id = xmlModel.XMLId
-	m.FileName = xmlModel.XMLMesh.File
-	m.GammaCorrection = xmlModel.GammaCorrection
-
-	m.texturesLoaded = make(map[string]texture.Texture)
-	GenGroundMesh(&m)
+	GenGroundMesh(&g)
 	for i := 0; i < len(m.Meshes); i++ {
 		m.Meshes[i].setup()
 	}
 
-	m.effect = &technique.LightingTechnique{}
-
-	// Material
-	m.material = &material.Material{}
-	m.material.AmbientColor = xmlModel.XMLMaterial.Ambientcolor.RGB()
-	m.material.DiffuseColor = xmlModel.XMLMaterial.Diffusecolor.RGB()
-	m.material.SpecularColor = xmlModel.XMLMaterial.Specularcolor.RGB()
-	m.material.Shininess = xmlModel.XMLMaterial.Shininess
-
-	s := &shader.Shader{
-		VertFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.VertFile),
-		FragFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.FragFile),
-	}
-	if err := s.Init(); err != nil {
-		logger.Error(err)
-		panic("errr")
-	}
-	m.effect.Init(s)
-
-	return m, nil
+	return g, nil
 }
+
+//
+//func (g *Ground) Init() {
+//	fmt.Printf("Ground.Init")
+//	GenGroundMesh(g)
+//	g.Model.Init()
+//}
+//
+//// Loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
+//func (g *Ground) loadModel() error {
+//	fmt.Printf("Ground.loadModel")
+//	GenGroundMesh(g)
+//	g.initGL()
+//	return nil
+//}
 
 func GenGroundMesh(m *Ground) {
 	mesh := Mesh{}

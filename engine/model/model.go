@@ -12,8 +12,8 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/shader"
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
-	assimp "github.com/rishabh-bector/assimp-golang"
-	"os"
+	"github.com/huangxiaobo/toy-engine/engine/utils"
+	"github.com/rishabh-bector/assimp-golang"
 	"path/filepath"
 	"sync"
 )
@@ -30,6 +30,7 @@ type Model struct {
 	Id       string
 	material *material.Material
 	effect   *technique.LightingTechnique
+	shader   *shader.Shader
 
 	Position mgl32.Vec3
 	Scale    mgl32.Vec3
@@ -39,49 +40,49 @@ type Model struct {
 }
 
 func NewModel(xmlModel config.XmlModel) (Model, error) {
-	cwd, _ := os.Getwd()
+	basePath := filepath.Join(utils.GetCurrentDir(), "resource/model", xmlModel.Name)
 	m := Model{
-		BasePath: filepath.Join(cwd, "resource/model", xmlModel.XMLAlias),
-		model:    mgl32.Ident4(),
+		BasePath:        basePath,
+		model:           mgl32.Ident4(),
+		Name:            xmlModel.Name,
+		Id:              xmlModel.Id,
+		FileName:        xmlModel.Mesh.File,
+		GammaCorrection: xmlModel.GammaCorrection,
+		texturesLoaded:  make(map[string]texture.Texture),
+		Position:        xmlModel.Position.XYZ(),
+		Scale:           xmlModel.Scale.XYZ(),
+		effect:          &technique.LightingTechnique{},
+		material: &material.Material{
+			AmbientColor:  xmlModel.Material.AmbientColor.RGB(),
+			DiffuseColor:  xmlModel.Material.DiffuseColor.RGB(),
+			SpecularColor: xmlModel.Material.SpecularColor.RGB(),
+			Shininess:     xmlModel.Material.Shininess,
+		},
+		shader: &shader.Shader{
+			VertFilePath: filepath.Join(basePath, xmlModel.Shader.VertFile),
+			FragFilePath: filepath.Join(basePath, xmlModel.Shader.FragFile),
+		},
 	}
 
-	m.Name = xmlModel.XMLAlias
-	m.Id = xmlModel.XMLId
-	m.FileName = xmlModel.XMLMesh.File
-	m.GammaCorrection = xmlModel.GammaCorrection
+	m.Init()
 
-	m.texturesLoaded = make(map[string]texture.Texture)
+	return m, nil
+}
+
+func (m *Model) Init() {
 	if err := m.loadModel(); err != nil {
 		panic(err)
 	}
 
-	m.effect = &technique.LightingTechnique{}
-
-	// Material
-	m.material = &material.Material{}
-	m.material.AmbientColor = xmlModel.XMLMaterial.Ambientcolor.RGB()
-	m.material.DiffuseColor = xmlModel.XMLMaterial.Diffusecolor.RGB()
-	m.material.SpecularColor = xmlModel.XMLMaterial.Specularcolor.RGB()
-	m.material.Shininess = xmlModel.XMLMaterial.Shininess
-
-	s := &shader.Shader{
-		VertFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.VertFile),
-		FragFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.FragFile),
-	}
-	fmt.Printf("%v\n", s)
-	if err := s.Init(); err != nil {
+	// shader
+	if err := m.shader.Init(); err != nil {
 		logger.Error(err)
-		panic("errr")
+		panic(err)
 	}
-	m.effect.Init(s)
+	m.effect.Init(m.shader)
 
-	m.Position = xmlModel.XMLPostion.XYZ()
-	m.Scale = xmlModel.XMLScale.XYZ()
-
-	m.SetPostion(m.Position)
+	m.SetPosition(m.Position)
 	m.SetScale(m.Scale)
-
-	return m, nil
 }
 
 func (m *Model) Dispose() {
@@ -94,14 +95,15 @@ func (m *Model) Dispose() {
 
 // Loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
 func (m *Model) loadModel() error {
+	if len(m.FileName) == 0 {
+		return nil
+	}
 	// Read file via ASSIMP
 	path := filepath.Join(m.BasePath, m.FileName)
-	fmt.Println(path)
-	scene := assimp.ImportFile(path, uint(
-		assimp.Process_Triangulate|assimp.Process_FlipUVs))
+	scene := assimp.ImportFile(path, uint(assimp.Process_Triangulate|assimp.Process_FlipUVs))
 
 	// Check for errors
-	if scene.Flags()&assimp.SceneFlags_Incomplete != 0 { // if is Not Zero
+	if scene.Flags()&assimp.SceneFlags_Incomplete != 0 {
 		fmt.Printf("ERROR::ASSIMP:: %v\n", scene.Flags())
 		return errors.New("shit failed")
 	}
@@ -354,9 +356,8 @@ func (m *Model) SetScale(scale mgl32.Vec3) {
 	m.model = m.model.Mul4(mgl32.Scale3D(m.Scale[0], m.Scale[1], m.Scale[2]))
 }
 
-func (m *Model) SetPostion(p mgl32.Vec3) {
-	m.model = m.model.Add(mgl32.Translate3D(p[0], p[1], p[2]))
-
+func (m *Model) SetPosition(p mgl32.Vec3) {
+	m.model = m.model.Mul4(mgl32.Translate3D(p[0], p[1], p[2]))
 }
 
 func (m *Model) Update(elapsed float64) {

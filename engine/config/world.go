@@ -58,24 +58,23 @@ type XmlShader struct {
 }
 
 type XmlMaterial struct {
-	Ambientcolor  XmlRGB  `xml:"ambient"`
-	Diffusecolor  XmlRGB  `xml:"diffuse"`
-	Specularcolor XmlRGB  `xml:"specular"`
+	AmbientColor  XmlRGB  `xml:"ambient"`
+	DiffuseColor  XmlRGB  `xml:"diffuse"`
+	SpecularColor XmlRGB  `xml:"specular"`
 	Shininess     float32 `xml:"shininess"`
 }
 
 type XmlModel struct {
-	XMLName          xml.Name `xml:"model"`
-	XmlResourceClass string   `xml:"resource_class,attr"`
+	XmlResourceClass string `xml:"resource_class,attr"`
 
-	XMLAlias        string      `xml:"name"`
-	XMLId           string      `xml:"id"`
-	XMLPostion      XmlXYZ      `xml:"postion"`
-	XMLScale        XmlXYZ      `xml:"scale"`
-	XMLMesh         XmlMesh     `xml:"mesh"`
-	XmlShader       XmlShader   `xml:"shader"`
+	Name            string      `xml:"name"`
+	Id              string      `xml:"id"`
+	Position        XmlXYZ      `xml:"position"`
+	Scale           XmlXYZ      `xml:"scale"`
+	Mesh            XmlMesh     `xml:"mesh"`
+	Shader          XmlShader   `xml:"shader"`
 	GammaCorrection bool        `xml:"gammacorrection"`
-	XMLMaterial     XmlMaterial `xml:"material"`
+	Material        XmlMaterial `xml:"material"`
 }
 
 type XmlModels struct {

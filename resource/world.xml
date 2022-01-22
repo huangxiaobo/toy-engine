@@ -78,9 +78,9 @@
                 <z>0</z>
             </postion>
             <scale>
-                <x>8</x>
-                <y>8</y>
-                <z>8</z>
+                <x>1</x>
+                <y>1</y>
+                <z>1</z>
             </scale>
             <mesh name="ground">
                 <file></file>
