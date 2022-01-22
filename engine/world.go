@@ -73,7 +73,7 @@ func (w *World) Destroy() {
 
 func (w *World) Run() {
 
-	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
+	gl.ClearColor(0.8, 0.85, 0.85, 1.0)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 	projection := mgl32.Perspective(

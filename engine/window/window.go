@@ -6,7 +6,6 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine"
 	"github.com/huangxiaobo/toy-engine/engine/config"
 	"github.com/huangxiaobo/toy-engine/engine/model"
-	"github.com/therecipe/qt/core"
 	"github.com/therecipe/qt/gui"
 	"github.com/therecipe/qt/widgets"
 	"log"
@@ -22,7 +21,6 @@ func SetupTree(window *MainWindow, treeItems []TreeModelItem) {
 
 	treeWidget := window.TreeWidget
 
-	treeWidget.HeaderItem().SetHidden(true)
 	treeWidget.HeaderItem().SetDisabled(true)
 	treeWidget.HeaderItem().SetText(0, "世界")
 
@@ -42,7 +40,7 @@ func SetupTree(window *MainWindow, treeItems []TreeModelItem) {
 	modelTreeNode.SetExpanded(true)
 
 	treeWidget.ConnectKeyPressEvent(func(event *gui.QKeyEvent) {
-		fmt.Printf("treeWidget.ConnectKeyPressEvent:%+v %d\n", event, event.Key())
+		fmt.Println(event)
 	})
 }
 
@@ -54,11 +52,11 @@ func SetupOpenGLWidget(window *MainWindow, world *engine.World) *MainWindow {
 		if err != nil {
 			log.Fatalln("failed to initialize world:", err)
 		}
-		ground, _ := model.NewGround("./assets/model/ground/ground.xml")
+		ground, _ := model.NewGround("./resource/model/ground/ground.xml")
 		ground.SetScale(mgl32.Vec3{1, 1, 1})
 		//obj.DrawMode = model.DRAW_MODEL_LINES
 		world.AddRenderObj(&ground)
-		obj, _ := model.NewModel("./assets/model/bunny/bunny.xml")
+		obj, _ := model.NewModel("./resource/model/bunny/bunny.xml")
 		world.AddRenderObj(&obj)
 
 		treeItems := make([]TreeModelItem, 0)
@@ -81,27 +79,6 @@ func SetupOpenGLWidget(window *MainWindow, world *engine.World) *MainWindow {
 	openglWidget.ConnectPaintGL(func() {
 		world.Run()
 	})
-	openglWidget.ConnectMousePressEvent(func(event *gui.QMouseEvent) {
-		openglWidget.SetFocus(core.Qt__MouseFocusReason)
-		fmt.Printf("openglWidget.ConnectMousePressEvent:%+v\n", event)
-	})
-	openglWidget.ConnectMouseReleaseEvent(func(event *gui.QMouseEvent) {
-		fmt.Printf("openglWidget.ConnectMouseReleaseEvent:%+v\n", event)
-	})
-
-	openglWidget.ConnectKeyPressEvent(func(event *gui.QKeyEvent) {
-		fmt.Printf("openglWidget.ConnectKeyPressEvent:%+v, %d\n", event, event.Key())
-		fmt.Printf("openglWidget.ConnectKeyPressEvent:%d, %d %d\n", core.Qt__Key_F1, event.Key(), core.Qt__Key(event.Key()))
-
-		switch core.Qt__Key(event.Key()) {
-		case core.Qt__Key_F1:
-			fmt.Printf("up")
-		}
-	})
-
-	openglWidget.ConnectKeyReleaseEvent(func(event *gui.QKeyEvent) {
-		fmt.Printf("openglWidget.ConnectKeyReleaseEvent%+v\n", event)
-	})
 
 	tk := time.NewTimer(time.Millisecond * 30)
 	go func() {
@@ -113,19 +90,11 @@ func SetupOpenGLWidget(window *MainWindow, world *engine.World) *MainWindow {
 			}
 		}
 	}()
-
-	window.ConnectMousePressEvent(func(event *gui.QMouseEvent) {
-		fmt.Printf("window.ConnectMousePressEvent%+v\n", event)
-	})
-	window.ConnectKeyPressEvent(func(event *gui.QKeyEvent) {
-		fmt.Printf("window.ConnectKeyPressEvent%+v\n", event)
-	})
 	return window
 }
 
 func SetupUi(world *engine.World) {
 	window := NewMainWindow(nil)
-	window.SetWindowTitle("ToyEngine")
 	SetupOpenGLWidget(window, world)
 	window.Show()
 }

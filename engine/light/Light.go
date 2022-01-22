@@ -40,7 +40,7 @@ var vertices = []float32{
 }
 
 func (light *PointLight) Init() {
-	light.shader = &shader.Shader{VertFilePath: "./assets/shader/light.vert", FragFilePath: "./assets/shader/light.frag"}
+	light.shader = &shader.Shader{VertFilePath: "./resource/shader/light.vert", FragFilePath: "./resource/shader/light.frag"}
 	if err := light.shader.Init(); err != nil {
 		logger.Error(err)
 		return
