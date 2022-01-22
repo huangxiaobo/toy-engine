@@ -1,11 +1,11 @@
 package model
 
 import (
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/huangxiaobo/toy-engine/engine/config"
 	"github.com/huangxiaobo/toy-engine/engine/light"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/material"
@@ -13,7 +13,7 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
 	assimp "github.com/rishabh-bector/assimp-golang"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync"
 )
@@ -38,63 +38,17 @@ type Model struct {
 	DrawMode uint32
 }
 
-type XmlModel struct {
-	XMLName         xml.Name    `xml:"model"`
-	XMLAlias        string      `xml:"name"`
-	XMLId           string      `xml:"id"`
-	XMLPostion      XmlPostion  `xml:"postion"`
-	XMLScale        XmlScale    `xml:"scale"`
-	XMLMesh         XmlMesh     `xml:"mesh"`
-	XmlShader       XmlShader   `xml:"shader"`
-	GammaCorrection bool        `xml:"gammacorrection"`
-	XMLMaterial     XmlMaterial `xml:"material"`
-}
-
-type XmlMesh struct {
-	File string `xml:"file"` // Mesh file
-}
-type XmlShader struct {
-	VertFile string `xml:"vert"`
-	FragFile string `xml:"frag"`
-}
-
-type XmlMaterial struct {
-	Ambientcolor  XmlColor `xml:"ambient"`
-	Diffusecolor  XmlColor `xml:"diffuse"`
-	Specularcolor XmlColor `xml:"specular"`
-	Shininess     float32  `xml:"shininess"`
-}
-
-type XmlColor struct {
-	R float32 `xml:"r"`
-	G float32 `xml:"g"`
-	B float32 `xml:"b"`
-}
-
-type XmlPostion struct {
-	X float32 `xml:"x"`
-	Y float32 `xml:"y"`
-	Z float32 `xml:"z"`
-}
-
-type XmlScale struct {
-	X float32 `xml:"x"`
-	Y float32 `xml:"y"`
-	Z float32 `xml:"z"`
-}
-
-func NewModel(f string) (Model, error) {
-	f, _ = filepath.Abs(f)
-
+func NewModel(xmlModel config.XmlModel) (Model, error) {
+	cwd, _ := os.Getwd()
 	m := Model{
-		BasePath: filepath.Dir(f),
+		BasePath: filepath.Join(cwd, "resource/model", xmlModel.XMLAlias),
 		model:    mgl32.Ident4(),
 	}
 
-	xm := m.loadXml(f)
-
-	m.Name = xm.XMLAlias
-	m.Id = xm.XMLId
+	m.Name = xmlModel.XMLAlias
+	m.Id = xmlModel.XMLId
+	m.FileName = xmlModel.XMLMesh.File
+	m.GammaCorrection = xmlModel.GammaCorrection
 
 	m.texturesLoaded = make(map[string]texture.Texture)
 	if err := m.loadModel(); err != nil {
@@ -105,23 +59,24 @@ func NewModel(f string) (Model, error) {
 
 	// Material
 	m.material = &material.Material{}
-	m.material.AmbientColor = mgl32.Vec3{xm.XMLMaterial.Ambientcolor.R, xm.XMLMaterial.Ambientcolor.G, xm.XMLMaterial.Ambientcolor.B}
-	m.material.DiffuseColor = mgl32.Vec3{xm.XMLMaterial.Diffusecolor.R, xm.XMLMaterial.Diffusecolor.G, xm.XMLMaterial.Diffusecolor.B}
-	m.material.SpecularColor = mgl32.Vec3{xm.XMLMaterial.Specularcolor.R, xm.XMLMaterial.Specularcolor.G, xm.XMLMaterial.Specularcolor.B}
-	m.material.Shininess = xm.XMLMaterial.Shininess
+	m.material.AmbientColor = xmlModel.XMLMaterial.Ambientcolor.RGB()
+	m.material.DiffuseColor = xmlModel.XMLMaterial.Diffusecolor.RGB()
+	m.material.SpecularColor = xmlModel.XMLMaterial.Specularcolor.RGB()
+	m.material.Shininess = xmlModel.XMLMaterial.Shininess
 
 	s := &shader.Shader{
-		VertFilePath: filepath.Join(m.BasePath, xm.XmlShader.VertFile),
-		FragFilePath: filepath.Join(m.BasePath, xm.XmlShader.FragFile),
+		VertFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.VertFile),
+		FragFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.FragFile),
 	}
+	fmt.Printf("%v\n", s)
 	if err := s.Init(); err != nil {
 		logger.Error(err)
 		panic("errr")
 	}
 	m.effect.Init(s)
 
-	m.Position = mgl32.Vec3{xm.XMLPostion.X, xm.XMLPostion.Y, xm.XMLPostion.Z}
-	m.Scale = mgl32.Vec3{xm.XMLScale.X, xm.XMLScale.Y, xm.XMLScale.Z}
+	m.Position = xmlModel.XMLPostion.XYZ()
+	m.Scale = xmlModel.XMLScale.XYZ()
 
 	m.SetPostion(m.Position)
 	m.SetScale(m.Scale)
@@ -137,29 +92,10 @@ func (m *Model) Dispose() {
 	}
 }
 
-func (m *Model) loadXml(f string) *XmlModel {
-	data, err := ioutil.ReadFile(f)
-	if err != nil {
-		panic(err)
-	}
-
-	xm := &XmlModel{}
-	err = xml.Unmarshal(data, &xm)
-	if err != nil {
-		fmt.Printf("error: %xm", err)
-		panic(err)
-	}
-
-	m.FileName = xm.XMLMesh.File
-	m.GammaCorrection = xm.GammaCorrection
-
-	return xm
-}
-
 // Loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
 func (m *Model) loadModel() error {
 	// Read file via ASSIMP
-	path := m.BasePath + m.FileName
+	path := filepath.Join(m.BasePath, m.FileName)
 	fmt.Println(path)
 	scene := assimp.ImportFile(path, uint(
 		assimp.Process_Triangulate|assimp.Process_FlipUVs))

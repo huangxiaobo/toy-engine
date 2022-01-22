@@ -32,6 +32,7 @@ type World struct {
 	imguiio  imgui.IO
 	renderer *platforms.OpenGL3
 
+	xmlWorld   *config.XmlWorld
 	Light      *light.PointLight
 	renderObjs []model.RenderObj
 	Camera     *camera.Camera
@@ -45,6 +46,8 @@ func (w *World) initSDL() {
 
 	windowWidth := config.Config.WindowWidth
 	windowHeight := config.Config.WindowHeight
+	fmt.Printf("windowWidth: %d windowHeight: %d\n", windowWidth, windowHeight)
+
 	w.platform, err = platforms.NewSDL(w.imguiio, platforms.SDLClientAPIOpenGL4, windowWidth, windowHeight)
 	if err != nil {
 		panic(err)
@@ -91,21 +94,42 @@ func (w *World) initGL() {
 
 }
 
-func (w *World) Init() error {
+func (w *World) initModels() {
 
+	for _, xmlMode := range w.xmlWorld.XMLModels.XMLModels {
+		resourceClass := xmlMode.XmlResourceClass
+
+		switch resourceClass {
+		case "Ground":
+			obj, _ := model.NewGround(xmlMode)
+			w.AddRenderObj(&obj)
+		case "Model":
+			obj, _ := model.NewModel(xmlMode)
+			w.AddRenderObj(&obj)
+
+		}
+	}
+
+}
+
+func (w *World) Init(configFile string) error {
+	w.xmlWorld = config.InitXML(configFile)
 	w.context = imgui.CreateContext(nil)
 
 	w.imguiio = imgui.CurrentIO()
 
 	w.initSDL()
 	//w.initGL()
+	w.initModels()
 
 	// 初始化摄像机
+	xmlCamera := w.xmlWorld.XMLCamera
 	w.Camera = new(camera.Camera)
-	w.Camera.Init(mgl32.Vec3{0.0, 50.0, 50.0}, mgl32.Vec3{-0.0, -0.0, -0.0})
+	w.Camera.Init(xmlCamera.XMLPosition.XYZ(), xmlCamera.XMLTarget.XYZ())
 
 	// 初始化灯光
-	w.Light = &light.PointLight{Position: mgl32.Vec4{0, 50.0, 0, 0.0}, Color: mgl32.Vec3{1.0, 1.0, 1.0}}
+	xmlLight := w.xmlWorld.XMLLight
+	w.Light = &light.PointLight{Position: xmlLight.XMLPosition.XYZW(), Color: xmlLight.XMLColor.RGB()}
 	w.Light.Init()
 
 	// Text
@@ -162,7 +186,6 @@ func (w *World) Run() {
 		name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
 		id := reflect.ValueOf(renderObj).Elem().FieldByName("Id").String()
 
-		fmt.Printf("name: %s, id: %s\n", name, id)
 		mainWindow.AddModelItem(window.ModelItem{Name: name, Id: id})
 	}
 
@@ -199,13 +222,13 @@ func (w *World) Run() {
 		// Rendering
 		imgui.Render() // This call only creates the draw data list. Actual rendering to framebuffer is done below.
 
-		w.renderer.PreRender([3]float32{0.8, 0.85, 0.85})
+		w.renderer.PreRender(config.Config.ClearColor.Vec3())
 
 		projection := mgl32.Perspective(
 			mgl32.DegToRad(w.Camera.Zoom),
 			float32(config.Config.WindowHeight/config.Config.WindowHeight),
-			0.1,
-			100.0,
+			config.Config.ClipNear,
+			config.Config.ClipFar,
 		)
 		view := w.Camera.GetViewMatrix()
 		model := mgl32.Ident4()
@@ -246,8 +269,8 @@ func (w *World) DrawLight() {
 	projection := mgl32.Perspective(
 		mgl32.DegToRad(w.Camera.Zoom),
 		width/height,
-		0.1,
-		100.0,
+		config.Config.ClipNear,
+		config.Config.ClipFar,
 	)
 	view := w.Camera.GetViewMatrix()
 	model := mgl32.Ident4().Mul4(mgl32.Scale3D(1, 1, 1))

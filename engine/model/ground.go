@@ -3,11 +3,13 @@ package model
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/huangxiaobo/toy-engine/engine/config"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/material"
 	"github.com/huangxiaobo/toy-engine/engine/shader"
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
+	"os"
 	"path/filepath"
 )
 
@@ -15,20 +17,19 @@ type Ground struct {
 	*Model
 }
 
-func NewGround(f string) (Ground, error) {
-	f, _ = filepath.Abs(f)
-
+func NewGround(xmlModel config.XmlModel) (Ground, error) {
+	cwd, _ := os.Getwd()
 	m := Ground{
 		Model: &Model{
-			BasePath: filepath.Dir(f),
+			BasePath: filepath.Join(cwd, "resource/model", xmlModel.XMLAlias),
 			model:    mgl32.Ident4(),
 		},
 	}
 
-	xm := m.loadXml(f)
-
-	m.Name = xm.XMLAlias
-	m.Id = xm.XMLId
+	m.Name = xmlModel.XMLAlias
+	m.Id = xmlModel.XMLId
+	m.FileName = xmlModel.XMLMesh.File
+	m.GammaCorrection = xmlModel.GammaCorrection
 
 	m.texturesLoaded = make(map[string]texture.Texture)
 	GenGroundMesh(&m)
@@ -40,14 +41,14 @@ func NewGround(f string) (Ground, error) {
 
 	// Material
 	m.material = &material.Material{}
-	m.material.AmbientColor = mgl32.Vec3{xm.XMLMaterial.Ambientcolor.R, xm.XMLMaterial.Ambientcolor.G, xm.XMLMaterial.Ambientcolor.B}
-	m.material.DiffuseColor = mgl32.Vec3{xm.XMLMaterial.Diffusecolor.R, xm.XMLMaterial.Diffusecolor.G, xm.XMLMaterial.Diffusecolor.B}
-	m.material.SpecularColor = mgl32.Vec3{xm.XMLMaterial.Specularcolor.R, xm.XMLMaterial.Specularcolor.G, xm.XMLMaterial.Specularcolor.B}
-	m.material.Shininess = xm.XMLMaterial.Shininess
+	m.material.AmbientColor = xmlModel.XMLMaterial.Ambientcolor.RGB()
+	m.material.DiffuseColor = xmlModel.XMLMaterial.Diffusecolor.RGB()
+	m.material.SpecularColor = xmlModel.XMLMaterial.Specularcolor.RGB()
+	m.material.Shininess = xmlModel.XMLMaterial.Shininess
 
 	s := &shader.Shader{
-		VertFilePath: filepath.Join(m.BasePath, xm.XmlShader.VertFile),
-		FragFilePath: filepath.Join(m.BasePath, xm.XmlShader.FragFile),
+		VertFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.VertFile),
+		FragFilePath: filepath.Join(m.BasePath, xmlModel.XmlShader.FragFile),
 	}
 	if err := s.Init(); err != nil {
 		logger.Error(err)
@@ -61,10 +62,10 @@ func NewGround(f string) (Ground, error) {
 func GenGroundMesh(m *Ground) {
 	mesh := Mesh{}
 
-	var xNum = 50
-	var xStrip float32 = 5
-	var zNum = 50
-	var zStrip float32 = 5
+	var xNum = 100
+	var xStrip float32 = 10
+	var zNum = 100
+	var zStrip float32 = 10
 
 	for zi := -zNum; zi <= zNum; zi += 1 {
 		for xi := -xNum; xi <= xNum; xi += 1 {
