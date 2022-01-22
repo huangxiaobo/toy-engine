@@ -1,14 +1,15 @@
 @echo off
 
-go env
-::go mod download
-::go mod vendor
-::vend
 
+if exist .\output (
+    echo
+) else (
+    md output
+)
 
-echo "start build..."
-qtdeploy build desktop main.go
+del /f /s /q .\output\*.*
 
-echo "start run..."
-xcopy .\lib\*.* .\deploy\windows\ /y
-deploy\windows\toy-engine.exe
+go build  -o output/toy-engine.exe main.go
+
+xcopy .\lib\*.* .\output\ /y
+.\output\toy-engine.exe
