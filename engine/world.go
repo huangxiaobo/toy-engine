@@ -12,7 +12,7 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/model"
 	"github.com/huangxiaobo/toy-engine/engine/platforms"
 	"github.com/huangxiaobo/toy-engine/engine/text"
-	"github.com/huangxiaobo/toy-engine/engine/window"
+	"github.com/huangxiaobo/toy-engine/engine/ui"
 	"github.com/inkyblackness/imgui-go/v4"
 
 	"github.com/huangxiaobo/toy-engine/engine/camera"
@@ -38,7 +38,10 @@ type World struct {
 	Camera     *camera.Camera
 	Text       *text.Text
 
-	bRun bool
+	uiWindowStatus   *ui.WindowStatus
+	uiWindowMain     *ui.WindowMain
+	uiWindowMaterial *ui.WindowMaterial
+	bRun             bool
 }
 
 func (w *World) initSDL() {
@@ -112,6 +115,42 @@ func (w *World) initModels() {
 
 }
 
+func (w *World) initUI() {
+	w.uiWindowMain = ui.NewWindowMain()
+	w.uiWindowMaterial = ui.NewWindowMaterial()
+	w.uiWindowStatus = ui.NewWindowStatus()
+
+	for _, renderObj := range w.renderObjs {
+		name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
+		id := reflect.ValueOf(renderObj).Elem().FieldByName("Id").String()
+
+		w.uiWindowMain.AddModelItem(ui.ModelItem{Name: name, Id: id})
+	}
+
+	w.uiWindowMain.NotifyModelItemChange(func(item ui.ModelItem) {
+		w.uiWindowMaterial.Reset()
+
+		var targetRenderObj model.RenderObj = nil
+		for _, renderObj := range w.renderObjs {
+			name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
+			if name == item.Name {
+				targetRenderObj = renderObj
+				break
+			}
+		}
+		if targetRenderObj == nil {
+			return
+		}
+		value := reflect.ValueOf(targetRenderObj).Elem().FieldByName("Position")
+		w.uiWindowMaterial.AddMaterialAttr("Position", value.Interface().(mgl32.Vec3))
+		value = reflect.ValueOf(targetRenderObj).Elem().FieldByName("Scale")
+		w.uiWindowMaterial.AddMaterialAttr("Scale", value.Interface().(mgl32.Vec3))
+
+		w.uiWindowMaterial.SetVisible(true)
+	})
+
+}
+
 func (w *World) Init(configFile string) error {
 	w.xmlWorld = config.InitXML(configFile)
 	w.context = imgui.CreateContext(nil)
@@ -121,6 +160,8 @@ func (w *World) Init(configFile string) error {
 	w.initSDL()
 	//w.initGL()
 	w.initModels()
+
+	w.initUI()
 
 	// 初始化摄像机
 	xmlCamera := w.xmlWorld.XMLCamera
@@ -181,34 +222,6 @@ func (board clipboard) SetText(text string) {
 func (w *World) Run() {
 	imgui.CurrentIO().SetClipboard(clipboard{platform: w.platform})
 
-	mainWindow := window.NewWindowMain()
-	for _, renderObj := range w.renderObjs {
-		name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
-		id := reflect.ValueOf(renderObj).Elem().FieldByName("Id").String()
-
-		mainWindow.AddModelItem(window.ModelItem{Name: name, Id: id})
-	}
-
-	mainWindow.NotifyModelItemChange(func(item window.ModelItem) {
-		window.InitWindowMaterial()
-
-		var targetRenderObj model.RenderObj = nil
-		for _, renderObj := range w.renderObjs {
-			name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
-			if name == item.Name {
-				targetRenderObj = renderObj
-				break
-			}
-		}
-		if targetRenderObj == nil {
-			return
-		}
-		value := reflect.ValueOf(targetRenderObj).Elem().FieldByName("Position")
-		window.AddMaterialAttr("Position", value.Interface().(mgl32.Vec3))
-		value = reflect.ValueOf(targetRenderObj).Elem().FieldByName("Scale")
-		window.AddMaterialAttr("Scale", value.Interface().(mgl32.Vec3))
-	})
-
 	for !w.platform.ShouldStop() {
 		w.platform.ProcessEvents()
 
@@ -216,8 +229,9 @@ func (w *World) Run() {
 		w.platform.NewFrame()
 		imgui.NewFrame()
 
-		mainWindow.ShowWindowMain()
-		window.ShowWindowMaterial()
+		w.uiWindowMain.ShowWindowMain()
+		w.uiWindowStatus.Show(w.platform.DisplaySize())
+		w.uiWindowMaterial.Show(w.platform.DisplaySize())
 
 		// Rendering
 		imgui.Render() // This call only creates the draw data list. Actual rendering to framebuffer is done below.

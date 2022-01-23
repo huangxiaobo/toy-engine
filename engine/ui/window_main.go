@@ -1,7 +1,13 @@
-package window
+package ui
 
 import (
 	"github.com/inkyblackness/imgui-go/v4"
+	"time"
+)
+
+const (
+	millisPerSecond = 1000
+	sleepDuration   = time.Millisecond * 25
 )
 
 type WindowMain struct {
@@ -13,7 +19,7 @@ type WindowMain struct {
 
 func NewWindowMain() *WindowMain {
 	wm := &WindowMain{
-		flags:       WindowFlags{noResize: true, noMove: true},
+		flags:       WindowFlags{noResize: true, noMove: true, noMenu: true},
 		ModelWidget: modelWidget{selectItemIdx: -1},
 	}
 	return wm
@@ -21,7 +27,7 @@ func NewWindowMain() *WindowMain {
 
 func (mw *WindowMain) ShowWindowMain() {
 	imgui.SetNextWindowPosV(imgui.Vec2{X: 0, Y: 20}, imgui.ConditionFirstUseEver, imgui.Vec2{})
-	imgui.SetNextWindowSizeV(imgui.Vec2{X: 350, Y: 680}, imgui.ConditionFirstUseEver)
+	imgui.SetNextWindowSizeV(imgui.Vec2{X: 350, Y: 350}, imgui.ConditionFirstUseEver)
 
 	if !imgui.BeginV("MainPanel", nil, mw.flags.combined()) {
 		// Early out if the window is collapsed, as an optimization.

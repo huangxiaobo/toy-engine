@@ -25,21 +25,6 @@ func NewGround(xmlModel config.XmlModel) (Ground, error) {
 	return g, nil
 }
 
-//
-//func (g *Ground) Init() {
-//	fmt.Printf("Ground.Init")
-//	GenGroundMesh(g)
-//	g.Model.Init()
-//}
-//
-//// Loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
-//func (g *Ground) loadModel() error {
-//	fmt.Printf("Ground.loadModel")
-//	GenGroundMesh(g)
-//	g.initGL()
-//	return nil
-//}
-
 func GenGroundMesh(m *Ground) {
 	mesh := Mesh{}
 

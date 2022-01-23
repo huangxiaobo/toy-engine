@@ -3,49 +3,26 @@ package model
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/huangxiaobo/toy-engine/engine/logger"
-	"github.com/huangxiaobo/toy-engine/engine/material"
-	"github.com/huangxiaobo/toy-engine/engine/shader"
-	"github.com/huangxiaobo/toy-engine/engine/technique"
-	"github.com/huangxiaobo/toy-engine/engine/texture"
+	"github.com/huangxiaobo/toy-engine/engine/config"
 )
 
 type Point struct {
-	Model
+	*Model
 }
 
-func NewPoint(f string, g bool, vertFile, fragFile string) (Point, error) {
-	m := Point{
-		Model{
-			FileName:        f,
-			GammaCorrection: g,
+func NewPoint(xmlModel config.XmlModel) (Point, error) {
 
-			model: mgl32.Ident4(),
-		},
+	m, _ := NewModel(xmlModel)
+	p := Point{
+		Model: &m,
 	}
-	m.texturesLoaded = make(map[string]texture.Texture)
-	GenPointMesh(&m)
 
+	GenPointMesh(&p)
 	for i := 0; i < len(m.Meshes); i++ {
 		m.Meshes[i].setup()
 	}
 
-	// Material
-	m.material = &material.Material{}
-	m.material.AmbientColor = mgl32.Vec3{0.05, 0.1, 0.05}
-	m.material.DiffuseColor = mgl32.Vec3{0.1, 0.2, 0.3}
-	m.material.SpecularColor = mgl32.Vec3{0.0, 1.0, 0.0}
-	m.material.Shininess = 2
-
-	s := &shader.Shader{VertFilePath: vertFile, FragFilePath: fragFile}
-	if err := s.Init(); err != nil {
-		logger.Error(err)
-		panic("errr")
-	}
-
-	m.effect = &technique.LightingTechnique{}
-	m.effect.Init(s)
-	return m, nil
+	return p, nil
 }
 
 func GenPointMesh(m *Point) {
@@ -74,9 +51,7 @@ func GenPointMesh(m *Point) {
 		Bitangent: mgl32.Vec3{0.0, 0.0, 0.0},
 	}
 	mesh.Vertices = append(mesh.Vertices, v0, v1, v2)
-
 	mesh.Indices = append(mesh.Indices, 0, 1, 2)
-
 	m.Meshes = append(m.Meshes, mesh)
 }
 

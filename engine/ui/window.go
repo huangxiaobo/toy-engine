@@ -1,4 +1,4 @@
-package window
+package ui
 
 import (
 	"github.com/inkyblackness/imgui-go/v4"
