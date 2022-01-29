@@ -26,17 +26,19 @@ type Model struct {
 	BasePath        string
 	FileName        string
 
-	Name     string
-	Id       string
-	material *material.Material
+	Name     string `ui:"Text"`
+	Id       string `ui:"Text"`
+	Material *material.Material
 	effect   *technique.LightingTechnique
 	shader   *shader.Shader
 
-	Position mgl32.Vec3
-	Scale    mgl32.Vec3
-	model    mgl32.Mat4
+	Position   mgl32.Vec3 `ui:"DragFloat3"`
+	Scale      mgl32.Vec3 `ui:"DragFloat3"`
+	Rotate     float32    `ui:"Rotate""`
+	geoInvalid bool
+	model      mgl32.Mat4
 
-	DrawMode uint32
+	DrawMode uint32 `ui:"DrawMode"`
 }
 
 func NewModel(xmlModel config.XmlModel) (Model, error) {
@@ -52,7 +54,7 @@ func NewModel(xmlModel config.XmlModel) (Model, error) {
 		Position:        xmlModel.Position.XYZ(),
 		Scale:           xmlModel.Scale.XYZ(),
 		effect:          &technique.LightingTechnique{},
-		material: &material.Material{
+		Material: &material.Material{
 			AmbientColor:  xmlModel.Material.AmbientColor.RGB(),
 			DiffuseColor:  xmlModel.Material.DiffuseColor.RGB(),
 			SpecularColor: xmlModel.Material.SpecularColor.RGB(),
@@ -353,15 +355,27 @@ func (m *Model) loadMaterialTextures(ms *assimp.Material, tm assimp.TextureMappi
 
 func (m *Model) SetScale(scale mgl32.Vec3) {
 	m.Scale = scale
-	m.model = m.model.Mul4(mgl32.Scale3D(m.Scale[0], m.Scale[1], m.Scale[2]))
+	m.geoInvalid = true
 }
 
 func (m *Model) SetPosition(p mgl32.Vec3) {
-	m.model = m.model.Mul4(mgl32.Translate3D(p[0], p[1], p[2]))
+	m.Position = p
+	m.geoInvalid = true
+}
+
+func (m *Model) SetRotate(rotate float32) {
+	m.Rotate = rotate
+	m.geoInvalid = true
 }
 
 func (m *Model) Update(elapsed float64) {
-	m.model = m.model.Mul4(mgl32.HomogRotate3DY(float32(elapsed)))
+	if m.geoInvalid {
+		m.model = mgl32.Translate3D(m.Position[0], m.Position[1], m.Position[2])
+		m.model = m.model.Mul4(mgl32.HomogRotate3D(m.Rotate, mgl32.Vec3{0, 1, 0}))
+		m.model = m.model.Mul4(mgl32.Scale3D(m.Scale[0], m.Scale[1], m.Scale[2]))
+
+		m.geoInvalid = false
+	}
 }
 
 func (m *Model) PreRender() {
@@ -382,7 +396,7 @@ func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Ve
 	m.effect.SetEyeWorldPos(eyePosition)
 
 	m.effect.SetPointLight(light)
-	m.effect.SetMaterial(m.material)
+	m.effect.SetMaterial(m.Material)
 
 	gl.BindFragDataLocation(m.effect.ShaderObj.Program, 0, gl.Str("color\x00"))
 

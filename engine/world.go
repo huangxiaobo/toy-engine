@@ -2,18 +2,18 @@ package engine
 
 import (
 	"fmt"
-	_ "image/png"
-	"os"
-	"reflect"
-	"time"
-
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/huangxiaobo/toy-engine/engine/model"
 	"github.com/huangxiaobo/toy-engine/engine/platforms"
 	"github.com/huangxiaobo/toy-engine/engine/text"
 	"github.com/huangxiaobo/toy-engine/engine/ui"
+	"github.com/huangxiaobo/toy-engine/engine/utils"
 	"github.com/inkyblackness/imgui-go/v4"
+	_ "image/png"
+	"os"
+	"reflect"
+	"time"
 
 	"github.com/huangxiaobo/toy-engine/engine/camera"
 	"github.com/huangxiaobo/toy-engine/engine/config"
@@ -40,7 +40,7 @@ type World struct {
 
 	uiWindowStatus   *ui.WindowStatus
 	uiWindowMain     *ui.WindowMain
-	uiWindowMaterial *ui.WindowMaterial
+	uiWindowMaterial *ui.WindowModel
 	bRun             bool
 }
 
@@ -130,21 +130,20 @@ func (w *World) initUI() {
 	w.uiWindowMain.NotifyModelItemChange(func(item ui.ModelItem) {
 		w.uiWindowMaterial.Reset()
 
-		var targetRenderObj model.RenderObj = nil
 		for _, renderObj := range w.renderObjs {
-			name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
-			if name == item.Name {
-				targetRenderObj = renderObj
-				break
+			rType := reflect.TypeOf(renderObj)
+			rVal := reflect.ValueOf(renderObj)
+			if rType.Kind() == reflect.Ptr {
+				rType = rType.Elem()
+				rVal = rVal.Elem()
 			}
+
+			name := rVal.FieldByName("Name").String()
+			if name != item.Name {
+				continue
+			}
+			w.uiWindowMaterial.SetRenderObj(renderObj)
 		}
-		if targetRenderObj == nil {
-			return
-		}
-		value := reflect.ValueOf(targetRenderObj).Elem().FieldByName("Position")
-		w.uiWindowMaterial.AddMaterialAttr("Position", value.Interface().(mgl32.Vec3))
-		value = reflect.ValueOf(targetRenderObj).Elem().FieldByName("Scale")
-		w.uiWindowMaterial.AddMaterialAttr("Scale", value.Interface().(mgl32.Vec3))
 
 		w.uiWindowMaterial.SetVisible(true)
 	})
@@ -156,6 +155,10 @@ func (w *World) Init(configFile string) error {
 	w.context = imgui.CreateContext(nil)
 
 	w.imguiio = imgui.CurrentIO()
+	imgui.PushStyleVarFloat(imgui.StyleVarWindowBorderSize, 1)
+	imgui.PushStyleVarFloat(imgui.StyleVarWindowRounding, 6)
+	imgui.PushStyleVarFloat(imgui.StyleVarFrameRounding, 6)
+	imgui.PushStyleVarFloat(imgui.StyleVarFrameBorderSize, 1)
 
 	w.initSDL()
 	//w.initGL()
@@ -219,6 +222,8 @@ func (board clipboard) SetText(text string) {
 	board.platform.SetClipboardText(text)
 }
 
+var cnt = 0
+
 func (w *World) Run() {
 	imgui.CurrentIO().SetClipboard(clipboard{platform: w.platform})
 
@@ -229,9 +234,10 @@ func (w *World) Run() {
 		w.platform.NewFrame()
 		imgui.NewFrame()
 
-		w.uiWindowMain.ShowWindowMain()
-		w.uiWindowStatus.Show(w.platform.DisplaySize())
-		w.uiWindowMaterial.Show(w.platform.DisplaySize())
+		displaySize := w.platform.DisplaySize()
+		w.uiWindowMain.Show(displaySize)
+		w.uiWindowStatus.Show(displaySize)
+		w.uiWindowMaterial.Show(displaySize)
 
 		// Rendering
 		imgui.Render() // This call only creates the draw data list. Actual rendering to framebuffer is done below.
@@ -266,6 +272,11 @@ func (w *World) Run() {
 		// Maintenance
 		w.renderer.Render(w.platform.DisplaySize(), w.platform.FramebufferSize(), imgui.RenderedDrawData())
 		w.platform.PostRender()
+
+		if cnt%10000 == 0 {
+			utils.Screenshot(int(displaySize[0]), int(displaySize[1]))
+		}
+		cnt += 1
 
 		// sleep to avoid 100% CPU usage for this demo
 		<-time.After(sleepDuration)

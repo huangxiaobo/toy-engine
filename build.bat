@@ -1,6 +1,5 @@
 @echo off
 
-
 if exist .\output (
     echo "Empty output directory"
     del /f /s /q .\output\*.*

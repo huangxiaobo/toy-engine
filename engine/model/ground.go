@@ -29,9 +29,9 @@ func GenGroundMesh(m *Ground) {
 	mesh := Mesh{}
 
 	var xNum = 100
-	var xStrip float32 = 10
+	var xStrip float32 = 5
 	var zNum = 100
-	var zStrip float32 = 10
+	var zStrip float32 = 5
 
 	for zi := -zNum; zi <= zNum; zi += 1 {
 		for xi := -xNum; xi <= xNum; xi += 1 {

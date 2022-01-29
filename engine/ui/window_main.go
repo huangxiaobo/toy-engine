@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/huangxiaobo/toy-engine/engine/utils"
 	"github.com/inkyblackness/imgui-go/v4"
 	"time"
 )
@@ -14,25 +15,40 @@ type WindowMain struct {
 	noClose bool
 	flags   WindowFlags
 
-	ModelWidget modelWidget
+	menuShowGoDemoWindow bool
+	menuScreenCat        bool
+	ModelWidget          modelWidget
 }
 
 func NewWindowMain() *WindowMain {
 	wm := &WindowMain{
-		flags:       WindowFlags{noResize: true, noMove: true, noMenu: true},
+		flags:       WindowFlags{noResize: true, noMove: true, noMenu: false, noCollapse: true, noTitlebar: true},
 		ModelWidget: modelWidget{selectItemIdx: -1},
 	}
 	return wm
 }
 
-func (mw *WindowMain) ShowWindowMain() {
-	imgui.SetNextWindowPosV(imgui.Vec2{X: 0, Y: 20}, imgui.ConditionFirstUseEver, imgui.Vec2{})
-	imgui.SetNextWindowSizeV(imgui.Vec2{X: 350, Y: 350}, imgui.ConditionFirstUseEver)
+func (mw *WindowMain) Show(displaySize [2]float32) {
+	imgui.SetNextWindowPosV(imgui.Vec2{X: 0, Y: 0}, imgui.ConditionNone, imgui.Vec2{})
+	imgui.SetNextWindowSizeV(imgui.Vec2{X: 200, Y: displaySize[1]}, imgui.ConditionNone)
 
 	if !imgui.BeginV("MainPanel", nil, mw.flags.combined()) {
-		// Early out if the window is collapsed, as an optimization.
 		imgui.End()
 		return
+	}
+
+	// MenuBar
+	if imgui.BeginMenuBar() {
+		if imgui.BeginMenu("Menu") {
+			imgui.EndMenu()
+		}
+		if imgui.BeginMenu("Examples") {
+			mw.menuShowGoDemoWindow = imgui.MenuItemV("Example", "", mw.menuShowGoDemoWindow, true)
+			mw.menuScreenCat = imgui.MenuItemV("ScreenCat", "", mw.menuScreenCat, true)
+			imgui.EndMenu()
+		}
+
+		imgui.EndMenuBar()
 	}
 
 	// We choose a width proportional to our font size.
@@ -40,6 +56,15 @@ func (mw *WindowMain) ShowWindowMain() {
 
 	// All demo contents
 	mw.ModelWidget.show()
+
+	if mw.menuShowGoDemoWindow {
+		imgui.ShowDemoWindow(&mw.menuShowGoDemoWindow)
+	}
+
+	if mw.menuScreenCat {
+		mw.ScreenCat(int(displaySize[0]), int(displaySize[1]))
+		mw.menuScreenCat = false
+	}
 
 	// End of ShowDemoWindow()
 	imgui.End()
@@ -50,7 +75,7 @@ type ModelItem struct {
 	Id   string
 }
 
-type ModelItemSlectFunc func(item ModelItem)
+type ModelItemSelectFunc func(item ModelItem)
 
 type modelWidget struct {
 	background     bool
@@ -60,15 +85,15 @@ type modelWidget struct {
 
 	selectItemIdx  int
 	modelItems     []ModelItem
-	selectItemFunc ModelItemSlectFunc
+	selectItemFunc ModelItemSelectFunc
 }
 
 func (mw *modelWidget) show() {
-	if !imgui.CollapsingHeaderV("World", 1<<5) {
+	if !imgui.CollapsingHeaderV("World", imgui.TreeNodeFlagsDefaultOpen) {
 		return
 	}
 
-	if imgui.TreeNodeV("model", 1<<5) {
+	if imgui.TreeNodeV("model", imgui.TreeNodeFlagsDefaultOpen) {
 
 		oldSelectItem := mw.selectItemIdx
 		selected := false
@@ -98,6 +123,11 @@ func (mw *WindowMain) AddModelItem(item ModelItem) {
 	mw.ModelWidget.modelItems = append(mw.ModelWidget.modelItems, item)
 }
 
-func (mw *WindowMain) NotifyModelItemChange(function ModelItemSlectFunc) {
+func (mw *WindowMain) NotifyModelItemChange(function ModelItemSelectFunc) {
 	mw.ModelWidget.selectItemFunc = function
+}
+
+func (mw *WindowMain) ScreenCat(width, height int) {
+	utils.Screenshot(width, height)
+
 }
