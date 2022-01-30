@@ -24,7 +24,7 @@ type WindowModel struct {
 	showDemoWindow bool
 }
 
-func NewWindowMaterial() *WindowModel {
+func NewWindowModel() *WindowModel {
 	w := &WindowModel{
 		visible:  false,
 		flags:    WindowFlags{noResize: true, noMenu: true, noTitlebar: true, noCollapse: true, noBackground: false},

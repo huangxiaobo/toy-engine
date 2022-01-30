@@ -38,10 +38,9 @@ type World struct {
 	Camera     *camera.Camera
 	Text       *text.Text
 
-	uiWindowStatus   *ui.WindowStatus
-	uiWindowMain     *ui.WindowMain
-	uiWindowMaterial *ui.WindowModel
-	bRun             bool
+	uiWindowStatus *ui.WindowStatus
+	uiWindowMain   *ui.WindowMain
+	bRun           bool
 }
 
 func (w *World) initSDL() {
@@ -116,38 +115,21 @@ func (w *World) initModels() {
 }
 
 func (w *World) initUI() {
-	w.uiWindowMain = ui.NewWindowMain()
-	w.uiWindowMaterial = ui.NewWindowMaterial()
-	w.uiWindowStatus = ui.NewWindowStatus()
+	imgui.PushStyleVarFloat(imgui.StyleVarWindowBorderSize, 1)
+	imgui.PushStyleVarFloat(imgui.StyleVarWindowRounding, 6)
+	imgui.PushStyleVarFloat(imgui.StyleVarFrameRounding, 6)
+	imgui.PushStyleVarFloat(imgui.StyleVarFrameBorderSize, 1)
+
+	w.uiWindowMain = ui.NewWindowMain(w)
+
+	w.uiWindowMain.AddLight(w.Light)
 
 	for _, renderObj := range w.renderObjs {
 		name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
 		id := reflect.ValueOf(renderObj).Elem().FieldByName("Id").String()
 
-		w.uiWindowMain.AddModelItem(ui.ModelItem{Name: name, Id: id})
+		w.uiWindowMain.AddModelItem(ui.ModelItem{Name: name, Id: id, Obj: renderObj})
 	}
-
-	w.uiWindowMain.NotifyModelItemChange(func(item ui.ModelItem) {
-		w.uiWindowMaterial.Reset()
-
-		for _, renderObj := range w.renderObjs {
-			rType := reflect.TypeOf(renderObj)
-			rVal := reflect.ValueOf(renderObj)
-			if rType.Kind() == reflect.Ptr {
-				rType = rType.Elem()
-				rVal = rVal.Elem()
-			}
-
-			name := rVal.FieldByName("Name").String()
-			if name != item.Name {
-				continue
-			}
-			w.uiWindowMaterial.SetRenderObj(renderObj)
-		}
-
-		w.uiWindowMaterial.SetVisible(true)
-	})
-
 }
 
 func (w *World) Init(configFile string) error {
@@ -155,16 +137,10 @@ func (w *World) Init(configFile string) error {
 	w.context = imgui.CreateContext(nil)
 
 	w.imguiio = imgui.CurrentIO()
-	imgui.PushStyleVarFloat(imgui.StyleVarWindowBorderSize, 1)
-	imgui.PushStyleVarFloat(imgui.StyleVarWindowRounding, 6)
-	imgui.PushStyleVarFloat(imgui.StyleVarFrameRounding, 6)
-	imgui.PushStyleVarFloat(imgui.StyleVarFrameBorderSize, 1)
 
 	w.initSDL()
 	//w.initGL()
 	w.initModels()
-
-	w.initUI()
 
 	// 初始化摄像机
 	xmlCamera := w.xmlWorld.XMLCamera
@@ -173,11 +149,13 @@ func (w *World) Init(configFile string) error {
 
 	// 初始化灯光
 	xmlLight := w.xmlWorld.XMLLight
-	w.Light = &light.PointLight{Position: xmlLight.XMLPosition.XYZW(), Color: xmlLight.XMLColor.RGB()}
+	w.Light = light.NewPointLight(xmlLight)
 	w.Light.Init()
 
 	// Text
 	w.Text, _ = text.NewText("Toy引擎", 32)
+
+	w.initUI()
 
 	w.bRun = true
 	return nil
@@ -236,8 +214,6 @@ func (w *World) Run() {
 
 		displaySize := w.platform.DisplaySize()
 		w.uiWindowMain.Show(displaySize)
-		w.uiWindowStatus.Show(displaySize)
-		w.uiWindowMaterial.Show(displaySize)
 
 		// Rendering
 		imgui.Render() // This call only creates the draw data list. Actual rendering to framebuffer is done below.

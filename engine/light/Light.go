@@ -3,12 +3,15 @@ package light
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
+	"github.com/huangxiaobo/toy-engine/engine/config"
+	"unsafe"
 
 	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/shader"
 )
 
 type Attenuation struct {
+	Range    float32
 	Constant float32
 	Linear   float32
 	Exp      float32
@@ -22,108 +25,167 @@ type PointLight struct {
 	DiffuseIntensity float32
 	DiffuseColor     mgl32.Vec3
 	SpecularColor    mgl32.Vec3
-	Atten            Attenuation
+	Atten            *Attenuation
 
 	shader            *shader.Shader
 	projectionUniform int32
 	viewUniform       int32
 	modelUniform      int32
-	vao               uint32
-	vbo               uint32
+	colorUniform      int32
 
-	locVert uint32
+	Indices  []uint32
+	Vertices []Vertex
+	vao      uint32
+	vbo      uint32
+	ebo      uint32
 }
 
-var vertices = []float32{
-	//  X, Y, Z,
-	0.0, 0.0, 0.0,
+type Vertex struct {
+	Position  mgl32.Vec3
+	Normal    mgl32.Vec3
+	TexCoords mgl32.Vec2
+	Tangent   mgl32.Vec3
+	Bitangent mgl32.Vec3
 }
 
-func (light *PointLight) Init() {
-	light.shader = &shader.Shader{VertFilePath: "./resource/shader/light.vert", FragFilePath: "./resource/shader/light.frag"}
-	if err := light.shader.Init(); err != nil {
+func NewPointLight(xmlLight config.XmlLight) *PointLight {
+	l := &PointLight{
+		Position: xmlLight.XMLPosition.XYZW(),
+		Color:    xmlLight.XMLColor.RGB(),
+		Atten: &Attenuation{
+			Constant: 1.0,
+			Linear:   0.022,
+			Exp:      0.0019,
+		},
+	}
+	l.Vertices = []Vertex{
+		{
+			Position: mgl32.Vec3{0.0, 0.0, 0.0},
+			Normal:   mgl32.Vec3{0, 1, 0},
+		},
+	}
+	l.Indices = []uint32{0}
+
+	return l
+}
+
+func (l *PointLight) Init() {
+	l.shader = &shader.Shader{VertFilePath: "./resource/shader/light.vert", FragFilePath: "./resource/shader/light.frag"}
+	if err := l.shader.Init(); err != nil {
 		logger.Error(err)
 		return
 	}
 
-	program := light.shader.Use()
+	program := l.shader.Use()
 
 	// Shader
-	light.projectionUniform = gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	light.viewUniform = gl.GetUniformLocation(program, gl.Str("view\x00"))
-	light.modelUniform = gl.GetUniformLocation(program, gl.Str("model\x00"))
+	l.projectionUniform = gl.GetUniformLocation(program, gl.Str("projection\x00"))
+	l.viewUniform = gl.GetUniformLocation(program, gl.Str("view\x00"))
+	l.modelUniform = gl.GetUniformLocation(program, gl.Str("model\x00"))
+	l.colorUniform = gl.GetUniformLocation(program, gl.Str("lightColor\x00"))
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
+	// size of the Vertex struct
+	dummy := l.Vertices[0]
+	structSize := int(unsafe.Sizeof(dummy))
+	structSize32 := int32(structSize)
+
 	// Configure the vertex data
-	gl.GenVertexArrays(1, &light.vao)
-	gl.BindVertexArray(light.vao)
+	gl.GenVertexArrays(1, &l.vao)
+	gl.GenBuffers(1, &l.vbo)
+	gl.GenBuffers(1, &l.ebo)
 
-	// vert buff
-	gl.GenBuffers(1, &light.vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, light.vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.BindVertexArray(l.vao)
 
-	// // Get an index for the attribute from the shader
-	light.locVert = uint32(gl.GetAttribLocation(program, gl.Str("position\x00")))
+	// vert buff 复制顶点数组到缓冲中供OpenGL使用
+	gl.BindBuffer(gl.ARRAY_BUFFER, l.vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, len(l.Vertices)*structSize, gl.Ptr(l.Vertices), gl.STATIC_DRAW)
+
+	// indic buff, 复制索引数组到缓冲中供OpenGL使用
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, l.ebo)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(l.Indices)*4, gl.Ptr(l.Indices), gl.STATIC_DRAW)
+
+	// Set the vertex attribute pointers
+	// Vertex Positions
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, structSize32, gl.PtrOffset(0))
+	gl.EnableVertexAttribArray(0)
+
+	// Vertex Normals
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Normal)))
+	gl.EnableVertexAttribArray(1)
+
+	// Vertex Texture Coords
+	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.TexCoords)))
+	gl.EnableVertexAttribArray(2)
+
+	// Vertex Tangent
+	gl.EnableVertexAttribArray(3)
+	gl.VertexAttribPointer(3, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Tangent)))
+	// Vertex Bitangent
+	gl.EnableVertexAttribArray(4)
+	gl.VertexAttribPointer(4, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Bitangent)))
 
 	// Unbind the buffer
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.DisableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
-	light.SetDiffuseColor(1.0, .5, 0.0)   // color the light orange
-	light.SetSpecularColor(1.0, 1.0, 0.0) // yellow highlights
-	light.DiffuseIntensity = 0.25
-	light.AmbientIntensity = 0.25
-	// light.SetAttenuation(100, 1.0, 0.045, 0.0075);
+	l.SetDiffuseColor(1.0, .5, 0.0)   // color the light orange
+	l.SetSpecularColor(1.0, 1.0, 0.0) // yellow highlights
+	l.DiffuseIntensity = 0.25
+	l.AmbientIntensity = 0.25
+	l.SetAttenuation(100, 1.0, 0.045, 0.0075)
 }
 
-func (light *PointLight) SetDiffuseColor(r, g, b float32) {
-	light.DiffuseColor = mgl32.Vec3{r, g, b}
+func (l *PointLight) SetPosition(p mgl32.Vec4) {
+	l.Position = p
 }
 
-func (light *PointLight) SetSpecularColor(r, g, b float32) {
-	light.SpecularColor = mgl32.Vec3{r, g, b}
+func (l *PointLight) SetAmbientIntensity(f float32) {
+	l.AmbientIntensity = f
 }
 
-func (light *PointLight) Update(elapsed float64) {
+func (l *PointLight) SetDiffuseIntensity(f float32) {
+	l.DiffuseIntensity = f
 }
 
-func (light *PointLight) Render(projection mgl32.Mat4, view mgl32.Mat4, model mgl32.Mat4) {
+func (l *PointLight) SetDiffuseColor(r, g, b float32) {
+	l.DiffuseColor = mgl32.Vec3{r, g, b}
+}
 
-	program := light.shader.Program
+func (l *PointLight) SetSpecularColor(r, g, b float32) {
+	l.SpecularColor = mgl32.Vec3{r, g, b}
+}
+
+func (l *PointLight) SetAttenuation(rang, constant, linear, exp float32) {
+	l.Atten.Range = rang
+	l.Atten.Constant = constant
+	l.Atten.Linear = linear
+	l.Atten.Exp = exp
+}
+
+func (l *PointLight) Update(elapsed float64) {
+}
+
+func (l *PointLight) Render(projection mgl32.Mat4, view mgl32.Mat4, model mgl32.Mat4) {
+
+	program := l.shader.Program
 	// Shader
 	gl.UseProgram(program)
 
-	gl.UniformMatrix4fv(light.projectionUniform, 1, false, &projection[0])
-	gl.UniformMatrix4fv(light.viewUniform, 1, false, &view[0])
-	gl.UniformMatrix4fv(light.modelUniform, 1, false, &model[0])
+	gl.UniformMatrix4fv(l.projectionUniform, 1, false, &projection[0])
+	gl.UniformMatrix4fv(l.viewUniform, 1, false, &view[0])
+	gl.UniformMatrix4fv(l.modelUniform, 1, false, &model[0])
+
+	gl.Uniform3f(l.colorUniform, l.Color.X(), l.Color.Y(), l.Color.Z())
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
 	// 开启顶点数组
-	gl.BindVertexArray(light.vao)
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, light.vbo)
-	gl.EnableVertexAttribArray(light.locVert)
-	gl.VertexAttribPointer(
-		light.locVert, // attribute index
-		3,             // number of elements per vertex, here (x,y,z)
-		gl.FLOAT,      // the type of each element
-		false,         // take our values as-is
-		0,             // no extra data between each position
-		nil,           // offset of first element
-	)
-
+	gl.BindVertexArray(l.vao)
 	gl.PointSize(10)
 	gl.DrawArrays(gl.POINTS, 0, 1)
+	gl.BindVertexArray(0)
 
 	gl.UseProgram(0)
 
-	// Unbind the buffer
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.DisableVertexAttribArray(0)
-	gl.BindVertexArray(0)
 }

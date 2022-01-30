@@ -89,7 +89,12 @@ func ImageToPixelData(file string) (*image.RGBA, error) {
 	if err != nil {
 		return nil, fmt.Errorf("texture %q not found on disk: %v", file, err)
 	}
-	defer imgFile.Close()
+	defer func(imgFile *os.File) {
+		err := imgFile.Close()
+		if err != nil {
+
+		}
+	}(imgFile)
 
 	img, _, err := image.Decode(imgFile)
 	if err != nil {
@@ -100,7 +105,7 @@ func ImageToPixelData(file string) (*image.RGBA, error) {
 	if rgba.Stride != rgba.Rect.Size().X*4 {
 		return nil, fmt.Errorf("unsupported stride")
 	}
-	draw.Draw(rgba, rgba.Bounds(), img, image.Point{0, 0}, draw.Src)
+	draw.Draw(rgba, rgba.Bounds(), img, image.Point{}, draw.Src)
 	return rgba, nil
 }
 
@@ -140,8 +145,8 @@ func NewTextureFromSDLSurface(surface *sdl.Surface) *Texture {
 		gl.TEXTURE_2D,
 		0,
 		gl.RGBA,
-		int32(surface.W),
-		int32(surface.H),
+		surface.W,
+		surface.H,
 		0,
 		gl.RGBA,
 		gl.UNSIGNED_BYTE,
@@ -150,7 +155,7 @@ func NewTextureFromSDLSurface(surface *sdl.Surface) *Texture {
 	return tex
 }
 
-func NewTexture(wrap_s, wrap_t, min_f, mag_f int32, file string) (uint32, error) {
+func NewTexture(texWrapS, texWrapT, texMinFilter, texNagFilter int32, file string) (uint32, error) {
 	rgba, _ := ImageToPixelData(file)
 
 	var texture uint32
@@ -158,11 +163,11 @@ func NewTexture(wrap_s, wrap_t, min_f, mag_f int32, file string) (uint32, error)
 	//gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap_s)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap_t)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, texWrapS)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, texWrapT)
 
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min_f)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, mag_f)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, texMinFilter)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, texNagFilter)
 
 	gl.TexImage2D(
 		gl.TEXTURE_2D,
