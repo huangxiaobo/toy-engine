@@ -382,7 +382,7 @@ func (m *Model) PreRender() {
 	gl.PolygonMode(gl.FRONT, gl.LINE)
 }
 
-func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, light *light.PointLight) {
+func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, lights []*light.PointLight) {
 	// RenderObj
 	model = model.Mul4(m.model)
 	mvp := projection.Mul4(view).Mul4(model)
@@ -395,7 +395,7 @@ func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Ve
 	m.effect.SetWVP(&mvp)
 	m.effect.SetEyeWorldPos(eyePosition)
 
-	m.effect.SetPointLight(light)
+	m.effect.SetPointLight(lights)
 	m.effect.SetMaterial(m.Material)
 
 	gl.BindFragDataLocation(m.effect.ShaderObj.Program, 0, gl.Str("color\x00"))
@@ -421,7 +421,7 @@ func (m *Model) textureFromFile(f string) uint32 {
 
 // RenderObj 可渲染對象
 type RenderObj interface {
-	Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, light *light.PointLight)
+	Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Vec3, light []*light.PointLight)
 	Update(elapsed float64)
 	PreRender()
 	PostRender()

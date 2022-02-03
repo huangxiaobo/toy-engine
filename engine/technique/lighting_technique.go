@@ -40,7 +40,8 @@ type LightingTechnique struct {
 	modelUniform      int32
 	wvpUniform        int32
 
-	lightUniform [8]LightUniform
+	lightUniform    [8]LightUniform
+	lightNumUniform int32
 
 	materialUniform MaterialUniform
 }
@@ -55,7 +56,8 @@ func (t *LightingTechnique) Init(s *shader.Shader) {
 	t.wvpUniform = t.GetUniformLocation("gWVP")
 
 	var name string
-	for i := 0; i < 1; i++ {
+	t.lightNumUniform = t.GetUniformLocation("gLightNum")
+	for i := 0; i < 8; i++ {
 		name = fmt.Sprintf("gLight[%d].Color", i)
 		t.lightUniform[i].Color = t.GetUniformLocation(name)
 
@@ -94,8 +96,10 @@ func (t *LightingTechnique) Init(s *shader.Shader) {
 	t.materialUniform.Shininess = t.GetUniformLocation(name)
 }
 
-func (t *LightingTechnique) SetPointLight(light *light.PointLight) {
-	for i := 0; i < 1; i++ {
+func (t *LightingTechnique) SetPointLight(lights []*light.PointLight) {
+	gl.Uniform1i(t.lightNumUniform, int32(len(lights)))
+	for i := 0; i < len(lights); i++ {
+		light := lights[i]
 		gl.Uniform3f(t.lightUniform[i].Color, light.Color.X(), light.Color.Y(), light.Color.Z())
 		gl.Uniform1f(t.lightUniform[i].AmbientIntensity, light.AmbientIntensity)
 		gl.Uniform1f(t.lightUniform[i].DiffuseIntensity, light.DiffuseIntensity)

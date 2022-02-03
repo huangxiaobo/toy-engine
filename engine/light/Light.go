@@ -40,6 +40,9 @@ type PointLight struct {
 	ebo      uint32
 }
 
+type DirectionLight struct {
+}
+
 type Vertex struct {
 	Position  mgl32.Vec3
 	Normal    mgl32.Vec3
@@ -50,14 +53,25 @@ type Vertex struct {
 
 func NewPointLight(xmlLight config.XmlLight) *PointLight {
 	l := &PointLight{
-		Position: xmlLight.XMLPosition.XYZW(),
-		Color:    xmlLight.XMLColor.RGB(),
+		Position:         xmlLight.XMLPosition.XYZW(),
+		Color:            xmlLight.XMLColor.RGB(),
+		DiffuseColor:     xmlLight.XMLLightDiffuse.XMLColor.RGB(),
+		DiffuseIntensity: xmlLight.XMLLightDiffuse.XMLIntensity,
+		AmbientIntensity: xmlLight.XMLLightAmbient.XMLIntensity,
+		SpecularColor:    xmlLight.XMLLightSpecular.XMLColor.RGB(),
 		Atten: &Attenuation{
 			Constant: 1.0,
-			Linear:   0.022,
-			Exp:      0.0019,
+			Linear:   0.007,
+			Exp:      0.0002,
 		},
 	}
+
+	// Atten参数参考表
+	// Distance	Constant    Linear    Quadratic
+	// 200	    1.0	        0.022      0.0019
+	// 325	    1.0	        0.014      0.0007
+	// 600	    1.0	        0.007      0.0002
+
 	l.Vertices = []Vertex{
 		{
 			Position: mgl32.Vec3{0.0, 0.0, 0.0},
@@ -65,6 +79,8 @@ func NewPointLight(xmlLight config.XmlLight) *PointLight {
 		},
 	}
 	l.Indices = []uint32{0}
+
+	l.Init()
 
 	return l
 }
@@ -129,11 +145,6 @@ func (l *PointLight) Init() {
 	// Unbind the buffer
 	gl.BindVertexArray(0)
 
-	l.SetDiffuseColor(1.0, .5, 0.0)   // color the light orange
-	l.SetSpecularColor(1.0, 1.0, 0.0) // yellow highlights
-	l.DiffuseIntensity = 0.25
-	l.AmbientIntensity = 0.25
-	l.SetAttenuation(100, 1.0, 0.045, 0.0075)
 }
 
 func (l *PointLight) SetPosition(p mgl32.Vec4) {
@@ -164,9 +175,11 @@ func (l *PointLight) SetAttenuation(rang, constant, linear, exp float32) {
 }
 
 func (l *PointLight) Update(elapsed float64) {
+	l.Position = mgl32.HomogRotate3DY(float32(elapsed)).Mul4x1(l.Position)
 }
 
 func (l *PointLight) Render(projection mgl32.Mat4, view mgl32.Mat4, model mgl32.Mat4) {
+	model = model.Add(mgl32.Translate3D(l.Position.X(), l.Position.Y(), l.Position.Z()))
 
 	program := l.shader.Program
 	// Shader

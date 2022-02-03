@@ -9,7 +9,7 @@ struct Attenuation
     float Exp;
 };
 
-struct Light {
+struct PointLight {
     vec3    Color;
     vec3    Position;
 
@@ -20,7 +20,8 @@ struct Light {
     Attenuation Atten;
 };
 
-uniform Light gLight[1];
+uniform PointLight gLight[8];
+uniform int gLightNum;
 
 // 材质结构体
 struct Material{
@@ -37,48 +38,52 @@ in vec3 Normal0;
 
 out vec4 color;
 
-// N = the surface normal vector
-// L = a vector from the surface to the light source
+vec4 CalcLightInternal(PointLight Light, vec3 LightDirection, vec3 Normal) {
+    vec4 AmbientColor = vec4(Light.Color, 1.0f) * vec4(gMaterial.AmbientColor, 1.0) * Light.AmbientIntensity;
+    float DiffuseFactor = dot(Normal, -LightDirection);
 
-void main() {
-
-    vec4 AmbientColor = vec4(0, 0, 0, 0);
     vec4 DiffuseColor = vec4(0, 0, 0, 0);
     vec4 SpecularColor = vec4(0, 0, 0, 0);
 
-
-    vec3 P = WorldPos0.xyz;
-    vec3 N = normalize(Normal0);
-
-    // 计算光源到顶点的距离
-    vec3 L = gLight[0].Position.xyz - WorldPos0.xyz;
-
-    //
-    vec3 LightDirection = WorldPos0.xyz - gLight[0].Position.xyz;
-    float LightDistance = length(LightDirection);
-    LightDirection = normalize(LightDirection);
-
-
-    // Ambient
-    AmbientColor.xyz = gLight[0].Color * gMaterial.AmbientColor;
-
-    float DiffuseFactor = dot(N, -LightDirection);
-
     if (DiffuseFactor > 0) {
         // 漫反射光照
-        DiffuseColor = vec4(gLight[0].Color, 1.0f) * vec4(gMaterial.DiffuseColor, 1.0) * DiffuseFactor;
+        DiffuseColor = vec4(Light.Color, 1.0f) * vec4(gMaterial.DiffuseColor, 1.0) * DiffuseFactor;
 
         // 计算眼睛观察方向
         vec3 VertexToEye = normalize(gViewPos - WorldPos0);
         // 计算反射光方向
-        vec3 LightReflect = normalize(reflect(LightDirection, N));
+        vec3 LightReflect = normalize(reflect(LightDirection, Normal));
         // 计算反射光与观测方向的夹角
         float SpecularFactor = dot(VertexToEye, LightReflect);
         // 计算镜面反射强度
         if (SpecularFactor > 0) {
             SpecularFactor = pow(SpecularFactor, gMaterial.Shininess);
-            SpecularColor = vec4(gLight[0].Color * gMaterial.SpecularColor * gMaterial.Shininess * SpecularFactor, 1.0f);
+            SpecularColor = vec4(Light.Color * gMaterial.SpecularColor * gMaterial.Shininess * SpecularFactor, 1.0f);
         }
     }
-    color = vec4(AmbientColor.xyz + DiffuseColor.xyz + SpecularColor.xyz, 1.0);
+
+    return (AmbientColor + DiffuseColor + SpecularColor);
+}
+
+vec4 CalcPointLight(int Index, vec3 Normal)
+{
+    vec3 LightDirection = WorldPos0 - gLight[Index].Position;
+    float Distance = length(LightDirection);
+    LightDirection = normalize(LightDirection);
+
+    vec4 Color = CalcLightInternal(gLight[Index], LightDirection, Normal);
+    float Attenuation = gLight[Index].Atten.Constant + gLight[Index].Atten.Linear * Distance + gLight[Index].Atten.Exp * Distance * Distance;
+
+    return Color / Attenuation;
+}
+
+void main() {
+    vec3 N = normalize(Normal0);
+
+    // 计算多个点光源
+    vec4 pointLightColor = vec4(0, 0, 0, 0);
+    for (int i = 0; i < gLightNum; i++) {
+        pointLightColor += CalcPointLight(i, N);
+    }
+    color = vec4(pointLightColor.rgb, 1.0);
 }

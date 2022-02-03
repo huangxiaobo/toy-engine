@@ -33,7 +33,7 @@ type World struct {
 	renderer *platforms.OpenGL3
 
 	xmlWorld   *config.XmlWorld
-	Light      *light.PointLight
+	Lights     []*light.PointLight
 	renderObjs []model.RenderObj
 	Camera     *camera.Camera
 	Text       *text.Text
@@ -122,7 +122,9 @@ func (w *World) initUI() {
 
 	w.uiWindowMain = ui.NewWindowMain(w)
 
-	w.uiWindowMain.AddLight(w.Light)
+	for _, l := range w.Lights {
+		w.uiWindowMain.AddLight(l)
+	}
 
 	for _, renderObj := range w.renderObjs {
 		name := reflect.ValueOf(renderObj).Elem().FieldByName("Name").String()
@@ -148,9 +150,11 @@ func (w *World) Init(configFile string) error {
 	w.Camera.Init(xmlCamera.XMLPosition.XYZ(), xmlCamera.XMLTarget.XYZ())
 
 	// 初始化灯光
-	xmlLight := w.xmlWorld.XMLLight
-	w.Light = light.NewPointLight(xmlLight)
-	w.Light.Init()
+
+	xmlLights := w.xmlWorld.XMLLights.XMLLights
+	for _, xmlLight := range xmlLights {
+		w.Lights = append(w.Lights, light.NewPointLight(xmlLight))
+	}
 
 	// Text
 	w.Text, _ = text.NewText("Toy引擎", 32)
@@ -230,15 +234,16 @@ func (w *World) Run() {
 		model := mgl32.Ident4()
 		//mvp := projection.Mul4(view).Mul4(model)
 
-		//w.DrawAxis()
-		w.DrawLight()
 		// Update
 		elapsed := 0.01
+
+		//w.DrawAxis()
+		w.DrawLight(elapsed)
 
 		for _, renderObj := range w.renderObjs {
 			renderObj.Update(elapsed)
 			renderObj.PreRender()
-			renderObj.Render(projection, model, view, &w.Camera.Position, w.Light)
+			renderObj.Render(projection, model, view, &w.Camera.Position, w.Lights)
 			renderObj.PostRender()
 		}
 
@@ -263,7 +268,7 @@ func (w *World) DrawAxis() {
 	// logger.Info("DrawAxis...")
 }
 
-func (w *World) DrawLight() {
+func (w *World) DrawLight(elapsed float64) {
 	// RenderObj
 	width := float32(config.Config.WindowWidth)
 	height := float32(config.Config.WindowHeight)
@@ -274,13 +279,12 @@ func (w *World) DrawLight() {
 		config.Config.ClipFar,
 	)
 	view := w.Camera.GetViewMatrix()
-	model := mgl32.Ident4().Mul4(mgl32.Scale3D(1, 1, 1))
+	model := mgl32.Ident4()
 
-	position := w.Light.Position
-	model = model.Add(mgl32.Translate3D(position.X(), position.Y(), position.Z()))
-
-	w.Light.Render(projection, view, model)
-
+	for _, l := range w.Lights {
+		l.Update(elapsed)
+		l.Render(projection, view, model)
+	}
 }
 
 func (w *World) AddRenderObj(renderObj model.RenderObj) {

@@ -30,11 +30,11 @@ type XmlXYZ struct {
 }
 
 func (xyz *XmlXYZ) XYZ() mgl32.Vec3 {
-	return mgl32.Vec3{xyz.Z, xyz.Y, xyz.Z}
+	return mgl32.Vec3{xyz.X, xyz.Y, xyz.Z}
 }
 
 func (xyz *XmlXYZ) XYZW() mgl32.Vec4 {
-	return mgl32.Vec4{xyz.Z, xyz.Y, xyz.Z, xyz.W}
+	return mgl32.Vec4{xyz.X, xyz.Y, xyz.Z, xyz.W}
 }
 
 type XmlTarget = XmlXYZ
@@ -44,9 +44,30 @@ type XmlCamera struct {
 	XMLTarget   XmlXYZ `xml:"target"`
 }
 
+type XmlLightDiffuse struct {
+	XMLColor     XmlRGB  `xml:"color"`
+	XMLIntensity float32 `xml:"intensity"`
+}
+
+type XmlLightAmbient struct {
+	XMLIntensity float32 `xml:"intensity"`
+}
+
+type XmlLightSpecular struct {
+	XMLColor XmlRGB `xml:"color"`
+}
+
 type XmlLight struct {
-	XMLPosition XmlXYZ `xml:"position"`
-	XMLColor    XmlRGB `xml:"color"`
+	XMLPosition      XmlXYZ           `xml:"position"`
+	XMLColor         XmlRGB           `xml:"color"`
+	XMLLightDiffuse  XmlLightDiffuse  `xml:"diffuse"`
+	XMLLightAmbient  XmlLightAmbient  `xml:"ambient"`
+	XMLLightSpecular XmlLightSpecular `xml:"specular"`
+}
+
+type XmlLights struct {
+	XMLName   xml.Name   `xml:"lights"`
+	XMLLights []XmlLight `xml:"light"`
 }
 
 type XmlMesh struct {
@@ -92,7 +113,7 @@ type XmlWorld struct {
 	XMLName   xml.Name  `xml:"world"`
 	XMLWindow XmlWindow `xml:"window"`
 	XMLCamera XmlCamera `xml:"camera"`
-	XMLLight  XmlLight  `xml:"light"`
+	XMLLights XmlLights `xml:"lights"`
 	XMLModels XmlModels `xml:"models"`
 }
 

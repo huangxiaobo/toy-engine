@@ -1,8 +1,6 @@
 package technique
 
 import (
-	"fmt"
-
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 
@@ -28,7 +26,6 @@ func (t *BaseTechnique) Init(shader *shader.Shader) {
 	t.modelUniform = t.GetUniformLocation("model")
 	t.wvpUniform = t.GetUniformLocation("gWVP")
 	t.cameraUniform = t.GetUniformLocation("gViewPos")
-	fmt.Printf("project: %d view: %d, view: %d wvp: %d\n", t.projectionUniform, t.viewUniform, t.modelUniform, t.wvpUniform)
 }
 
 // SetWVP 设置模型-视图矩阵

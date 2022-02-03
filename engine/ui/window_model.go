@@ -149,6 +149,9 @@ func (w *WindowModel) Show(displaySize [2]float32) {
 
 func (w *WindowModel) ShowFloat3(rPtrType reflect.Type, rPtrVal reflect.Value, fieldName string) {
 	position := rPtrVal.Elem().FieldByName(fieldName)
+	if !position.IsValid() {
+		return
+	}
 	f3 := position.Interface().(mgl32.Vec3)
 
 	imgui.DragFloat3(fieldName, (*[3]float32)(&f3))
@@ -165,6 +168,10 @@ func (w *WindowModel) ShowFloat3(rPtrType reflect.Type, rPtrVal reflect.Value, f
 
 func (w *WindowModel) ShowFloat(rPtrType reflect.Type, rPtrVal reflect.Value, fieldName string) {
 	position := rPtrVal.Elem().FieldByName(fieldName)
+	if !position.IsValid() {
+		return
+	}
+
 	f1 := position.Interface().(float32)
 
 	imgui.DragFloat(fieldName, &f1)

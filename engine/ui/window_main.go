@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"github.com/huangxiaobo/toy-engine/engine/utils"
 	"github.com/inkyblackness/imgui-go/v4"
 	"time"
@@ -27,6 +28,7 @@ type WindowMain struct {
 
 	World interface{}
 
+	lightObjs   []interface{}
 	lightWindow *WindowLight
 
 	modelWindow *WindowModel
@@ -91,6 +93,7 @@ func (mw *WindowMain) Show(displaySize [2]float32) {
 	}
 
 	if ShowPanel == ShowLightPanel {
+		mw.lightWindow.SetVisible(true)
 		mw.lightWindow.Show(displaySize)
 	} else {
 		mw.lightWindow.SetVisible(false)
@@ -113,11 +116,18 @@ func (mw *WindowMain) Show(displaySize [2]float32) {
 
 func (mw *WindowMain) addLightTreeNode() {
 	if imgui.TreeNodeV("light", imgui.TreeNodeFlagsDefaultOpen) {
+		for i, lightObj := range mw.lightObjs {
+			selected := false
+			if mw.lightWindow.lightObj == lightObj && mw.lightWindow.visible == true {
+				selected = true
+			}
 
-		selected := mw.lightWindow.visible
-		if imgui.SelectableV("light", selected, imgui.SelectableFlagsAllowDoubleClick, imgui.Vec2{}) {
-			mw.lightWindow.SetVisible(true)
-			ShowPanel = ShowLightPanel
+			label := fmt.Sprintf("light %d", i)
+			if imgui.SelectableV(label, selected, imgui.SelectableFlagsAllowDoubleClick, imgui.Vec2{}) {
+				mw.lightWindow.SetLight(lightObj)
+				mw.lightWindow.SetVisible(false)
+				ShowPanel = ShowLightPanel
+			}
 		}
 
 		imgui.TreePop()
@@ -160,8 +170,7 @@ func (mw *WindowMain) SetModelItem(items []ModelItem) {
 }
 
 func (mw *WindowMain) AddLight(light interface{}) {
-	mw.lightWindow.SetLight(light)
-	mw.lightWindow.SetVisible(false)
+	mw.lightObjs = append(mw.lightObjs, light)
 }
 
 func (mw *WindowMain) AddModelItem(item ModelItem) {
