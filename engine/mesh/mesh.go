@@ -103,12 +103,14 @@ func (m *Mesh) Dispose() {
 func (m *Mesh) Draw(program uint32) {
 	// Bind appropriate textures
 	var (
+		materialNr uint64
 		diffuseNr  uint64
 		specularNr uint64
 		normalNr   uint64
 		heightNr   uint64
 		i          uint32
 	)
+	materialNr = 1
 	diffuseNr = 1
 	specularNr = 1
 	normalNr = 1
@@ -120,6 +122,9 @@ func (m *Mesh) Draw(program uint32) {
 		// Retrieve texture number (the N in diffuse_textureN)
 		ss := ""
 		switch m.Textures[i].TextureType {
+		case "texture_material":
+			ss = ss + strconv.FormatUint(materialNr, 10) // Transfer GLuint to stream
+			materialNr++
 		case "texture_diffuse":
 			ss = ss + strconv.FormatUint(diffuseNr, 10) // Transfer GLuint to stream
 			diffuseNr++

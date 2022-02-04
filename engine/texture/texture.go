@@ -15,6 +15,14 @@ import (
 	"github.com/kardianos/osext"
 )
 
+const (
+	TextureMaterial = string("texture_material")
+	TextureDiffuse  = string("texture_diffuse")
+	TextureSpecular = string("texture_specular")
+	TextureNormal   = string("texture_normal")
+	TextureHeight   = string("texture_height")
+)
+
 type Texture struct {
 	Id          uint32
 	TextureType string
@@ -132,8 +140,10 @@ func NewTextureFromRGBA(rgba *image.RGBA) *Texture {
 	return tex
 }
 
-func NewTextureFromSDLSurface(surface *sdl.Surface) *Texture {
-	tex := &Texture{}
+func NewTextureFromSDLSurface(texType string, surface *sdl.Surface) *Texture {
+	tex := &Texture{
+		TextureType: texType,
+	}
 	gl.GenTextures(1, &tex.Id)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, tex.Id)

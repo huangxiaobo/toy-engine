@@ -29,7 +29,7 @@ const (
 type World struct {
 	context  *imgui.Context
 	platform *platforms.SDL
-	imguiio  imgui.IO
+	imguiIO  imgui.IO
 	renderer *platforms.OpenGL3
 
 	xmlWorld   *config.XmlWorld
@@ -38,9 +38,9 @@ type World struct {
 	Camera     *camera.Camera
 	Text       *text.Text
 
-	uiWindowStatus *ui.WindowStatus
-	uiWindowMain   *ui.WindowMain
-	bRun           bool
+	// 界面
+	uiWindowMain *ui.WindowMain
+	bRun         bool
 }
 
 func (w *World) initSDL() {
@@ -50,12 +50,12 @@ func (w *World) initSDL() {
 	windowHeight := config.Config.WindowHeight
 	fmt.Printf("windowWidth: %d windowHeight: %d\n", windowWidth, windowHeight)
 
-	w.platform, err = platforms.NewSDL(w.imguiio, platforms.SDLClientAPIOpenGL4, windowWidth, windowHeight)
+	w.platform, err = platforms.NewSDL(w.imguiIO, platforms.SDLClientAPIOpenGL4, windowWidth, windowHeight)
 	if err != nil {
 		panic(err)
 	}
 
-	w.renderer, err = platforms.NewOpenGL3(w.imguiio)
+	w.renderer, err = platforms.NewOpenGL3(w.imguiIO)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(-1)
@@ -85,15 +85,6 @@ func (w *World) initGL() {
 	// 设置顺时针方向 CW : Clock Wind 顺时针方向
 	// 默认是 GL_CCW : Counter Clock Wind 逆时针方向
 	gl.FrontFace(gl.CCW)
-
-	// 设置线框模式
-	// 设置了该模式后 , 之后的所有图形都会变成线
-	//gl.PolygonMode(gl.FRONT, gl.LINE)
-
-	// 设置点模式
-	// 设置了该模式后 , 之后的所有图形都会变成点
-	// glPolygonMode(GL_FRONT, GL_POINT);
-
 }
 
 func (w *World) initModels() {
@@ -138,7 +129,7 @@ func (w *World) Init(configFile string) error {
 	w.xmlWorld = config.InitXML(configFile)
 	w.context = imgui.CreateContext(nil)
 
-	w.imguiio = imgui.CurrentIO()
+	w.imguiIO = imgui.CurrentIO()
 
 	w.initSDL()
 	//w.initGL()
@@ -157,7 +148,7 @@ func (w *World) Init(configFile string) error {
 	}
 
 	// Text
-	w.Text, _ = text.NewText("Toy引擎", 32)
+	w.Text = text.NewText("Toy引擎", 32, mgl32.Vec3{1, 1, 1})
 
 	w.initUI()
 
@@ -248,13 +239,13 @@ func (w *World) Run() {
 		}
 
 		// Logo
-		w.Text.Render(0, 50, mgl32.Vec4{1.0, 1.0, 1.0, 1.0})
+		w.Text.Render(int(displaySize[0]/2-50), 0)
 
 		// Maintenance
 		w.renderer.Render(w.platform.DisplaySize(), w.platform.FramebufferSize(), imgui.RenderedDrawData())
 		w.platform.PostRender()
 
-		if cnt%10000 == 0 {
+		if cnt > 0 && cnt%1000 == 0 {
 			utils.Screenshot(int(displaySize[0]), int(displaySize[1]))
 		}
 		cnt += 1
