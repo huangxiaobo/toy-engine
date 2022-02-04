@@ -7,11 +7,13 @@ uniform mat4 gWorld;
 
 
 layout (location = 0) in vec3 position;
-layout (location = 1) in vec3 normal;
+layout (location = 1) in vec3 vertcolor;
+layout (location = 2) in vec3 normal;
 
 
 out vec3 WorldPos0;
 out vec3 Normal0;
+out vec3 Color0;
 
 void main() {
     gl_Position = projection * view * model * vec4(position, 1);
@@ -28,4 +30,5 @@ void main() {
     WorldPos0 = (model * position_h).xyz;
     // 将法线向量转化到直接坐标系
     Normal0 = normalize(normalmatrix * normal);
+    Color0 = vertcolor;
 }

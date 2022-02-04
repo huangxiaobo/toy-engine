@@ -35,6 +35,7 @@ uniform Material gMaterial;
 
 in vec3 WorldPos0;
 in vec3 Normal0;
+in vec3 Color0;
 
 out vec4 color;
 
@@ -89,5 +90,5 @@ void main() {
     for (int i = 0; i < gLightNum; i++) {
         pointLightColor += CalcPointLight(i, N);
     }
-    color = vec4(pointLightColor.rgb, 1.0);
+    color = vec4(pointLightColor.rgb + Color0, 1.0);
 }

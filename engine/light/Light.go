@@ -4,9 +4,8 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/huangxiaobo/toy-engine/engine/config"
-	"unsafe"
-
 	"github.com/huangxiaobo/toy-engine/engine/logger"
+	"github.com/huangxiaobo/toy-engine/engine/mesh"
 	"github.com/huangxiaobo/toy-engine/engine/shader"
 )
 
@@ -33,11 +32,7 @@ type PointLight struct {
 	modelUniform      int32
 	colorUniform      int32
 
-	Indices  []uint32
-	Vertices []Vertex
-	vao      uint32
-	vbo      uint32
-	ebo      uint32
+	Meshes []mesh.Mesh
 }
 
 type DirectionLight struct {
@@ -72,13 +67,17 @@ func NewPointLight(xmlLight config.XmlLight) *PointLight {
 	// 325	    1.0	        0.014      0.0007
 	// 600	    1.0	        0.007      0.0002
 
-	l.Vertices = []Vertex{
-		{
-			Position: mgl32.Vec3{0.0, 0.0, 0.0},
-			Normal:   mgl32.Vec3{0, 1, 0},
-		},
+	l.Meshes = mesh.NewMeshPoint()
+	for _, m := range l.Meshes {
+		for i := range m.Vertices {
+			m.Vertices[i].Color[0] = l.Color.X()
+			m.Vertices[i].Color[1] = l.Color.Y()
+			m.Vertices[i].Color[2] = l.Color.Z()
+		}
+
+		m.Dispose()
+		m.Setup()
 	}
-	l.Indices = []uint32{0}
 
 	l.Init()
 
@@ -101,50 +100,6 @@ func (l *PointLight) Init() {
 	l.colorUniform = gl.GetUniformLocation(program, gl.Str("lightColor\x00"))
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
-
-	// size of the Vertex struct
-	dummy := l.Vertices[0]
-	structSize := int(unsafe.Sizeof(dummy))
-	structSize32 := int32(structSize)
-
-	// Configure the vertex data
-	gl.GenVertexArrays(1, &l.vao)
-	gl.GenBuffers(1, &l.vbo)
-	gl.GenBuffers(1, &l.ebo)
-
-	gl.BindVertexArray(l.vao)
-
-	// vert buff 复制顶点数组到缓冲中供OpenGL使用
-	gl.BindBuffer(gl.ARRAY_BUFFER, l.vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(l.Vertices)*structSize, gl.Ptr(l.Vertices), gl.STATIC_DRAW)
-
-	// indic buff, 复制索引数组到缓冲中供OpenGL使用
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, l.ebo)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(l.Indices)*4, gl.Ptr(l.Indices), gl.STATIC_DRAW)
-
-	// Set the vertex attribute pointers
-	// Vertex Positions
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, structSize32, gl.PtrOffset(0))
-	gl.EnableVertexAttribArray(0)
-
-	// Vertex Normals
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Normal)))
-	gl.EnableVertexAttribArray(1)
-
-	// Vertex Texture Coords
-	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.TexCoords)))
-	gl.EnableVertexAttribArray(2)
-
-	// Vertex Tangent
-	gl.EnableVertexAttribArray(3)
-	gl.VertexAttribPointer(3, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Tangent)))
-	// Vertex Bitangent
-	gl.EnableVertexAttribArray(4)
-	gl.VertexAttribPointer(4, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Bitangent)))
-
-	// Unbind the buffer
-	gl.BindVertexArray(0)
-
 }
 
 func (l *PointLight) SetPosition(p mgl32.Vec4) {
@@ -189,15 +144,14 @@ func (l *PointLight) Render(projection mgl32.Mat4, view mgl32.Mat4, model mgl32.
 	gl.UniformMatrix4fv(l.viewUniform, 1, false, &view[0])
 	gl.UniformMatrix4fv(l.modelUniform, 1, false, &model[0])
 
-	gl.Uniform3f(l.colorUniform, l.Color.X(), l.Color.Y(), l.Color.Z())
+	//gl.Uniform3f(l.colorUniform, l.Color.X(), l.Color.Y(), l.Color.Z())
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
-	// 开启顶点数组
-	gl.BindVertexArray(l.vao)
 	gl.PointSize(10)
-	gl.DrawArrays(gl.POINTS, 0, 1)
-	gl.BindVertexArray(0)
+	for _, m := range l.Meshes {
+		m.Draw(program)
+	}
 
 	gl.UseProgram(0)
 

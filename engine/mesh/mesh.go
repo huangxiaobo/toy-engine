@@ -1,4 +1,4 @@
-package model
+package mesh
 
 import (
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -11,6 +11,7 @@ import (
 
 type Vertex struct {
 	Position  mgl32.Vec3
+	Color     mgl32.Vec3
 	Normal    mgl32.Vec3
 	TexCoords mgl32.Vec2
 	Tangent   mgl32.Vec3
@@ -38,12 +39,13 @@ func NewMesh(v []Vertex, i []uint32, t []texture.Texture) Mesh {
 		Vertices: v,
 		Indices:  i,
 		Textures: t,
+		DrawMode: gl.TRIANGLES,
 	}
-	//m.setup()
+	//m.Setup()
 	return m
 }
 
-func (m *Mesh) setup() {
+func (m *Mesh) Setup() {
 	// size of the Vertex struct
 	dummy := m.Vertices[0]
 	structSize := int(unsafe.Sizeof(dummy))
@@ -69,26 +71,36 @@ func (m *Mesh) setup() {
 	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, structSize32, gl.PtrOffset(0))
 	gl.EnableVertexAttribArray(0)
 
-	// Vertex Normals
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Normal)))
+	// Vertex Colors
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Color)))
 	gl.EnableVertexAttribArray(1)
 
-	// Vertex Texture Coords
-	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.TexCoords)))
+	// Vertex Normals
+	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Normal)))
 	gl.EnableVertexAttribArray(2)
 
-	// Vertex Tangent
+	// Vertex Texture Coords
+	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.TexCoords)))
 	gl.EnableVertexAttribArray(3)
-	gl.VertexAttribPointer(3, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Tangent)))
-	// Vertex Bitangent
+
+	// Vertex Tangent
 	gl.EnableVertexAttribArray(4)
-	gl.VertexAttribPointer(4, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Bitangent)))
+	gl.VertexAttribPointer(4, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Tangent)))
+	// Vertex Bitangent
+	gl.EnableVertexAttribArray(5)
+	gl.VertexAttribPointer(5, 3, gl.FLOAT, false, structSize32, unsafe.Pointer(unsafe.Offsetof(dummy.Bitangent)))
 
 	// Unbind the buffer
 	gl.BindVertexArray(0)
 }
 
-func (m *Mesh) draw(program uint32) {
+func (m *Mesh) Dispose() {
+	gl.DeleteVertexArrays(1, &m.vao)
+	gl.DeleteBuffers(1, &m.vbo)
+	gl.DeleteBuffers(1, &m.ebo)
+}
+
+func (m *Mesh) Draw(program uint32) {
 	// Bind appropriate textures
 	var (
 		diffuseNr  uint64
@@ -132,7 +144,7 @@ func (m *Mesh) draw(program uint32) {
 
 	// Draw mesh
 	gl.BindVertexArray(m.vao)
-	gl.DrawElements(gl.TRIANGLES, int32(len(m.Indices)), gl.UNSIGNED_INT, gl.PtrOffset(0))
+	gl.DrawElements(m.DrawMode, int32(len(m.Indices)), gl.UNSIGNED_INT, gl.PtrOffset(0))
 	gl.BindVertexArray(0)
 
 	// Always good practice to set everything back to default once configured.

@@ -9,6 +9,7 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/light"
 	"github.com/huangxiaobo/toy-engine/engine/logger"
 	"github.com/huangxiaobo/toy-engine/engine/material"
+	"github.com/huangxiaobo/toy-engine/engine/mesh"
 	"github.com/huangxiaobo/toy-engine/engine/shader"
 	"github.com/huangxiaobo/toy-engine/engine/technique"
 	"github.com/huangxiaobo/toy-engine/engine/texture"
@@ -21,7 +22,7 @@ import (
 type Model struct {
 	texturesLoaded  map[string]texture.Texture
 	wg              sync.WaitGroup
-	Meshes          []Mesh
+	Meshes          []mesh.Mesh
 	GammaCorrection bool
 	BasePath        string
 	FileName        string
@@ -89,9 +90,7 @@ func (m *Model) Init() {
 
 func (m *Model) Dispose() {
 	for i := 0; i < len(m.Meshes); i++ {
-		gl.DeleteVertexArrays(1, &m.Meshes[i].vao)
-		gl.DeleteBuffers(1, &m.Meshes[i].vbo)
-		gl.DeleteBuffers(1, &m.Meshes[i].ebo)
+		m.Meshes[i].Dispose()
 	}
 }
 
@@ -129,70 +128,70 @@ func (m *Model) initGL() {
 				m.texturesLoaded[m.Meshes[i].Textures[j].Path] = m.Meshes[i].Textures[j]
 			}
 		}
-		m.Meshes[i].setup()
+		m.Meshes[i].Setup()
 	}
 }
 
-func (m *Model) processNode(n *assimp.Node, s *assimp.Scene) {
+func (m *Model) processNode(aNode *assimp.Node, aScene *assimp.Scene) {
 	// Process each mesh located at the current node
-	m.wg.Add(n.NumMeshes() + n.NumChildren())
+	m.wg.Add(aNode.NumMeshes() + aNode.NumChildren())
 
-	for i := 0; i < n.NumMeshes(); i++ {
+	for i := 0; i < aNode.NumMeshes(); i++ {
 		// The node object only contains indices to index the actual objects in the scene.
 		// The scene contains all the data, node is just to keep stuff organized (like relations between nodes).
 		go func(index int) {
 			defer m.wg.Done()
-			mesh := s.Meshes()[n.Meshes()[index]]
-			ms := m.processMesh(mesh, s)
+			mi := aScene.Meshes()[aNode.Meshes()[index]]
+			ms := m.processMesh(mi, aScene)
 			m.Meshes = append(m.Meshes, ms)
 		}(i)
 
 	}
 
 	// After we've processed all the meshes (if any) we then recursively process each of the children nodes
-	c := n.Children()
+	c := aNode.Children()
 	for j := 0; j < len(c); j++ {
 		go func(n *assimp.Node, s *assimp.Scene) {
 			defer m.wg.Done()
 			m.processNode(n, s)
-		}(c[j], s)
+		}(c[j], aScene)
 	}
 }
 
-func (m *Model) processMesh(ms *assimp.Mesh, s *assimp.Scene) Mesh {
+func (m *Model) processMesh(aMesh *assimp.Mesh, aScene *assimp.Scene) mesh.Mesh {
 	// Return a mesh object created from the extracted mesh data
 
-	return NewMesh(
-		m.processMeshVertices(ms),
-		m.processMeshIndices(ms),
-		m.processMeshTextures(ms, s))
+	return mesh.NewMesh(
+		m.processMeshVertices(aMesh),
+		m.processMeshIndices(aMesh),
+		m.processMeshTextures(aMesh, aScene))
 }
 
-func (m *Model) ProcessAssimpMesh(mesh *assimp.Mesh) []Vertex {
+func (m *Model) ProcessAssimpMesh(aMesh *assimp.Mesh) []mesh.Vertex {
 	// Walk through each of the mesh's vertices
-	var vertices []Vertex
+	var vertices []mesh.Vertex
 
-	positions := mesh.Vertices()
+	positions := aMesh.Vertices()
 
-	normals := mesh.Normals()
+	normals := aMesh.Normals()
 	useNormals := len(normals) > 0
 
-	tex := mesh.TextureCoords(0)
+	tex := aMesh.TextureCoords(0)
 	useTex := true
 	if tex == nil {
 		useTex = false
 	}
 
-	tangents := mesh.Tangents()
+	tangents := aMesh.Tangents()
 	useTangents := len(tangents) > 0
 
-	bitangents := mesh.Bitangents()
+	bitangents := aMesh.Bitangents()
 	useBitTangents := len(bitangents) > 0
 
-	for i := 0; i < mesh.NumVertices(); i++ {
+	for i := 0; i < aMesh.NumVertices(); i++ {
 		// We declare a placeholder vector since assimp uses its own vector class that
 		// doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
-		vertex := Vertex{}
+		vertex := mesh.Vertex{}
 
 		// Positions
 		vertex.Position = mgl32.Vec3{positions[i].X(), positions[i].Y(), positions[i].Z()}
@@ -229,34 +228,41 @@ func (m *Model) ProcessAssimpMesh(mesh *assimp.Mesh) []Vertex {
 	return vertices
 }
 
-func (m *Model) processMeshVertices(mesh *assimp.Mesh) []Vertex {
+func (m *Model) processMeshVertices(aMesh *assimp.Mesh) []mesh.Vertex {
 	// Walk through each of the mesh's vertices
-	var vertices []Vertex
+	var vertices []mesh.Vertex
 
-	positions := mesh.Vertices()
+	positions := aMesh.Vertices()
 
-	normals := mesh.Normals()
+	colors := aMesh.Colors(0)
+	useColors := len(colors) > 0
+
+	normals := aMesh.Normals()
 	useNormals := len(normals) > 0
 
-	tex := mesh.TextureCoords(0)
+	tex := aMesh.TextureCoords(0)
 	useTex := true
 	if tex == nil {
 		useTex = false
 	}
 
-	tangents := mesh.Tangents()
+	tangents := aMesh.Tangents()
 	useTangents := len(tangents) > 0
 
-	bitangents := mesh.Bitangents()
+	bitangents := aMesh.Bitangents()
 	useBitTangents := len(bitangents) > 0
 
-	for i := 0; i < mesh.NumVertices(); i++ {
+	for i := 0; i < aMesh.NumVertices(); i++ {
 		// We declare a placeholder vector since assimp uses its own vector class that
 		// doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
-		vertex := Vertex{}
+		vertex := mesh.Vertex{}
 
 		// Positions
 		vertex.Position = mgl32.Vec3{positions[i].X(), positions[i].Y(), positions[i].Z()}
+
+		if useColors {
+			vertex.Color = mgl32.Vec3{colors[i].R(), colors[i].G(), colors[i].B()}
+		}
 
 		// Normals
 		if useNormals {
@@ -290,22 +296,22 @@ func (m *Model) processMeshVertices(mesh *assimp.Mesh) []Vertex {
 	return vertices
 }
 
-func (m *Model) processMeshIndices(mesh *assimp.Mesh) []uint32 {
+func (m *Model) processMeshIndices(aMesh *assimp.Mesh) []uint32 {
 	var indices []uint32
-	// Now wak through each of the mesh's faces (a face is a mesh its triangle) and retrieve the corresponding vertex indices.
-	for i := 0; i < mesh.NumFaces(); i++ {
-		face := mesh.Faces()[i]
+	// Now wak through each of the aMesh's faces (a face is a aMesh its triangle) and retrieve the corresponding vertex indices.
+	for i := 0; i < aMesh.NumFaces(); i++ {
+		face := aMesh.Faces()[i]
 		// Retrieve all indices of the face and store them in the indices vector
 		indices = append(indices, face.CopyIndices()...)
 	}
 	return indices
 }
 
-func (m *Model) processMeshTextures(mesh *assimp.Mesh, s *assimp.Scene) []texture.Texture {
+func (m *Model) processMeshTextures(aMesh *assimp.Mesh, aScene *assimp.Scene) []texture.Texture {
 	var textures []texture.Texture
 	// Process materials
-	if mesh.MaterialIndex() >= 0 {
-		material := s.Materials()[mesh.MaterialIndex()]
+	if aMesh.MaterialIndex() >= 0 {
+		materialObj := aScene.Materials()[aMesh.MaterialIndex()]
 
 		// We assume a convention for sampler names in the shaders. Each diffuse texture should be named
 		// as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER.
@@ -315,39 +321,39 @@ func (m *Model) processMeshTextures(mesh *assimp.Mesh, s *assimp.Scene) []textur
 		// Normal: texture_normalN
 
 		// 1. Diffuse maps
-		diffuseMaps := m.loadMaterialTextures(material, assimp.TextureMapping_Diffuse, "texture_diffuse")
+		diffuseMaps := m.loadMaterialTextures(materialObj, assimp.TextureMapping_Diffuse, "texture_diffuse")
 		textures = append(textures, diffuseMaps...)
 		// 2. Specular maps
-		specularMaps := m.loadMaterialTextures(material, assimp.TextureMapping_Specular, "texture_specular")
+		specularMaps := m.loadMaterialTextures(materialObj, assimp.TextureMapping_Specular, "texture_specular")
 		textures = append(textures, specularMaps...)
 		// 3. Normal maps
-		normalMaps := m.loadMaterialTextures(material, assimp.TextureMapping_Height, "texture_normal")
+		normalMaps := m.loadMaterialTextures(materialObj, assimp.TextureMapping_Height, "texture_normal")
 		textures = append(textures, normalMaps...)
 		// 4. Height maps
-		heightMaps := m.loadMaterialTextures(material, assimp.TextureMapping_Ambient, "texture_height")
+		heightMaps := m.loadMaterialTextures(materialObj, assimp.TextureMapping_Ambient, "texture_height")
 		textures = append(textures, heightMaps...)
 	}
 	return textures
 }
 
-func (m *Model) loadMaterialTextures(ms *assimp.Material, tm assimp.TextureMapping, tt string) []texture.Texture {
-	textureType := assimp.TextureType(tm)
-	textureCount := ms.GetMaterialTextureCount(textureType)
+func (m *Model) loadMaterialTextures(aMaterial *assimp.Material, aTextureMapping assimp.TextureMapping, tt string) []texture.Texture {
+	textureType := assimp.TextureType(aTextureMapping)
+	textureCount := aMaterial.GetMaterialTextureCount(textureType)
 	var result []texture.Texture
 
 	for i := 0; i < textureCount; i++ {
-		file, _, _, _, _, _, _, _ := ms.GetMaterialTexture(textureType, 0)
+		file, _, _, _, _, _, _, _ := aMaterial.GetMaterialTexture(textureType, 0)
 		filename := m.BasePath + file
-		texture := texture.Texture{Id: 0, TextureType: tt, Path: filename}
-		result = append(result, texture)
+		textureObj := texture.Texture{Id: 0, TextureType: tt, Path: filename}
+		result = append(result, textureObj)
 
 		//if val, ok := m.texturesLoaded[filename]; ok {
 		//	result = append(result, val)
 		//} else {
 		//	texId := m.textureFromFile(filename)
-		//	texture := Texture{id: texId, TextureType: tt, Path: filename}
-		//	result = append(result, texture)
-		//	m.texturesLoaded[filename] = texture
+		//	textureObj := Texture{id: texId, TextureType: tt, Path: filename}
+		//	result = append(result, textureObj)
+		//	m.texturesLoaded[filename] = textureObj
 		//}
 	}
 	return result
@@ -400,8 +406,8 @@ func (m *Model) Render(projection, model, view mgl32.Mat4, eyePosition *mgl32.Ve
 
 	gl.BindFragDataLocation(m.effect.ShaderObj.Program, 0, gl.Str("color\x00"))
 
-	for _, mesh := range m.Meshes {
-		mesh.draw(m.effect.ShaderObj.Program)
+	for _, mi := range m.Meshes {
+		mi.Draw(m.effect.ShaderObj.Program)
 	}
 	m.effect.Disable()
 }
