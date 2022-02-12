@@ -1,7 +1,3 @@
-### 依赖
-
-> https://github.com/JoeyDeVries/LearnOpenGL
-
 #### gcc
 https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/8.1.0/threads-win32/seh/x86_64-8.1.0-release-win32-seh-rt_v6-rev0.7z
 
@@ -16,6 +12,7 @@ sudo apt install xorg-dev
 
 ### 参考
 
+> https://github.com/JoeyDeVries/LearnOpenGL
 > https://www.opengl.org/archives/resources/code/samples/glut_examples/examples/examples.html
 > https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/7.4.camera_class/camera_class.cpp
 > https://ogldev.org/index.html
@@ -48,7 +45,7 @@ void main() {
 
 ```
 
-uniform前面不要有空行 有空行
+获取shader的变量需要添加"\000"后缀
 
 ## 坐标系
 
@@ -77,6 +74,3 @@ https://developer.apple.com/library/archive/documentation/TextFonts/Conceptual/C
 ## ScreenShots
 
 ![Screenshot](assets/screenshot.png)
-
-## 网格球体
-> http://www.songho.ca/opengl/gl_sphere.html
