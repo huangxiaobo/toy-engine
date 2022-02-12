@@ -31,7 +31,7 @@ type World struct {
 	context  *imgui.Context
 	platform *platforms.SDL
 	imguiIO  imgui.IO
-	renderer *platforms.OpenGL3
+	renderer *platforms.OpenGL4
 
 	xmlWorld   *config.XmlWorld
 	Lights     []*light.PointLight
@@ -64,7 +64,7 @@ func (w *World) initSDL() {
 		panic(err)
 	}
 
-	w.renderer, err = platforms.NewOpenGL3(w.imguiIO)
+	w.renderer, err = platforms.NewOpenGL4(w.imguiIO)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(-1)
