@@ -27,19 +27,19 @@ type Model struct {
 	BasePath        string
 	FileName        string
 
-	Name     string `ui:"Text"`
-	Id       string `ui:"Text"`
+	Name     string
+	Id       string
 	Material *material.Material
 	effect   *technique.LightingTechnique
 	shader   *shader.Shader
 
-	Position   mgl32.Vec3 `ui:"DragFloat3"`
-	Scale      mgl32.Vec3 `ui:"DragFloat3"`
-	Rotate     float32    `ui:"Rotate""`
+	Position   mgl32.Vec3
+	Scale      mgl32.Vec3
+	Rotate     float32
 	geoInvalid bool
 	model      mgl32.Mat4
 
-	DrawMode uint32 `ui:"DrawMode"`
+	DrawMode uint32
 }
 
 func NewModel(xmlModel config.XmlModel) (Model, error) {
