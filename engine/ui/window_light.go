@@ -5,6 +5,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/inkyblackness/imgui-go/v4"
 	"reflect"
+	"strings"
 )
 
 type WindowLight struct {
@@ -29,14 +30,20 @@ func (w *WindowLight) Reset() {
 	w.lightObj = nil
 }
 
-//var colorUI = [3]float32{-1, -1, -1}
+const (
+	TableFlags                   = imgui.TableFlagsNone | imgui.TableFlagsRowBg | imgui.TableFlagsBorders | imgui.TableFlagsNoBordersInBody | imgui.TableFlagsSizingStretchSame
+	WindowLightWidth             = 360
+	WindowLightTableColumn1Width = 100
+	WindowLightTableColumn2Width = 200
+	WindowLightItemWidth         = 200
+)
 
 func (w *WindowLight) Show(displaySize [2]float32) {
 	if !w.visible || w.lightObj == nil {
 		return
 	}
-	imgui.SetNextWindowPosV(imgui.Vec2{X: displaySize[0] - 320, Y: 0}, imgui.ConditionNone, imgui.Vec2{})
-	imgui.SetNextWindowSizeV(imgui.Vec2{X: 320, Y: displaySize[1]}, imgui.ConditionNone)
+	imgui.SetNextWindowPosV(imgui.Vec2{X: displaySize[0] - WindowLightWidth, Y: 0}, imgui.ConditionNone, imgui.Vec2{})
+	imgui.SetNextWindowSizeV(imgui.Vec2{X: WindowLightWidth, Y: displaySize[1]}, imgui.ConditionNone)
 
 	defer imgui.End()
 	if !imgui.BeginV("LightPanel", &w.visible, w.flags.combined()) {
@@ -61,7 +68,22 @@ func (w *WindowLight) Show(displaySize [2]float32) {
 	imgui.Text("Geometry")
 	imgui.Indent()
 
-	w.ShowFloat4(rPtrType, rPtrVal, "Position")
+	//w.ShowFloat4(rPtrType, rPtrVal, "Position")
+	if imgui.BeginTableV("tableLightGeo", len(tabDetailHeader), TableFlags, imgui.Vec2{}, 0.0) {
+		imgui.TableSetupColumnV("tableLightGeo.Column1", imgui.TableColumnFlagsWidthFixed, WindowLightTableColumn1Width, 0)
+		imgui.TableSetupColumnV("tableLightGeo.Column2", imgui.TableColumnFlagsWidthFixed, WindowLightTableColumn2Width, 0)
+		for _, fieldName := range []string{"Position"} {
+			imgui.TableNextRow()
+			imgui.TableSetColumnIndex(0)
+			imgui.Text(fieldName)
+
+			imgui.TableSetColumnIndex(1)
+			imgui.SetNextItemWidth(WindowLightItemWidth)
+			w.ShowFloat4(rPtrType, rPtrVal, fieldName)
+
+		}
+		imgui.EndTable()
+	}
 
 	imgui.Unindent()
 	imgui.Spacing()
@@ -70,11 +92,25 @@ func (w *WindowLight) Show(displaySize [2]float32) {
 	imgui.Text("Color")
 	imgui.Indent()
 
-	w.ShowColor3(rPtrType, rPtrVal, "Color")
-	w.ShowFloat(rPtrType, rPtrVal, "AmbientIntensity")
-	w.ShowFloat(rPtrType, rPtrVal, "DiffuseIntensity")
-	w.ShowColor3(rPtrType, rPtrVal, "DiffuseColor")
-	w.ShowColor3(rPtrType, rPtrVal, "SpecularColor")
+	if imgui.BeginTableV("tableLightColor", len(tabDetailHeader), TableFlags, imgui.Vec2{}, 0.0) {
+		imgui.TableSetupColumnV("tableLightColor.Column1", imgui.TableColumnFlagsWidthFixed, WindowLightTableColumn1Width, 0)
+		imgui.TableSetupColumnV("tableLightColor.Column2", imgui.TableColumnFlagsWidthFixed, WindowLightTableColumn2Width, 0)
+		for _, fieldName := range []string{"Color", "AmbientIntensity", "DiffuseIntensity", "DiffuseColor", "SpecularColor"} {
+			imgui.TableNextRow()
+			imgui.TableSetColumnIndex(0)
+			imgui.Text(fieldName)
+
+			imgui.TableSetColumnIndex(1)
+			imgui.SetNextItemWidth(WindowLightItemWidth)
+			if strings.HasSuffix(fieldName, "Intensity") {
+				w.ShowFloat(rPtrType, rPtrVal, fieldName)
+			} else {
+				w.ShowColor3(rPtrType, rPtrVal, fieldName)
+			}
+
+		}
+		imgui.EndTable()
+	}
 
 	imgui.Unindent()
 	imgui.Spacing()
@@ -82,12 +118,30 @@ func (w *WindowLight) Show(displaySize [2]float32) {
 	imgui.Bullet()
 	imgui.Text("Atten")
 	imgui.Indent()
+
 	atten := rPtrVal.Elem().FieldByName("Atten").Interface()
 	attenPtrType := reflect.TypeOf(atten)
 	attenPtrVal := reflect.ValueOf(atten)
-	w.ShowFloat(attenPtrType, attenPtrVal, "Constant")
-	w.ShowFloat(attenPtrType, attenPtrVal, "Linear")
-	w.ShowFloat(attenPtrType, attenPtrVal, "Exp")
+	//w.ShowFloat(attenPtrType, attenPtrVal, "Constant")
+	//w.ShowFloat(attenPtrType, attenPtrVal, "Linear")
+	//w.ShowFloat(attenPtrType, attenPtrVal, "Exp")
+
+	if imgui.BeginTableV("tableLightAtten", len(tabDetailHeader), TableFlags, imgui.Vec2{}, 0.0) {
+		imgui.TableSetupColumnV("tableLightAtten.Column1", imgui.TableColumnFlagsWidthFixed, WindowLightTableColumn1Width, 0)
+		imgui.TableSetupColumnV("tableLightAtten.Column2", imgui.TableColumnFlagsWidthFixed, WindowLightTableColumn2Width, 0)
+		for _, fieldName := range []string{"Constant", "Linear", "Exp"} {
+			imgui.TableNextRow()
+			imgui.TableSetColumnIndex(0)
+			imgui.Text(fieldName)
+
+			imgui.TableSetColumnIndex(1)
+			imgui.SetNextItemWidth(WindowLightItemWidth)
+			w.ShowFloat(attenPtrType, attenPtrVal, fieldName)
+
+		}
+		imgui.EndTable()
+	}
+
 	imgui.Unindent()
 
 	imgui.Unindent()
@@ -112,7 +166,7 @@ func (w *WindowLight) ShowFloat4(rPtrType reflect.Type, rPtrVal reflect.Value, f
 	position := rPtrVal.Elem().FieldByName(fieldName)
 	f4 := position.Interface().(mgl32.Vec4)
 
-	imgui.DragFloat4(fieldName, (*[4]float32)(&f4))
+	imgui.DragFloat4(fmt.Sprintf("##%s", fieldName), (*[4]float32)(&f4))
 	f4[3] = 1
 
 	methodName := fmt.Sprintf("Set%s", fieldName)
@@ -134,7 +188,7 @@ func (w *WindowLight) ShowFloat(rPtrType reflect.Type, rPtrVal reflect.Value, fi
 	}
 
 	f1 := position.Interface().(float32)
-	imgui.DragFloat(fieldName, &f1)
+	imgui.DragFloat(fmt.Sprintf("##%s", fieldName), &f1)
 
 	methodName := fmt.Sprintf("Set%s", fieldName)
 	method, err := rPtrType.MethodByName(methodName)
@@ -152,7 +206,7 @@ func (w *WindowLight) ShowFloat(rPtrType reflect.Type, rPtrVal reflect.Value, fi
 func (w *WindowLight) ShowColor3(rPtrType reflect.Type, rPtrVal reflect.Value, fieldName string) {
 	rVal := rPtrVal.Elem().FieldByName(fieldName)
 	f3 := rVal.Interface().(mgl32.Vec3)
-	imgui.ColorEdit3(fieldName, (*[3]float32)(&f3))
+	imgui.ColorEdit3(fmt.Sprintf("##%s", fieldName), (*[3]float32)(&f3))
 
 	if rVal.CanAddr() {
 		rVal.Set(reflect.ValueOf(f3))

@@ -43,7 +43,7 @@ func NewSDL(io imgui.IO, clientAPI SDLClientAPI, windowWidth, windowHeight int32
 		return nil, fmt.Errorf("filed to initialize ttf: %w", err)
 	}
 
-	window, err := sdl.CreateWindow("ImGui-Go SDL2+"+string(clientAPI)+" example",
+	window, err := sdl.CreateWindow("Toy Engine",
 		sdl.WINDOWPOS_CENTERED, sdl.WINDOWPOS_CENTERED, windowWidth, windowHeight, sdl.WINDOW_OPENGL)
 	if err != nil {
 		sdl.Quit()

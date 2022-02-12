@@ -74,7 +74,8 @@ func (mw *WindowMain) Show(displaySize [2]float32) {
 
 	imgui.PushItemWidth(imgui.FontSize() * -12)
 
-	if !imgui.CollapsingHeaderV("World", imgui.TreeNodeFlagsDefaultOpen) {
+	if !imgui.CollapsingHeaderV("Scene", imgui.TreeNodeFlagsDefaultOpen) {
+		imgui.End()
 		return
 	}
 

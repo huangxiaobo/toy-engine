@@ -11,6 +11,7 @@ import (
 	"github.com/huangxiaobo/toy-engine/engine/utils"
 	"github.com/inkyblackness/imgui-go/v4"
 	_ "image/png"
+	"log"
 	"os"
 	"reflect"
 	"time"
@@ -43,12 +44,20 @@ type World struct {
 	bRun         bool
 }
 
+func NewWorld(configFile string) *World {
+	world := &World{}
+	err := world.Init(configFile)
+	if err != nil {
+		log.Fatalln("failed to initialize world:", err)
+	}
+	return world
+}
+
 func (w *World) initSDL() {
 	var err error
 
 	windowWidth := config.Config.WindowWidth
 	windowHeight := config.Config.WindowHeight
-	fmt.Printf("windowWidth: %d windowHeight: %d\n", windowWidth, windowHeight)
 
 	w.platform, err = platforms.NewSDL(w.imguiIO, platforms.SDLClientAPIOpenGL4, windowWidth, windowHeight)
 	if err != nil {
@@ -83,8 +92,7 @@ func (w *World) initGL() {
 	// gl.Enable(gl.CULL_FACE)
 
 	// 设置顺时针方向 CW : Clock Wind 顺时针方向
-	// 默认是 GL_CCW : Counter Clock Wind 逆时针方向
-	gl.FrontFace(gl.CCW)
+	gl.FrontFace(gl.CCW) // 默认是 GL_CCW : Counter Clock Wind 逆时针方向
 }
 
 func (w *World) initModels() {
@@ -95,14 +103,13 @@ func (w *World) initModels() {
 		switch resourceClass {
 		case "Ground":
 			obj, _ := model.NewGround(xmlMode)
-			w.AddRenderObj(&obj)
+			w.renderObjs = append(w.renderObjs, &obj)
 		case "Model":
 			obj, _ := model.NewModel(xmlMode)
-			w.AddRenderObj(&obj)
+			w.renderObjs = append(w.renderObjs, &obj)
 
 		}
 	}
-
 }
 
 func (w *World) initUI() {
@@ -148,7 +155,7 @@ func (w *World) Init(configFile string) error {
 	}
 
 	// Text
-	w.Text = text.NewText("Toy引擎", 32, mgl32.Vec3{1, 1, 1})
+	w.Text = text.NewText("Toy引擎", 32, mgl32.Vec3{1, 0, 0})
 
 	w.initUI()
 
@@ -255,10 +262,6 @@ func (w *World) Run() {
 	}
 }
 
-func (w *World) DrawAxis() {
-	// logger.Info("DrawAxis...")
-}
-
 func (w *World) DrawLight(elapsed float64) {
 	// RenderObj
 	width := float32(config.Config.WindowWidth)
@@ -276,8 +279,4 @@ func (w *World) DrawLight(elapsed float64) {
 		l.Update(elapsed)
 		l.Render(projection, view, model)
 	}
-}
-
-func (w *World) AddRenderObj(renderObj model.RenderObj) {
-	w.renderObjs = append(w.renderObjs, renderObj)
 }

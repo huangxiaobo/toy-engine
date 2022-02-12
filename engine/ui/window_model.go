@@ -13,6 +13,18 @@ type WindowMaterialItem struct {
 	val reflect.Value
 }
 
+var tabDetailHeader = []string{
+	"Attribute", "Value",
+}
+
+var tabMaterialHeader = []string{
+	"Attribute", "Value",
+}
+
+var tabGeometryHeader = []string{
+	"Attribute", "Value",
+}
+
 type WindowModel struct {
 	noClose bool
 	visible bool
@@ -39,13 +51,19 @@ func (w *WindowModel) Reset() {
 }
 
 //var colorUI = [3]float32{-1, -1, -1}
+const (
+	WindowModelWidth             = 360
+	WindowModelTableColumnWidths = 100
+	WindowModelTableColumn2Width = 200
+	WindowModelItemWidth         = 200
+)
 
 func (w *WindowModel) Show(displaySize [2]float32) {
 	if !w.visible || w.modelObj == nil {
 		return
 	}
-	imgui.SetNextWindowPosV(imgui.Vec2{X: displaySize[0] - 320, Y: 0}, imgui.ConditionNone, imgui.Vec2{})
-	imgui.SetNextWindowSizeV(imgui.Vec2{X: 320, Y: displaySize[1]}, imgui.ConditionNone)
+	imgui.SetNextWindowPosV(imgui.Vec2{X: displaySize[0] - WindowModelWidth, Y: 0}, imgui.ConditionNone, imgui.Vec2{})
+	imgui.SetNextWindowSizeV(imgui.Vec2{X: WindowModelWidth, Y: displaySize[1]}, imgui.ConditionNone)
 
 	if !imgui.BeginV("ModelPanel", &w.visible, w.flags.combined()) {
 		imgui.End()
@@ -57,20 +75,40 @@ func (w *WindowModel) Show(displaySize [2]float32) {
 	rPtrType := reflect.TypeOf(w.modelObj)
 	rPtrVal := reflect.ValueOf(w.modelObj)
 
-	rType := rPtrType
-	rVal := rPtrVal
+	rMatType := rPtrType
+	rMatVal := rPtrVal
 	if rPtrType.Kind() == reflect.Ptr {
-		rType = rPtrType.Elem()
-		rVal = rPtrVal.Elem()
+		rMatType = rPtrType.Elem()
+		rMatVal = rPtrVal.Elem()
 	}
+
+	// set flags according to the options that have been selected
+	flgs := imgui.TableFlagsNone
+	flgs |= imgui.TableFlagsRowBg
+	flgs |= imgui.TableFlagsBorders
+	flgs |= imgui.TableFlagsNoBordersInBody
+	flgs |= imgui.TableFlagsSizingStretchSame
 
 	imgui.Spacing()
 	imgui.Bullet()
-	imgui.Text("Name")
+	imgui.Text("Detail")
 	imgui.Indent()
-	name := rVal.FieldByName("Name").String()
-	id := rVal.FieldByName("Id").String()
-	imgui.Text(fmt.Sprintf("%v(%v)", name, id))
+
+	if imgui.BeginTableV("tableMain", len(tabDetailHeader), flgs, imgui.Vec2{}, 0.0) {
+		imgui.TableSetupColumnV("tableMain.Column1", imgui.TableColumnFlagsWidthFixed, WindowModelTableColumnWidths, 0)
+		imgui.TableSetupColumnV("tableMain.Column2", imgui.TableColumnFlagsWidthFixed, WindowModelTableColumn2Width, 0)
+		for _, fieldName := range []string{"Name", "Id"} {
+			imgui.TableNextRow()
+			imgui.TableSetColumnIndex(0)
+			imgui.Text(fieldName)
+
+			imgui.TableSetColumnIndex(1)
+			imgui.SetNextItemWidth(WindowModelItemWidth)
+			name := rMatVal.FieldByName(fieldName).String()
+			imgui.Text(name)
+		}
+		imgui.EndTable()
+	}
 
 	imgui.Unindent()
 	imgui.Spacing()
@@ -79,9 +117,28 @@ func (w *WindowModel) Show(displaySize [2]float32) {
 	imgui.Text("Geometry")
 	imgui.Indent()
 
-	w.ShowFloat3(rPtrType, rPtrVal, "Position")
-	w.ShowFloat3(rPtrType, rPtrVal, "Scale")
-	w.ShowFloat(rPtrType, rPtrVal, "Rotate")
+	if imgui.BeginTableV("tableGeometry", len(tabGeometryHeader), flgs, imgui.Vec2{}, 100.0) {
+		imgui.TableSetupColumnV("tableGeometry.Column1", imgui.TableColumnFlagsWidthFixed, WindowModelTableColumnWidths, 0)
+		imgui.TableSetupColumnV("tableGeometry.Column2", imgui.TableColumnFlagsWidthFixed, WindowModelTableColumn2Width, 0)
+
+		for row, fieldName := range []string{"Position", "Scale", "Rotate"} {
+
+			imgui.TableNextRow()
+			imgui.TableSetColumnIndex(0)
+
+			imgui.Text(fieldName)
+
+			imgui.TableSetColumnIndex(1)
+			imgui.SetNextItemWidth(WindowModelItemWidth)
+			if row == 2 {
+				w.ShowFloat(rPtrType, rPtrVal, fieldName)
+			} else {
+				w.ShowFloat3(rPtrType, rPtrVal, fieldName)
+			}
+
+		}
+		imgui.EndTable()
+	}
 
 	imgui.Unindent()
 	imgui.Spacing()
@@ -90,55 +147,42 @@ func (w *WindowModel) Show(displaySize [2]float32) {
 	imgui.Text("Material")
 	imgui.Indent()
 
-	material := rVal.FieldByName("Material").Interface()
-	rType = reflect.TypeOf(material)
-	rVal = reflect.ValueOf(material)
-	if rType.Kind() == reflect.Ptr {
-		rType = rType.Elem()
-		rVal = rVal.Elem()
-	}
-	for i := 0; i < rType.NumField(); i++ {
-		tag := rType.Field(i).Tag.Get("ui")
-		if len(tag) == 0 {
-			continue
-		}
+	material := rMatVal.FieldByName("Material").Interface()
+	rMatType = reflect.TypeOf(material)
+	rMatVal = reflect.ValueOf(material)
+	//if rMatType.Kind() == reflect.Ptr {
+	//	rMatType = rMatType.Elem()
+	//	rMatVal = rMatVal.Elem()
+	//}
 
-		key := rType.Field(i)
-		val := rVal.Field(i)
+	if imgui.BeginTableV("tableMaterial", len(tabMaterialHeader), flgs, imgui.Vec2{}, 0.0) {
+		imgui.TableSetupColumnV("tableMaterial.Column1", imgui.TableColumnFlagsWidthFixed, WindowModelTableColumnWidths, 0)
+		imgui.TableSetupColumnV("tableMaterial.Column2", imgui.TableColumnFlagsWidthStretch, WindowModelTableColumn2Width, 0)
+		for row, fieldName := range []string{"AmbientColor", "DiffuseColor", "SpecularColor", "Shininess"} {
 
-		if tag == "ColorEdit3" {
-			color := val.Interface().(mgl32.Vec3)
-			var colorUI = [3]float32{-1, -1, -1}
-			colorUI[0] = color.X()
-			colorUI[1] = color.Y()
-			colorUI[2] = color.Z()
-			imgui.ColorEdit3(key.Name, &colorUI)
-			color = val.Interface().(mgl32.Vec3)
-			if colorUI[0] < 0 {
-				colorUI[0] = color.X()
-				colorUI[1] = color.Y()
-				colorUI[2] = color.Z()
+			imgui.TableNextRow()
+			imgui.TableSetColumnIndex(0)
+
+			imgui.Text(fieldName)
+
+			imgui.TableSetColumnIndex(1)
+			imgui.SetNextItemWidth(WindowModelItemWidth)
+			if row == 3 {
+				w.ShowFloat(rMatType, rMatVal, fieldName)
 			} else {
-				if val.CanAddr() {
-					val.Set(reflect.ValueOf(mgl32.Vec3{colorUI[0], colorUI[1], colorUI[2]}))
-				}
-			}
-		} else if tag == "SliderFloat" {
-			value := val.Interface().(float32)
-			imgui.SliderFloat(key.Name, &value, 0, 100)
-			if val.CanAddr() {
-				val.SetFloat(float64(value))
+				w.ShowColor3(rMatType, rMatVal, fieldName)
 			}
 		}
+
+		imgui.EndTable()
 	}
+
 	imgui.Unindent()
 
 	// End of ShowDemoWindow()
 	imgui.End()
 
 	if w.showDemoWindow {
-		// Normally user code doesn't need/want to call this because positions are saved in .ini file anyway.
-		// Here we just want to make the demo initial state a bit more friendly!
 		const demoX = 650
 		const demoY = 20
 		imgui.SetNextWindowPosV(imgui.Vec2{X: demoX, Y: demoY}, imgui.ConditionFirstUseEver, imgui.Vec2{})
@@ -148,13 +192,13 @@ func (w *WindowModel) Show(displaySize [2]float32) {
 }
 
 func (w *WindowModel) ShowFloat3(rPtrType reflect.Type, rPtrVal reflect.Value, fieldName string) {
-	position := rPtrVal.Elem().FieldByName(fieldName)
-	if !position.IsValid() {
+	rVal := rPtrVal.Elem().FieldByName(fieldName)
+	if !rVal.IsValid() {
 		return
 	}
-	f3 := position.Interface().(mgl32.Vec3)
+	f3 := rVal.Interface().(mgl32.Vec3)
 
-	imgui.DragFloat3(fieldName, (*[3]float32)(&f3))
+	imgui.DragFloat3(fmt.Sprintf("##%s", fieldName), (*[3]float32)(&f3))
 
 	methodName := fmt.Sprintf("Set%s", fieldName)
 	method, err := rPtrType.MethodByName(methodName)
@@ -162,27 +206,43 @@ func (w *WindowModel) ShowFloat3(rPtrType reflect.Type, rPtrVal reflect.Value, f
 		fmt.Printf("%v %v: %v\n", rPtrType, methodName, err)
 		return
 	}
-	//fmt.Printf("method: %v, %v\n", method, colorUI)
 	method.Func.Call([]reflect.Value{rPtrVal, reflect.ValueOf(f3)})
 }
 
 func (w *WindowModel) ShowFloat(rPtrType reflect.Type, rPtrVal reflect.Value, fieldName string) {
-	position := rPtrVal.Elem().FieldByName(fieldName)
-	if !position.IsValid() {
+	rVal := rPtrVal.Elem().FieldByName(fieldName)
+	if !rVal.IsValid() {
 		return
 	}
 
-	f1 := position.Interface().(float32)
+	f1 := rVal.Interface().(float32)
 
-	imgui.DragFloat(fieldName, &f1)
+	imgui.DragFloat(fmt.Sprintf("##%s", fieldName), &f1)
 
 	methodName := fmt.Sprintf("Set%s", fieldName)
 	method, err := rPtrType.MethodByName(methodName)
-	if err != true {
-		fmt.Printf("%v %v: %v\n", rPtrType, methodName, err)
+	if err == true {
+		method.Func.Call([]reflect.Value{rPtrVal, reflect.ValueOf(f1)})
 		return
 	}
-	method.Func.Call([]reflect.Value{rPtrVal, reflect.ValueOf(f1)})
+	if rVal.CanAddr() {
+		rVal.Set(reflect.ValueOf(f1))
+		return
+	}
+	fmt.Printf("%v %v: %v\n", rPtrType, methodName, err)
+	return
+
+}
+
+func (w *WindowModel) ShowColor3(rPtrType reflect.Type, rPtrVal reflect.Value, fieldName string) {
+	rVal := rPtrVal.Elem().FieldByName(fieldName)
+	f3 := rVal.Interface().(mgl32.Vec3)
+	flags := imgui.ColorEditFlagsFloat | imgui.ColorEditFlagsAlphaPreviewHalf | imgui.ColorEditFlagsAlphaBar
+	imgui.ColorEdit3V(fmt.Sprintf("##%s", fieldName), (*[3]float32)(&f3), flags)
+
+	if rVal.CanAddr() {
+		rVal.Set(reflect.ValueOf(f3))
+	}
 }
 
 func (w *WindowModel) SetRenderObj(renderObj interface{}) {
