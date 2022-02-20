@@ -19,8 +19,8 @@
     <lights>
         <light>
             <position>
-                <x>30.0</x>
-                <y>50.0</y>
+                <x>20.0</x>
+                <y>30.0</y>
                 <z>0.0</z>
             </position>
             <color>
@@ -49,9 +49,10 @@
         </light>
         <light>
             <position>
-                <x>-30.0</x>
-                <y>50.0</y>
+                <x>-20.0</x>
+                <y>30.0</y>
                 <z>0.0</z>
+                <w>1.0</w>
             </position>
             <color>
                 <r>0.0</r>

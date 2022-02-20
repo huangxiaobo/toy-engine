@@ -121,7 +121,6 @@ func creatSurface(content string, size int, color mgl32.Vec3) (*sdl.Surface, err
 		return nil, fmt.Errorf("RenderUTF8Blended failed: %w", err)
 	}
 	defer surfaceRaw.Free()
-	fmt.Printf("%v\n", sdlColor)
 
 	w := utils.NextP2(surfaceRaw.W)
 	h := utils.NextP2(surfaceRaw.H)

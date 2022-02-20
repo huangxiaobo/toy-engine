@@ -32,7 +32,8 @@ type PointLight struct {
 	modelUniform      int32
 	colorUniform      int32
 
-	Meshes []mesh.Mesh
+	model  mgl32.Mat4
+	Meshes []*mesh.Mesh
 }
 
 type DirectionLight struct {
@@ -59,6 +60,7 @@ func NewPointLight(xmlLight config.XmlLight) *PointLight {
 			Linear:   0.007,
 			Exp:      0.0002,
 		},
+		model: mgl32.Ident4(),
 	}
 
 	// Atten参数参考表
@@ -67,7 +69,7 @@ func NewPointLight(xmlLight config.XmlLight) *PointLight {
 	// 325	    1.0	        0.014      0.0007
 	// 600	    1.0	        0.007      0.0002
 
-	l.Meshes = mesh.NewMeshPoint()
+	l.Meshes = mesh.NewMeshPoint([]mgl32.Vec3{l.Position.Vec3()}...)
 	for _, m := range l.Meshes {
 		for i := range m.Vertices {
 			m.Vertices[i].Color[0] = l.Color.X()
@@ -80,7 +82,6 @@ func NewPointLight(xmlLight config.XmlLight) *PointLight {
 	}
 
 	l.Init()
-
 	return l
 }
 
@@ -130,21 +131,20 @@ func (l *PointLight) SetAttenuation(rang, constant, linear, exp float32) {
 }
 
 func (l *PointLight) Update(elapsed float64) {
+	l.model = l.model.Mul4(mgl32.HomogRotate3DY(float32(elapsed)))
 	l.Position = mgl32.HomogRotate3DY(float32(elapsed)).Mul4x1(l.Position)
 }
 
 func (l *PointLight) Render(projection mgl32.Mat4, view mgl32.Mat4, model mgl32.Mat4) {
-	model = model.Add(mgl32.Translate3D(l.Position.X(), l.Position.Y(), l.Position.Z()))
+	model = model.Mul4(l.model)
 
-	program := l.shader.Program
 	// Shader
+	program := l.shader.Program
 	gl.UseProgram(program)
 
-	gl.UniformMatrix4fv(l.projectionUniform, 1, false, &projection[0])
-	gl.UniformMatrix4fv(l.viewUniform, 1, false, &view[0])
-	gl.UniformMatrix4fv(l.modelUniform, 1, false, &model[0])
-
-	//gl.Uniform3f(l.colorUniform, l.Color.X(), l.Color.Y(), l.Color.Z())
+	gl.UniformMatrix4fv(l.projectionUniform, 1, false, &(projection[0]))
+	gl.UniformMatrix4fv(l.viewUniform, 1, false, &(view[0]))
+	gl.UniformMatrix4fv(l.modelUniform, 1, false, &(model[0]))
 
 	gl.BindFragDataLocation(program, 0, gl.Str("color\x00"))
 
