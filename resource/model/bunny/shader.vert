@@ -11,8 +11,10 @@ layout (location = 1) in vec3 vertcolor;
 layout (location = 2) in vec3 normal;
 
 
-out vec3 WorldPos0;
-out vec3 Normal0;
+out VsOut {
+    vec3 WorldPos0;
+    vec3 Normal0;
+} v2f;
 
 void main() {
     gl_Position = projection * view * model * vec4(position, 1);
@@ -26,7 +28,7 @@ void main() {
     mat3 normalmatrix = mat3(transpose(inverse(model)));
 
     // 计算顶点在世界坐标系的位置
-    WorldPos0 = (model * position_h).xyz;
+    v2f.WorldPos0 = (model * position_h).xyz;
     // 将法线向量转化到直接坐标系
-    Normal0 = normalize(normalmatrix * normal);
+    v2f.Normal0 = normalize(normalmatrix * normal);
 }

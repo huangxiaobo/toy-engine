@@ -5,9 +5,9 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-func NewMeshPoint(points ...mgl32.Vec3) []*Mesh {
+func NewMeshLines(points ...mgl32.Vec3) []*Mesh {
 
-	meshes := GenPointMesh(points...)
+	meshes := GenLineMesh(points...)
 
 	for i := 0; i < len(meshes); i++ {
 		meshes[i].Setup()
@@ -16,16 +16,16 @@ func NewMeshPoint(points ...mgl32.Vec3) []*Mesh {
 	return meshes
 }
 
-func GenPointMesh(points ...mgl32.Vec3) []*Mesh {
+func GenLineMesh(points ...mgl32.Vec3) []*Mesh {
 	meshes := make([]*Mesh, 0)
 
 	m := &Mesh{
-		DrawMode: gl.POINTS,
+		DrawMode: gl.LINES,
 	}
 
 	for idx, point := range points {
 		v := Vertex{
-			Position:  mgl32.Vec3{point.X(), point.Y(), point.Z()},
+			Position:  point,
 			Color:     mgl32.Vec3{0, 0, 0},
 			Normal:    mgl32.Vec3{0.0, 1.0, 0.0},
 			TexCoords: mgl32.Vec2{0.0, 0.0},
@@ -35,6 +35,7 @@ func GenPointMesh(points ...mgl32.Vec3) []*Mesh {
 
 		m.Vertices = append(m.Vertices, v)
 		m.Indices = append(m.Indices, uint32(idx))
+
 	}
 	meshes = append(meshes, m)
 

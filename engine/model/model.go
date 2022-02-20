@@ -22,7 +22,7 @@ import (
 type Model struct {
 	texturesLoaded  map[string]texture.Texture
 	wg              sync.WaitGroup
-	Meshes          []mesh.Mesh
+	Meshes          []*mesh.Mesh
 	GammaCorrection bool
 	BasePath        string
 	FileName        string
@@ -158,7 +158,7 @@ func (m *Model) processNode(aNode *assimp.Node, aScene *assimp.Scene) {
 	}
 }
 
-func (m *Model) processMesh(aMesh *assimp.Mesh, aScene *assimp.Scene) mesh.Mesh {
+func (m *Model) processMesh(aMesh *assimp.Mesh, aScene *assimp.Scene) *mesh.Mesh {
 	// Return a mesh object created from the extracted mesh data
 
 	return mesh.NewMesh(

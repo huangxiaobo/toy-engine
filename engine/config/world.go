@@ -58,6 +58,7 @@ type XmlLightSpecular struct {
 }
 
 type XmlLight struct {
+	XMLLightType     string           `xml:"type"`
 	XMLPosition      XmlXYZ           `xml:"position"`
 	XMLColor         XmlRGB           `xml:"color"`
 	XMLLightDiffuse  XmlLightDiffuse  `xml:"diffuse"`

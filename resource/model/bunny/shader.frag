@@ -33,8 +33,10 @@ struct Material{
 
 uniform Material gMaterial;
 
-in vec3 WorldPos0;
-in vec3 Normal0;
+in VsOut {
+    vec3 WorldPos0;
+    vec3 Normal0;
+} v2f;
 
 out vec4 color;
 
@@ -50,7 +52,7 @@ vec4 CalcLightInternal(PointLight Light, vec3 LightDirection, vec3 Normal) {
         DiffuseColor = vec4(Light.Color, 1.0f) * vec4(gMaterial.DiffuseColor, 1.0) * DiffuseFactor;
 
         // 计算眼睛观察方向
-        vec3 VertexToEye = normalize(gViewPos - WorldPos0);
+        vec3 VertexToEye = normalize(gViewPos - v2f.WorldPos0);
         // 计算反射光方向
         vec3 LightReflect = normalize(reflect(LightDirection, Normal));
         // 计算反射光与观测方向的夹角
@@ -67,7 +69,7 @@ vec4 CalcLightInternal(PointLight Light, vec3 LightDirection, vec3 Normal) {
 
 vec4 CalcPointLight(int Index, vec3 Normal)
 {
-    vec3 LightDirection = WorldPos0 - gLight[Index].Position;
+    vec3 LightDirection = v2f.WorldPos0 - gLight[Index].Position;
     float Distance = length(LightDirection);
     LightDirection = normalize(LightDirection);
 
@@ -78,7 +80,7 @@ vec4 CalcPointLight(int Index, vec3 Normal)
 }
 
 void main() {
-    vec3 N = normalize(Normal0);
+    vec3 N = normalize(v2f.Normal0);
 
     // 计算多个点光源
     vec4 pointLightColor = vec4(0, 0, 0, 0);

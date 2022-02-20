@@ -34,8 +34,8 @@ type Mesh struct {
 	ebo uint32
 }
 
-func NewMesh(v []Vertex, i []uint32, t []texture.Texture) Mesh {
-	m := Mesh{
+func NewMesh(v []Vertex, i []uint32, t []texture.Texture) *Mesh {
+	m := &Mesh{
 		Vertices: v,
 		Indices:  i,
 		Textures: t,
