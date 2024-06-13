@@ -4,10 +4,12 @@ https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64
 ### Ubuntu安装依赖
 
 ```
-sudo apt install assimp-utils libassimp-dev
-sudo apt install build-essential
-sudo apt install libx11-dev
-sudo apt install xorg-dev
+sudo apt install -y assimp-utils libassimp-dev
+sudo apt install -y build-essential
+sudo apt install -y libx11-dev
+sudo apt install -y xorg-dev
+sudo apt install -y libsdl2-dev
+sudo apt install -y libsdl2-ttf-dev
 ```
 
 ### 参考
