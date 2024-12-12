@@ -1,7 +1,7 @@
 #### gcc
 https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/8.1.0/threads-win32/seh/x86_64-8.1.0-release-win32-seh-rt_v6-rev0.7z
 
-### Ubuntu安装依赖
+### Debian+Ubuntu安装依赖
 
 ```
 sudo apt install -y assimp-utils libassimp-dev
@@ -10,6 +10,7 @@ sudo apt install -y libx11-dev
 sudo apt install -y xorg-dev
 sudo apt install -y libsdl2-dev
 sudo apt install -y libsdl2-ttf-dev
+sudo apt install -y pkg-config
 ```
 
 ### 参考
