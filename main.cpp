@@ -3,11 +3,14 @@
 #include <QOpenGLFunctions>
 #include <QOpenGLWidget>
 
-auto main(int argc, char* argv[]) -> int{
+#include "engine/mainwindow.h"
+
+auto main(int argc, char *argv[]) -> int
+{
     QApplication app(argc, argv);
-    QOpenGLWidget w{/*parent:*/nullptr, /*f:*/Qt::WindowFlags{}};
-    w.resize(500,500);
-    w.setWindowTitle("Hello OpenGL");
+
+    ToyEngineMainWindow w;
     w.show();
+
     return app.exec();
 }
