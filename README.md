@@ -1,17 +1,10 @@
-#### gcc
-https://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/8.1.0/threads-win32/seh/x86_64-8.1.0-release-win32-seh-rt_v6-rev0.7z
-
-### Debian+Ubuntu安装依赖
-
+### Qt安装 
+#### Mac安装
 ```
-sudo apt install -y assimp-utils libassimp-dev
-sudo apt install -y build-essential
-sudo apt install -y libx11-dev
-sudo apt install -y xorg-dev
-sudo apt install -y libsdl2-dev
-sudo apt install -y libsdl2-ttf-dev
-sudo apt install -y pkg-config
+brew install qt
+brew install cmake
 ```
+
 
 ### 参考
 
@@ -50,29 +43,10 @@ void main() {
 
 获取shader的变量需要添加"\000"后缀
 
-## 坐标系
+### 坐标系
 
 OpenGL是右手坐标系
 
-## 字体
-
-https://stackoverflow.com/questions/34455925/render-truetype-fonts-with-opengl
-https://github.com/golang/freetype/blob/master/example/freetype/main.go
-
-### freetype
-
-https://developer.apple.com/library/archive/documentation/TextFonts/Conceptual/CocoaTextArchitecture/Art/glyph_metrics_2x.png
-https://developer.apple.com/library/archive/documentation/TextFonts/Conceptual/CocoaTextArchitecture/Art/glyph_metrics_2x.png
-
-重要的字体度量参数：
-
-- 上下高度 (ascent) ： 从基线到放置轮廓点最高 ( 上 ) 的距离；
-- 下行高度 (descent) ：从基线到放置轮廓点最低 ( 下 ) 的距离；
-- 左跨距 ( bearingX ) ： 从当前笔位置到轮廓左边界的水平位置；
-- 上跨距 ( bearingY ) ： 从当前笔位置到轮廓上边界的垂直位置；
-- 步进宽度 ( advanceX ): 相邻两个笔位置的水平距离 ( 字间距 )；
-- 字形宽度 (width) ： 字形的水平长度；
-- 字形高度 (height) ： 字形的垂直长度。
 
 ## ScreenShots
 
