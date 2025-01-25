@@ -18,9 +18,21 @@ set(SOURCES
     main.cpp
     engine/mainwindow.cpp
     engine/renderer.cpp
+    engine/shader/shader.cpp
+    engine/axis/axis.cpp
 )
 
+# 添加glad
+add_subdirectory(3rdparty/glad)
+
+# 添加glfw
+include_directories(/opt/homebrew/Cellar/glfw/3.4/include)
+# glfw 库文件也加进来
+link_directories(/opt/homebrew/Cellar/glfw/3.4/lib)
+
 find_package(Qt6 REQUIRED COMPONENTS Core Gui OpenGL Widgets OpenGLWidgets)
+find_package(glm CONFIG REQUIRED)
+# find_package(glfw CONFIG REQUIRED)
 
 qt_standard_project_setup()
 
@@ -28,6 +40,17 @@ qt_add_executable(toy-engine
     main.cpp
     engine/mainwindow.cpp
     engine/renderer.cpp
+    engine/shader/shader.cpp
+    engine/axis/axis.cpp
 )
 
-target_link_libraries(toy-engine PRIVATE Qt6::Core Qt6::Gui  Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets)
+target_link_libraries(toy-engine PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
+    glm::glm
+    glad
+    glfw
+)

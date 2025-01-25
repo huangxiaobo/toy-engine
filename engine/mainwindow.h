@@ -14,9 +14,6 @@ public:
     ToyEngineMainWindow(QWidget *parent = nullptr);
     ~ToyEngineMainWindow();
 
-protected:
-    // void paintEvent(QPaintEvent *event);
-
 private:
     Renderer *renderer;
 

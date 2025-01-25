@@ -3,7 +3,14 @@
 ```
 brew install qt
 brew install cmake
+brew install glfw
+brew install glm
 ```
+
+
+#### Glad配置
+
+在[glad](https://gen.glad.sh/)下载glad依赖文件
 
 
 ### 参考
@@ -16,9 +23,11 @@ brew install cmake
 obj格式
 > https://www.cs.cmu.edu/~mbz/personal/graphics/obj.html
 
+---
+
 ### 问题解决记录
 
-####
+#### 1.  error: failed to compile #version 330
 
 ```shader
 panic: failed to compile #version 330
@@ -42,6 +51,14 @@ void main() {
 ```
 
 获取shader的变量需要添加"\000"后缀
+
+#### 2.  error: C1189: #error: OpenGL header already included, remove this include, glad already provides it.
+
+原因是#include <glad/glad.h>位置不当。
+
+#include <glad/glad.h>必须放在所有头文件之前，不管在哪里，不管在.h还是.cpp;
+
+---
 
 ### 坐标系
 
