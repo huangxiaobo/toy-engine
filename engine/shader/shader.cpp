@@ -5,9 +5,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <QDebug>
-// #include <QOpenGLFunctions>
-// #include <QOpenGLShaderProgram>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 Shader::Shader()
 {
@@ -19,22 +18,17 @@ Shader::~Shader()
 
 void Shader::init()
 {
-}
-
-void Shader::load(const char *vertexShaderPath, const char *fragmentShaderPath)
-{
-    std::cout << "1111" << std::endl;
     // glad 初始化
     if (!gladLoaderLoadGL())
     {
         std::cout << "gladLoadGLLoader error!" << std::endl;
-        qDebug() << "gladLoadGLLoader error!";
     }
-    std::cout << "2222" << std::endl;
-    std::cout << glGetString(GL_VERSION);
-    std::cout << "3333" << std::endl;
+    m_program = glCreateProgram();
+}
 
-    std::ifstream file(vertexShaderPath);
+void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath)
+{
+    std::ifstream file(filePath);
     std::stringstream buffer;
     if (file.is_open())
     {
@@ -43,20 +37,25 @@ void Shader::load(const char *vertexShaderPath, const char *fragmentShaderPath)
     }
     else
     {
-        std::cerr << "无法打开文件进行读取: " << vertexShaderPath << std::endl;
+        std::cerr << "无法打开文件进行读取: " << filePath << std::endl;
+        return;
     }
 
-    std::cerr << "1111" << std::endl;
-
     const GLchar *vertexShaderSource = buffer.str().c_str();
-    std::cerr << "1111" << std::endl;
-    std::cerr << buffer.str() << std::endl;
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    std::cerr << "1112" << std::endl;
+
+    int glShaderType = 0;
+    if (shaderType == VERTEX_SHADER)
+    {
+        glShaderType = GL_VERTEX_SHADER;
+    }
+    else
+    {
+        glShaderType = GL_FRAGMENT_SHADER;
+    }
+
+    unsigned int vertexShader = glCreateShader(glShaderType);
     glShaderSource(vertexShader, 1, &vertexShaderSource, 0);
-    std::cerr << "1111" << std::endl;
     glCompileShader(vertexShader);
-    std::cerr << "1111" << std::endl;
     // check for shader compile errors
     int success;
     char infoLog[512];
@@ -67,35 +66,18 @@ void Shader::load(const char *vertexShaderPath, const char *fragmentShaderPath)
         std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
                   << infoLog << std::endl;
     }
-
-    // fragment shader
-    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    std::ifstream file1(fragmentShaderPath);
-    std::stringstream buffer1;
-    if (file1.is_open())
-    {
-        buffer1 << file1.rdbuf();
-        file1.close();
-    }
-    else
-    {
-        std::cerr << "无法打开文件进行读取: " << vertexShaderPath << std::endl;
-    }
-    const GLchar *fragmentShaderSource = buffer1.str().c_str();
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, 0);
-    glCompileShader(fragmentShader);
-    // check for shader compile errors
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(fragmentShader, 512, 0, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-    }
-    m_program = glCreateProgram();
     glAttachShader(m_program, vertexShader);
-    glAttachShader(m_program, fragmentShader);
+
+    glDeleteShader(vertexShader);
+}
+
+void Shader::link()
+{
+    int success;
+    char infoLog[512];
+
     glLinkProgram(m_program);
+
     // check for linking errors
     glGetProgramiv(m_program, GL_LINK_STATUS, &success);
     if (!success)
@@ -104,8 +86,6 @@ void Shader::load(const char *vertexShaderPath, const char *fragmentShaderPath)
         std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
                   << infoLog << std::endl;
     }
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
 }
 
 void Shader::use()
@@ -113,18 +93,23 @@ void Shader::use()
     glUseProgram(m_program);
 }
 
-void Shader::setUniform(const char *name, float value)
+void Shader::setUniformValue(const char *name, float value)
 {
 }
 
-void Shader::setUniform(const char *name, int value)
+void Shader::setUniformValue(const char *name, int value)
 {
 }
 
-void Shader::setUniform(const char *name, bool value)
+void Shader::setUniformValue(const char *name, bool value)
 {
 }
 
-void Shader::setUniform(const char *name, glm::vec2 value)
+void Shader::setUniformValue(const char *name, glm::vec2 value)
 {
+}
+
+void Shader::setUniformValue(const char *name, glm::mat4 value)
+{
+    glUniformMatrix4fv(glGetUniformLocation(m_program, name), 1, GL_FALSE, glm::value_ptr(value));
 }
