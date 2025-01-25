@@ -25,14 +25,13 @@ set(SOURCES
 # 添加glad
 add_subdirectory(3rdparty/glad)
 
-# 添加glfw
+# 添加glfw头文件
 include_directories(/opt/homebrew/Cellar/glfw/3.4/include)
 # glfw 库文件也加进来
 link_directories(/opt/homebrew/Cellar/glfw/3.4/lib)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui OpenGL Widgets OpenGLWidgets)
 find_package(glm CONFIG REQUIRED)
-# find_package(glfw CONFIG REQUIRED)
 
 qt_standard_project_setup()
 
