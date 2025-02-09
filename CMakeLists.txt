@@ -20,6 +20,9 @@ set(SOURCES
     engine/renderer.cpp
     engine/shader/shader.cpp
     engine/axis/axis.cpp
+    engine/mesh/mesh.cpp
+    engine/model/model.cpp
+    engine/technique/technique.cpp
 )
 
 # 添加glad
@@ -41,6 +44,9 @@ qt_add_executable(toy-engine
     engine/renderer.cpp
     engine/shader/shader.cpp
     engine/axis/axis.cpp
+    engine/mesh/mesh.cpp
+    engine/model/model.cpp
+    engine/technique/technique.cpp
 )
 
 target_link_libraries(toy-engine PRIVATE
