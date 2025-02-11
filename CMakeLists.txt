@@ -23,6 +23,7 @@ set(SOURCES
     engine/mesh/mesh.cpp
     engine/model/model.cpp
     engine/technique/technique.cpp
+    engine/utils/utils.cpp
 )
 
 # 添加glad
@@ -47,6 +48,7 @@ qt_add_executable(toy-engine
     engine/mesh/mesh.cpp
     engine/model/model.cpp
     engine/technique/technique.cpp
+    engine/utils/utils.cpp
 )
 
 target_link_libraries(toy-engine PRIVATE
