@@ -1,10 +1,11 @@
 #include "technique.h"
 
+#include <iostream>
+
 Technique::Technique(QString name, QString vertexShader, QString fragmentShader)
 {
     shaderVertex = vertexShader;
     shaderFragment = fragmentShader;
-    shader_program = new QOpenGLShaderProgram();
 }
 
 Technique::~Technique()
@@ -18,20 +19,22 @@ Technique::~Technique()
 
 void Technique::init()
 {
-
+    this->shader_program = new QOpenGLShaderProgram();
     // ===================== 着色器 =====================
     this->shader_program->addShaderFromSourceFile(QOpenGLShader::Vertex, shaderVertex);
     this->shader_program->addShaderFromSourceFile(QOpenGLShader::Fragment, shaderFragment);
+
     bool success = this->shader_program->link();
     if (!success)
         qDebug() << "ERROR: " << this->shader_program->log();
 
-    this->shader_program->bind();                                              // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
-    ProjectionUniform = this->shader_program->attributeLocation("projection"); // 获取顶点着色器中顶点属性 aPos 的位置
-    ViewUniform = this->shader_program->attributeLocation("view");             // 获取顶点着色器中顶点属性 aPos 的位置
-    ModelUniform = this->shader_program->attributeLocation("model");           // 获取顶点着色器中顶点属性 aPos 的位置
-    WvpUniform = this->shader_program->attributeLocation("gWVP");              // 获取顶点着色器中顶点属性 aPos 的位置
-    CameraUniform = this->shader_program->attributeLocation("gViewPos");       // 获取顶点着色器中顶点属性 aPos 的位置
+    this->shader_program->bind();                                            // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
+    ProjectionUniform = this->shader_program->uniformLocation("projection"); // 获取顶点着色器中顶点属性 aPos 的位置
+    ViewUniform = this->shader_program->uniformLocation("view");             // 获取顶点着色器中顶点属性 aPos 的位置
+    ModelUniform = this->shader_program->uniformLocation("model");           // 获取顶点着色器中顶点属性 aPos 的位置
+    WvpUniform = this->shader_program->uniformLocation("gWVP");              // 获取顶点着色器中顶点属性 aPos 的位置
+    CameraUniform = this->shader_program->uniformLocation("gViewPos");       // 获取顶点着色器中顶点属性 aPos 的位置
+
 }
 
 void Technique::SetWVP(QMatrix4x4 wvp)
@@ -85,7 +88,7 @@ void Technique::setUniform()
 
 void Technique::Enable()
 {
-    shader_program->bind();
+    bool ok = shader_program->bind();
 }
 
 void Technique::Disable()
