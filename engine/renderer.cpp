@@ -4,6 +4,7 @@
 #include "mesh/mesh.h"
 #include "technique/technique.h"
 #include "model/model.h"
+#include "utils/utils.h"
 #include <QTime>
 
 Renderer::Renderer(QWidget *parent) : QOpenGLWidget(parent)
@@ -33,7 +34,6 @@ void Renderer::initializeGL()
     m_axis->init(width(), height());
 
     // Create Plane
-
     Mesh *planeMesh = Mesh::CreatePlaneMesh();
     Technique *planeEffect = new Technique("plane",
                                            "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/light.vert",
@@ -48,7 +48,7 @@ void Renderer::initializeGL()
 
 void Renderer::paintGL()
 {
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     this->m_axis->draw(this->m_time.elapsed());
@@ -72,7 +72,7 @@ void Renderer::paintGL()
 
     for (auto model : m_models)
     {
-        model->Draw(this->m_time.elapsed(), &mat_projection, &mat_view, &mat_model, &cam_pos);
+        model->Draw(this->m_time.elapsed(), mat_projection, mat_view, mat_model, cam_pos);
     }
 }
 
