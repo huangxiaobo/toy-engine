@@ -27,7 +27,7 @@ public:
 
     void SetMesh(Mesh *model);
     void SetEffect(Technique *effect);
-    void Draw(long long elapsed,QMatrix4x4 *projection, QMatrix4x4 *view, QMatrix4x4 *model,QVector3D *camera); 
+    void Draw(long long elapsed, const QMatrix4x4 &projection, const QMatrix4x4 &view, const QMatrix4x4 &model, const QVector3D &camera); 
 };
 
 #endif

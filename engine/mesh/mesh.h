@@ -20,6 +20,9 @@ public:
     QVector3D Color;
     QVector3D Normal;
     QVector2D TexCoords;
+
+    alignas(16) static constexpr int PositionLocation = 0;
+    alignas(16) static constexpr int ColorLocation = 1;
 };
 
 class Mesh
@@ -32,7 +35,7 @@ public:
 
     void Draw(long long elapsed);
 
-    static Mesh* CreatePlaneMesh();
+    static Mesh *CreatePlaneMesh();
 
 public:
     QString name;
