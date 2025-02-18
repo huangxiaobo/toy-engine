@@ -91,8 +91,10 @@ void Mesh::Draw(long long elapsed)
     glBindVertexArray(0);
 }
 
-Mesh *Mesh::CreatePlaneMesh()
+QVector<Mesh *> Mesh::CreatePlaneMesh()
 {
+    QVector<Mesh *> meshes;
+
     Mesh *mesh = new Mesh();
 
     mesh->vertices = {
@@ -133,5 +135,106 @@ Mesh *Mesh::CreatePlaneMesh()
 
     mesh->SetUpMesh();
 
-    return mesh;
+    meshes.push_back(mesh);
+    return meshes;
+}
+
+QVector<Mesh *> Mesh::CreateGroundMesh()
+{
+    QVector<Mesh *> meshes;
+
+    Mesh *m1 = new Mesh();
+    m1->DrawMode = GL_LINES;
+
+    int gridNum = 10;
+    float gridStrip = 1;
+    float gridWidth = 1.0f * gridNum * gridStrip / 2;
+
+    // draw grid
+    GLuint i = 0;
+    for (int k = -gridNum / 2; k <= gridNum / 2; k += 1)
+    {
+        if (k == 0)
+        {
+            continue;
+        }
+        m1->vertices.push_back(Vertex{
+            QVector3D{1.0f * k * gridStrip, 0.0f, +gridWidth},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector2D{0.0, 0.0},
+        });
+        m1->indices.push_back(i++);
+
+        m1->vertices.push_back(Vertex{
+            QVector3D{1.0f * k * gridStrip, 0.0f, -gridWidth},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector2D{0.0, 0.0},
+        });
+        m1->indices.push_back(i++);
+
+        m1->vertices.push_back(Vertex{
+            QVector3D{+gridWidth, 0.0f, 1.0f * k * gridStrip},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector2D{0.0, 0.0},
+        });
+        m1->indices.push_back(i++);
+
+        m1->vertices.push_back(Vertex{
+            QVector3D{-gridWidth, 0.0f, 1.0f * k * gridStrip},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector3D{0.0, 1.0, 0.0},
+            QVector2D{0.0, 0.0},
+        });
+        m1->indices.push_back(i++);
+    }
+
+    meshes.push_back(m1);
+
+    Mesh *m = new Mesh();
+    m->DrawMode = GL_LINES;
+
+    i = 0;
+
+    m->vertices.push_back(Vertex{
+        QVector3D{0.0f, 0.0f, -gridWidth},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector2D{0.0, 0.0},
+    });
+    m->indices.push_back(i++);
+
+    m->vertices.push_back(Vertex{
+        QVector3D{0.0f, 0.0f, +gridWidth},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector2D{0.0, 0.0},
+    });
+    m->indices.push_back(i++);
+
+    m->vertices.push_back(Vertex{
+        QVector3D{+gridWidth, 0.0f, 0.0f},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector2D{0.0, 0.0},
+    });
+    m->indices.push_back(i++);
+
+    m->vertices.push_back(Vertex{
+        QVector3D{-gridWidth, 0.0f, 0.0f},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector3D{0.0, 1.0, 0.0},
+        QVector2D{0.0, 0.0},
+    });
+    m->indices.push_back(i++);
+
+    meshes.push_back(m);
+
+    for (auto mesh: meshes)
+    {
+        mesh->SetUpMesh();
+    }
+    return meshes;
 }

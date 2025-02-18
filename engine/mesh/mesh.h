@@ -35,7 +35,8 @@ public:
 
     void Draw(long long elapsed);
 
-    static Mesh *CreatePlaneMesh();
+    static QVector<Mesh*> CreatePlaneMesh();
+    static QVector<Mesh*> CreateGroundMesh();
 
 public:
     QString name;
@@ -44,6 +45,8 @@ public:
 
     GLuint VAO, VBO;
     GLuint EBO; // 创建 EBO 元素缓冲对象
+
+    GLuint DrawMode;
 };
 
 #endif

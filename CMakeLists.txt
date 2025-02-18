@@ -28,6 +28,7 @@ set(SOURCES
 
 # 添加glad
 add_subdirectory(3rdparty/glad)
+add_subdirectory(3rdparty/tinyxml2)
 
 # 添加glfw头文件
 include_directories(/opt/homebrew/Cellar/glfw/3.4/include)
@@ -60,4 +61,5 @@ target_link_libraries(toy-engine PRIVATE
     glm::glm
     glad
     glfw
+    tinyxml2
 )

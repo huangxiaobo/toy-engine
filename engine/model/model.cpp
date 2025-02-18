@@ -6,13 +6,32 @@
 #include "../technique/technique.h"
 #include "../mesh/mesh.h"
 
-void Model::Init()
+Model::Model()
 {
 }
 
-void Model::SetMesh(Mesh *mesh)
+Model::~Model()
 {
-    this->mesh = mesh;
+    while (!meshes.empty()) {
+        delete meshes[0];
+        meshes.erase(meshes.begin());
+    }
+    if (effect) {
+        delete effect;
+        effect = nullptr;
+    }
+}
+
+void Model::Init()
+{
+   
+}
+
+void Model::SetMesh(QVector<Mesh*> meshes)
+{
+    for(auto m : meshes) {
+        this->meshes.push_back(m);
+    }
 }
 
 void Model::SetEffect(Technique *effect)
@@ -30,5 +49,7 @@ void Model::Draw(long long elapsed, const QMatrix4x4 &projection, const QMatrix4
     this->effect->SetModel(model);
     this->effect->SetCamera(camera);
 
-    this->mesh->Draw(elapsed);
+    for(int i = 0; i < this->meshes.size(); i++) {
+        this->meshes[i]->Draw(elapsed);
+    }
 }
