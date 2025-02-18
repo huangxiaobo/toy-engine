@@ -14,7 +14,7 @@ class Mesh;
 class Model
 {
 public:
-    Mesh *mesh;
+    QVector<Mesh*> meshes;
     Technique *effect;
 
     QVector3D position;
@@ -23,9 +23,12 @@ public:
     QMatrix4x4 matrix;
 
 public:
+
+    Model();
+    ~Model();
     void Init();
 
-    void SetMesh(Mesh *model);
+    void SetMesh(QVector<Mesh *>model);
     void SetEffect(Technique *effect);
     void Draw(long long elapsed, const QMatrix4x4 &projection, const QMatrix4x4 &view, const QMatrix4x4 &model, const QVector3D &camera); 
 };

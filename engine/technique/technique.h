@@ -6,7 +6,7 @@
 #include <QOpenGLShaderProgram>
 class Technique
 {
-private:
+protected:
     QString shaderVertex;
     QString shaderFragment;
     QOpenGLShaderProgram *shader_program;
@@ -21,7 +21,7 @@ public:
     Technique(QString name, QString vertexShader, QString fragmentShader);
     ~Technique();
 
-    void init();
+    virtual void init();
 
     void SetWVP(QMatrix4x4 wvp);
     void SetCamera(QVector3D camera);

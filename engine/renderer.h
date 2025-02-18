@@ -25,6 +25,7 @@ protected:
 private:
     Axis *m_axis;
     QVector<Model*> m_models;
+    Model* m_ground;
     QElapsedTimer m_time;
 };
 
