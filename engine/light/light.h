@@ -1,7 +1,6 @@
 #ifndef __LIGHT_H__
 #define __LIGHT_H__
 
-#include <QVector3D>
 
 enum LightType
 {

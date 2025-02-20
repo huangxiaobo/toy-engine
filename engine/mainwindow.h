@@ -5,7 +5,7 @@
 #include <QWidget>
 #include <QMainWindow>
 
-class Renderer;
+class RendererWidget;
 
 class ToyEngineMainWindow : public QMainWindow
 {
@@ -15,7 +15,7 @@ public:
     ~ToyEngineMainWindow();
 
 private:
-    Renderer *renderer;
+    RendererWidget *renderer_widget;
 
     QTimer *timer;
 };
