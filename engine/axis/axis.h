@@ -1,7 +1,7 @@
 #ifndef __AXIS_H__
 #define __AXIS_H__
 
-#include <QOpenGLShaderProgram>
+class Shader;
 
 class Axis
 {
@@ -14,8 +14,8 @@ public:
     void draw(long long elapsed);
 
 private:
-    QOpenGLShaderProgram *shader_program;
-    GLuint VAO, VBO;
+    Shader *shader_program;
+    unsigned int VAO, VBO;
     // 创建 EBO 元素缓冲对象
     unsigned int EBO;
 };

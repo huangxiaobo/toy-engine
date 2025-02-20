@@ -1,5 +1,7 @@
 #include "direction_light.h"
 
+#include <glm/glm.hpp>
+
 DirectionLight::DirectionLight()
 {
 }
@@ -13,27 +15,27 @@ DirectionLight::~DirectionLight()
 {
 }
 
-QVector3D DirectionLight::getDirection() const
+glm::vec3 DirectionLight::getDirection() const
 {
     return attr.direction;
 }
 
-QVector3D DirectionLight::getColor() const
+glm::vec3 DirectionLight::getColor() const
 {
     return attr.color;
 }
 
-QVector3D DirectionLight::getAmbient() const
+glm::vec3 DirectionLight::getAmbient() const
 {
     return attr.ambient;
 }
 
-QVector3D DirectionLight::getDiffuse() const
+glm::vec3 DirectionLight::getDiffuse() const
 {
     return attr.diffuse;
 }
 
-QVector3D DirectionLight::getSpecular() const
+glm::vec3 DirectionLight::getSpecular() const
 {
     return attr.specular;
 }

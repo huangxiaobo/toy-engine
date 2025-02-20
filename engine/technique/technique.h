@@ -1,40 +1,47 @@
 #ifndef __TECHNIQUE_H__
 #define __TECHNIQUE_H__
 
-#include <QString>
-#include <QVector3D>
-#include <QOpenGLShaderProgram>
+
+#include <glm/glm.hpp>
+#include <string>
+#include <vector>
+
+using namespace std;
+
+class Shader;
+
 class Technique
 {
 protected:
-    QString shaderVertex;
-    QString shaderFragment;
-    QOpenGLShaderProgram *shader_program;
+    string shaderVertex;
+    string shaderFragment;
+    Shader *shader_program;
 
-    GLuint ProjectionUniform;
-    GLuint ViewUniform;
-    GLuint ModelUniform;
-    GLuint WvpUniform; // 模型视图投影矩阵
-    GLuint CameraUniform; // 摄像机位置
+    unsigned int ProjectionUniform;
+    unsigned int ViewUniform;
+    unsigned int ModelUniform;
+    unsigned int WvpUniform; // 模型视图投影矩阵
+    unsigned int CameraUniform; // 摄像机位置
 
 public:
-    Technique(QString name, QString vertexShader, QString fragmentShader);
+    Technique(string name, string vertexShader,  string fragmentShader);
     ~Technique();
 
     virtual void init();
 
-    void SetWVP(QMatrix4x4 wvp);
-    void SetCamera(QVector3D camera);
+    void SetWVP(const glm::mat4& wvp);
+    void SetCamera(const glm::vec3 &camera);
 
-    void SetProjection(QMatrix4x4 projection);
-    void SetView(QMatrix4x4 view);
-    void SetModel(QMatrix4x4 model);
+    void SetProjection(const glm::mat4& projection);
+    void SetView(const glm::mat4& view);
+    void SetModel(const glm::mat4& model);
 
     void draw(long long elapsed);
-    void setUniform(QString name, QVector3D value);
-    void setUniform(QString name, QVector4D value);
-    void setUniform(QString name, float value);
-    void setUniform(QString name, int value);
+    void setUniform(const char* name, const glm::vec2& value);
+    void setUniform(const char* name, const glm::vec3& value);
+    void setUniform(const char* name, const glm::vec4& value);
+    void setUniform(const char* name, float value);
+    void setUniform(const char* name, int value);
     void setUniform();
 
     void Enable();

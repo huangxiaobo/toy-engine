@@ -14,42 +14,40 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # Qt 默认动态链接，如果没有添加到系统环境变量，需要复制相关dll到相同文件夹中
 set(CMAKE_PREFIX_PATH "/opt/Qt/6.8.1/gcc_arm64/lib/cmake/")
 
-set(SOURCES
-    main.cpp
-    engine/mainwindow.cpp
-    engine/renderer.cpp
-    engine/shader/shader.cpp
-    engine/axis/axis.cpp
-    engine/mesh/mesh.cpp
-    engine/model/model.cpp
-    engine/technique/technique.cpp
-    engine/utils/utils.cpp
-)
+# set(SOURCES
+#     main.cpp
+#     engine/mainwindow.cpp
+#     engine/renderer.cpp
+#     engine/renderer_view.cpp
+#     engine/shader/shader.cpp
+#     engine/axis/axis.cpp
+#     engine/mesh/mesh.cpp
+#     engine/model/model.cpp
+#     engine/texture/texture.cpp
+#     engine/technique/technique.cpp
+#     engine/utils/utils.cpp
+# )
+file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.cpp)
 
 # 添加glad
 add_subdirectory(3rdparty/glad)
 add_subdirectory(3rdparty/tinyxml2)
 
-# 添加glfw头文件
-include_directories(/opt/homebrew/Cellar/glfw/3.4/include)
-# glfw 库文件也加进来
-link_directories(/opt/homebrew/Cellar/glfw/3.4/lib)
+# # 添加glfw头文件
+# include_directories(/opt/homebrew/Cellar/glfw/3.4/include)
+# # glfw 库文件也加进来
+# link_directories(/opt/homebrew/Cellar/glfw/3.4/lib)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui OpenGL Widgets OpenGLWidgets)
 find_package(glm CONFIG REQUIRED)
+find_package(assimp)
 
 qt_standard_project_setup()
 
+# 将源代码文件编译为可执行文件
 qt_add_executable(toy-engine
     main.cpp
-    engine/mainwindow.cpp
-    engine/renderer.cpp
-    engine/shader/shader.cpp
-    engine/axis/axis.cpp
-    engine/mesh/mesh.cpp
-    engine/model/model.cpp
-    engine/technique/technique.cpp
-    engine/utils/utils.cpp
+    ${SOURCES}
 )
 
 target_link_libraries(toy-engine PRIVATE
@@ -60,6 +58,7 @@ target_link_libraries(toy-engine PRIVATE
     Qt6::OpenGLWidgets
     glm::glm
     glad
-    glfw
+    # glfw
     tinyxml2
+    assimp::assimp
 )

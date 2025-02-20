@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+using namespace std;
+
 Shader::Shader()
 {
 }
@@ -40,8 +42,8 @@ void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath
         std::cerr << "无法打开文件进行读取: " << filePath << std::endl;
         return;
     }
-
-    const GLchar *vertexShaderSource = buffer.str().c_str();
+    string shader_source = buffer.str();
+    const GLchar *vertexShaderSource = shader_source.c_str();
 
     int glShaderType = 0;
     if (shaderType == VERTEX_SHADER)
@@ -66,15 +68,14 @@ void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath
         std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
                   << infoLog << std::endl;
     }
-    glAttachShader(m_program, vertexShader);
 
+    glAttachShader(m_program, vertexShader);
     glDeleteShader(vertexShader);
 }
 
-void Shader::link()
+bool Shader::link()
 {
     int success;
-    char infoLog[512];
 
     glLinkProgram(m_program);
 
@@ -82,15 +83,61 @@ void Shader::link()
     glGetProgramiv(m_program, GL_LINK_STATUS, &success);
     if (!success)
     {
-        glGetProgramInfoLog(m_program, 512, 0, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
-                  << infoLog << std::endl;
+        PrintProgramLog(m_program);
     }
+    return success == 1;
+}
+
+// 捕获链接着色器时的错误的函数
+void Shader::PrintProgramLog(unsigned int id)
+{
+    int len = 0;
+    char *log;
+    glGetProgramiv(id, GL_INFO_LOG_LENGTH, &len);
+    if (len > 0)
+    {
+        log = (char *)malloc(len);
+        glGetProgramInfoLog(id, len, 0, log);
+        std::cout << "Program Inof Log:" << log << std::endl;
+        free(log);
+    }
+}
+
+
+unsigned int Shader::attributeLocation(const char *name)
+{
+
+    if (m_program != 0)
+    {
+        return glGetAttribLocation(m_program, name);
+    }
+    return 0;
+}
+
+unsigned int Shader::uniformLocation(const char *name)
+{
+    if (m_program != 0)
+    {
+        return glGetUniformLocation(m_program, name);
+    }
+    return 0;
 }
 
 void Shader::use()
 {
     glUseProgram(m_program);
+}
+
+bool Shader::unbind()
+{
+    glUseProgram(0);
+    return true;
+}
+
+bool Shader::bind()
+{
+    glUseProgram(m_program);
+    return true;
 }
 
 void Shader::setUniformValue(const char *name, float value)
@@ -105,11 +152,40 @@ void Shader::setUniformValue(const char *name, bool value)
 {
 }
 
-void Shader::setUniformValue(const char *name, glm::vec2 value)
+void Shader::setUniformValue(const char *name, const glm::vec2 &value)
 {
 }
 
-void Shader::setUniformValue(const char *name, glm::mat4 value)
+void Shader::setUniformValue(const char *name, const glm::mat4 &value)
 {
     glUniformMatrix4fv(glGetUniformLocation(m_program, name), 1, GL_FALSE, glm::value_ptr(value));
+}
+
+void Shader::setUniformValue(unsigned int uniform_location, float value)
+{
+    glUniform1f(uniform_location, value);
+}
+
+void Shader::setUniformValue(unsigned int uniform_location, int value)
+{
+    glUniform1i(uniform_location, value);
+}
+
+void Shader::setUniformValue(unsigned int uniform_location, bool value)
+{
+}
+
+void Shader::setUniformValue(unsigned int uniform_location, const glm::vec2 &value)
+{
+    glUniform2fv(uniform_location, 1, glm::value_ptr(value));
+}
+
+void Shader::setUniformValue(unsigned int uniform_location, const glm::vec3 &value)
+{
+    glUniform3fv(uniform_location, 1, glm::value_ptr(value));
+}
+
+void Shader::setUniformValue(unsigned int uniform_location, const glm::mat4 &value)
+{
+    glUniformMatrix4fv(uniform_location, 1, GL_FALSE, glm::value_ptr(value));
 }

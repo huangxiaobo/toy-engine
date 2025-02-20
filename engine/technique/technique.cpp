@@ -1,8 +1,9 @@
 #include "technique.h"
+#include "../shader/shader.h"
 
 #include <iostream>
 
-Technique::Technique(QString name, QString vertexShader, QString fragmentShader)
+Technique::Technique(string name,  string vertexShader,  string fragmentShader)
 {
     shaderVertex = vertexShader;
     shaderFragment = fragmentShader;
@@ -19,14 +20,16 @@ Technique::~Technique()
 
 void Technique::init()
 {
-    this->shader_program = new QOpenGLShaderProgram();
+    this->shader_program = new Shader();
+    this->shader_program->init();
     // ===================== 着色器 =====================
-    this->shader_program->addShaderFromSourceFile(QOpenGLShader::Vertex, shaderVertex);
-    this->shader_program->addShaderFromSourceFile(QOpenGLShader::Fragment, shaderFragment);
+    this->shader_program->addShaderFromSourceFile(ShaderType::VERTEX_SHADER, shaderVertex.c_str());
+    this->shader_program->addShaderFromSourceFile(ShaderType::FRAGMENT_SHADER, shaderFragment.c_str());
 
     bool success = this->shader_program->link();
-    if (!success)
-        qDebug() << "ERROR: " << this->shader_program->log();
+    if (!success){
+        exit(-1);
+    }
 
     this->shader_program->bind();                                            // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
     ProjectionUniform = this->shader_program->uniformLocation("projection"); // 获取顶点着色器中顶点属性 aPos 的位置
@@ -37,27 +40,27 @@ void Technique::init()
 
 }
 
-void Technique::SetWVP(QMatrix4x4 wvp)
+void Technique::SetWVP(const glm::mat4& wvp)
 {
     this->shader_program->setUniformValue(WvpUniform, wvp);
 }
 
-void Technique::SetCamera(QVector3D camera)
+void Technique::SetCamera(const glm::vec3& camera)
 {
     this->shader_program->setUniformValue(CameraUniform, camera);
 }
 
-void Technique::SetProjection(QMatrix4x4 projection)
+void Technique::SetProjection(const glm::mat4& projection)
 {
     this->shader_program->setUniformValue(ProjectionUniform, projection);
 }
 
-void Technique::SetView(QMatrix4x4 view)
+void Technique::SetView(const glm::mat4& view)
 {
     this->shader_program->setUniformValue(ViewUniform, view);
 }
 
-void Technique::SetModel(QMatrix4x4 model)
+void Technique::SetModel( const glm::mat4& model)
 {
     this->shader_program->setUniformValue(ModelUniform, model);
 }
@@ -66,19 +69,23 @@ void Technique::draw(long long elapsed)
 {
 }
 
-void Technique::setUniform(QString name, QVector3D value)
+void Technique::setUniform(const char* name, const glm::vec2& value)
 {
 }
 
-void Technique::setUniform(QString name, QVector4D value)
+void Technique::setUniform(const char* name, const glm::vec3& value)
 {
 }
 
-void Technique::setUniform(QString name, float value)
+void Technique::setUniform(const char* name, const glm::vec4& value)
 {
 }
 
-void Technique::setUniform(QString name, int value)
+void Technique::setUniform(const char* name, float value)
+{
+}
+
+void Technique::setUniform(const char* name, int value)
 {
 }
 
@@ -93,5 +100,5 @@ void Technique::Enable()
 
 void Technique::Disable()
 {
-    glUseProgram(0);
+    shader_program->unbind();
 }
