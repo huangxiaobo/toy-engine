@@ -1,9 +1,16 @@
 #include "mesh.h"
-
+#include <glad/gl.h>
 #include <iostream>
 
 Mesh::Mesh()
 {
+}
+
+Mesh::Mesh(const vector<Vertex>& vertices, const vector<GLuint>& indices)
+{
+    this->vertices.insert(this->vertices.end(), vertices.begin(), vertices.end());
+    this->indices.insert(this->indices.end(), indices.begin(), indices.end());
+    this->SetUpMesh();
 }
 
 Mesh::~Mesh()
@@ -28,7 +35,7 @@ void Mesh::SetUpMesh()
                           const GLvoid* data,  // 数据
                           GLenum usage)        // 创建在 GPU 上的哪一片区域（显存上的每个区域的性能是不一样的）https://registry.khronos.org/OpenGL-Refpages/es3.0/
     */
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.constData(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
 
 #if 1
     /* 告知显卡如何解析缓冲区里面的属性值
@@ -75,7 +82,7 @@ void Mesh::SetUpMesh()
     // ===================== EBO =====================
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices.constData(), GL_STATIC_DRAW); // EBO/IBO 是储存顶点【索引】的
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices.data(), GL_STATIC_DRAW); // EBO/IBO 是储存顶点【索引】的
 
     // 解绑 VAO 和 VBO，注意先解绑 VAO再解绑EBO
     glBindVertexArray(0);
@@ -91,41 +98,42 @@ void Mesh::Draw(long long elapsed)
     glBindVertexArray(0);
 }
 
-QVector<Mesh *> Mesh::CreatePlaneMesh()
+vector<Mesh *> Mesh::CreatePlaneMesh()
 {
-    QVector<Mesh *> meshes;
+    vector<Mesh *> meshes;
 
     Mesh *mesh = new Mesh();
 
+   
     mesh->vertices = {
         {
             // top right
-            QVector3D(0.5f, 0.5f, -0.5f), // Position
-            QVector3D(1.0f, 0.0f, 0.0f),  // Color
-            QVector3D(0.0f, 0.0f, 0.0f),  // Normal
-            QVector2D(1.0f, 1.0f),        // texture coords
+            glm::vec3(0.5f, 0.5f, -0.5f), // Position
+            glm::vec3(1.0f, 0.0f, 0.0f),  // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
+            glm::vec2(1.0f, 1.0f),        // texture coords
 
         },
         {
             // bottom right
-            QVector3D(0.5f, -0.5f, 0.0f), // Position
-            QVector3D(0.0f, 1.0f, 0.0f),  // Color
-            QVector3D(0.0f, 0.0f, 0.0f),  // Normal
-            QVector2D(1.0f, 1.0f),        // texture coords
+            glm::vec3(0.5f, -0.5f, 0.0f), // Position
+            glm::vec3(0.0f, 1.0f, 0.0f),  // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
+            glm::vec2(1.0f, 1.0f),        // texture coords
         },
         {
             // bottom left
-            QVector3D(-0.5f, -0.5f, 0.5f), // Position
-            QVector3D(0.0f, 0.0f, 1.0f),   // Color
-            QVector3D(0.0f, 0.0f, 0.0f),   // Normal
-            QVector2D(1.0f, 1.0f),         // texture coords
+            glm::vec3(-0.5f, -0.5f, 0.5f), // Position
+            glm::vec3(0.0f, 0.0f, 1.0f),   // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),   // Normal
+            glm::vec2(1.0f, 1.0f),         // texture coords
         },
         {
             // top left
-            QVector3D(-0.5f, 0.5f, 0.0f), // Position
-            QVector3D(0.0f, 0.0f, 0.0f),  // Color
-            QVector3D(0.0f, 0.0f, 0.0f),  // Normal
-            QVector2D(1.0f, 1.0f),        // texture coords
+            glm::vec3(-0.5f, 0.5f, 0.0f), // Position
+            glm::vec3(0.0f, 0.0f, 0.0f),  // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
+            glm::vec2(1.0f, 1.0f),        // texture coords
         },
     };
     mesh->indices = {
@@ -139,9 +147,9 @@ QVector<Mesh *> Mesh::CreatePlaneMesh()
     return meshes;
 }
 
-QVector<Mesh *> Mesh::CreateGroundMesh()
+vector<Mesh *> Mesh::CreateGroundMesh()
 {
-    QVector<Mesh *> meshes;
+    vector<Mesh *> meshes;
 
     Mesh *m1 = new Mesh();
     m1->DrawMode = GL_LINES;
@@ -159,34 +167,34 @@ QVector<Mesh *> Mesh::CreateGroundMesh()
             continue;
         }
         m1->vertices.push_back(Vertex{
-            QVector3D{1.0f * k * gridStrip, 0.0f, +gridWidth},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector2D{0.0, 0.0},
+            glm::vec3{1.0f * k * gridStrip, 0.0f, +gridWidth},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec2{0.0, 0.0},
         });
         m1->indices.push_back(i++);
 
         m1->vertices.push_back(Vertex{
-            QVector3D{1.0f * k * gridStrip, 0.0f, -gridWidth},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector2D{0.0, 0.0},
+            glm::vec3{1.0f * k * gridStrip, 0.0f, -gridWidth},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec2{0.0, 0.0},
         });
         m1->indices.push_back(i++);
 
         m1->vertices.push_back(Vertex{
-            QVector3D{+gridWidth, 0.0f, 1.0f * k * gridStrip},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector2D{0.0, 0.0},
+            glm::vec3{+gridWidth, 0.0f, 1.0f * k * gridStrip},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec2{0.0, 0.0},
         });
         m1->indices.push_back(i++);
 
         m1->vertices.push_back(Vertex{
-            QVector3D{-gridWidth, 0.0f, 1.0f * k * gridStrip},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector3D{0.0, 1.0, 0.0},
-            QVector2D{0.0, 0.0},
+            glm::vec3{-gridWidth, 0.0f, 1.0f * k * gridStrip},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec3{0.0, 1.0, 0.0},
+            glm::vec2{0.0, 0.0},
         });
         m1->indices.push_back(i++);
     }
@@ -199,34 +207,34 @@ QVector<Mesh *> Mesh::CreateGroundMesh()
     i = 0;
 
     m->vertices.push_back(Vertex{
-        QVector3D{0.0f, 0.0f, -gridWidth},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector2D{0.0, 0.0},
+        glm::vec3{0.0f, 0.0f, -gridWidth},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec2{0.0, 0.0},
     });
     m->indices.push_back(i++);
 
     m->vertices.push_back(Vertex{
-        QVector3D{0.0f, 0.0f, +gridWidth},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector2D{0.0, 0.0},
+        glm::vec3{0.0f, 0.0f, +gridWidth},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec2{0.0, 0.0},
     });
     m->indices.push_back(i++);
 
     m->vertices.push_back(Vertex{
-        QVector3D{+gridWidth, 0.0f, 0.0f},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector2D{0.0, 0.0},
+        glm::vec3{+gridWidth, 0.0f, 0.0f},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec2{0.0, 0.0},
     });
     m->indices.push_back(i++);
 
     m->vertices.push_back(Vertex{
-        QVector3D{-gridWidth, 0.0f, 0.0f},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector3D{0.0, 1.0, 0.0},
-        QVector2D{0.0, 0.0},
+        glm::vec3{-gridWidth, 0.0f, 0.0f},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec3{0.0, 1.0, 0.0},
+        glm::vec2{0.0, 0.0},
     });
     m->indices.push_back(i++);
 

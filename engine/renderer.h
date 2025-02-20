@@ -1,32 +1,32 @@
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
-#include <QOpenGLWidget>
-#include <QOpenGLFunctions_4_1_Core>
-#include <QElapsedTimer>
-#include "axis/axis.h"
-// #include "model/model.h"
+
+#include <vector>
+
+using namespace std;
 
 class Model;
+class Axis;
 
-class Renderer : public QOpenGLWidget, protected QOpenGLFunctions_4_1_Core
+class Renderer 
 {
 
-    Q_OBJECT
 
 public:
-    explicit Renderer(QWidget *parent = Q_NULLPTR);
+    explicit Renderer();
     virtual ~Renderer();
 
-protected:
-    void initializeGL();
-    void paintGL();
-    void resizeGL(int w, int h);
+public:
+    void init(int w, int h);
+    void draw(long long elapsed);
+    void resize(int w, int h);
 
 private:
+    int width;
+    int height;
     Axis *m_axis;
-    QVector<Model*> m_models;
+    vector<Model*> m_models;
     Model* m_ground;
-    QElapsedTimer m_time;
 };
 
 #endif

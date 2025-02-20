@@ -5,20 +5,20 @@
 #include <QVBoxLayout>
 #include <QTimer>
 #include "mainwindow.h"
-#include "renderer.h"
+#include "renderer_view.h"
 
 ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
 {
 
-    renderer = new Renderer(this);
+    renderer_widget = new RendererWidget(this);
 
-     this->setCentralWidget(renderer);
+     this->setCentralWidget(renderer_widget);
     //设置窗口大小
     this->setGeometry(0,0,800,600);
     //创建定时器，定时刷新QOpenGLWidget
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, [this]{
-        renderer->update();
+        renderer_widget->update();
     });
 
     timer->start(33);
@@ -27,8 +27,8 @@ ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
 
 ToyEngineMainWindow::~ToyEngineMainWindow()
 {
-    if (renderer != nullptr){
-        delete renderer;
-        renderer = nullptr;
+    if (renderer_widget != nullptr){
+        delete renderer_widget;
+        renderer_widget = nullptr;
     }
 }

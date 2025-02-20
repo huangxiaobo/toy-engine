@@ -1,8 +1,9 @@
 #include "technique_light.h"
 
 #include "../light/direction_light.h"
+#include "../shader/shader.h"
 
-TechniqueLight::TechniqueLight(QString name, QString vertexShader, QString fragmentShader)
+TechniqueLight::TechniqueLight(string name, string vertexShader, string fragmentShader)
     : Technique(name, vertexShader, fragmentShader)
 {
 }
@@ -30,4 +31,36 @@ void TechniqueLight::SetDirectionLight(DirectionLight *light)
     this->shader_program->setUniformValue(LightDiffuseUniform, light->getDiffuse());
     this->shader_program->setUniformValue(LightSpecularUniform, light->getSpecular());
     this->shader_program->setUniformValue(LightDirectionUniform, light->getDirection());
+}
+
+MaterialUniform::MaterialUniform()
+{
+}
+
+MaterialUniform::~MaterialUniform()
+{
+}
+
+void MaterialUniform::SetAmbientColor(const glm::vec3 &color)
+{
+}
+
+void MaterialUniform::SetDiffuseColor(const glm::vec3 &color)
+{
+}
+
+void MaterialUniform::SetSpecularColor(const glm::vec3 &color)
+{
+}
+
+void MaterialUniform::SetShininess(float shininess)
+{
+}
+
+void MaterialUniform::Init(GLuint program)
+{
+}
+
+void MaterialUniform::Apply(GLuint program)
+{
 }

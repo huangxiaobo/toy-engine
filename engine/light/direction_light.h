@@ -1,15 +1,16 @@
 #ifndef __DIRECTION_LIGHT_H__
 
 #include "light.h"
+#include <glm/glm.hpp>
 
 // 方向光源的属性
 class DirLightAttr {
     public:
-    QVector3D direction;
-    QVector3D color;
-    QVector3D ambient;
-    QVector3D diffuse;
-    QVector3D specular;
+    glm::vec3 direction;
+    glm::vec3 color;
+    glm::vec3 ambient;
+    glm::vec3 diffuse;
+    glm::vec3 specular;
 };
 class DirectionLight : public Light {
 public:
@@ -18,14 +19,14 @@ public:
 
     ~DirectionLight();
 
-    QVector3D getDirection() const;
-    QVector3D getColor() const;
-    QVector3D getAmbient() const;   
-    QVector3D getDiffuse() const;
-    QVector3D getSpecular() const;
+    glm::vec3 getDirection() const;
+    glm::vec3 getColor() const;
+    glm::vec3 getAmbient() const;   
+    glm::vec3 getDiffuse() const;
+    glm::vec3 getSpecular() const;
 
 private:
     DirLightAttr attr;
 };
 
-#endif#define __DIRECTION_LIGHT_H__
+#endif //# define __DIRECTION_LIGHT_H__

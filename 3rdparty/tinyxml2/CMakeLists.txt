@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.26.1)
-project(tinyxml2 LANGUAGES C VERSION 1.0.0)
+project(tinyxml2 LANGUAGES CXX VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(${PROJECT_NAME} src/tinyxml2.cpp)
+add_library(${PROJECT_NAME} STATIC src/tinyxml2.cpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC include/)
 # A CMake pattern to have headers that are not seen by the client of this library.
