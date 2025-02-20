@@ -1,36 +1,49 @@
 #ifndef __MODEL_H__
 #define __MODEL_H__
 
-#include <QVector3D>
-#include <QMatrix4x4>
-#include <QVector2D>
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 
- #include "../mesh/mesh.h"
- #include "../technique/technique.h"
+#include <vector>
+#include <glm/glm.hpp>
+#include "../mesh/mesh.h"
+// #include "../texture/texture.h"
+#include "../technique/technique.h"
+
+using namespace std;
 
 class Renderer;
 class Technique;
 class Mesh;
+class Texture;
+
 class Model
 {
 public:
-    QVector<Mesh*> meshes;
+    vector<Mesh*> meshes;
     Technique *effect;
+    vector<Texture> textures_loaded; // 存储到目前为止加载的所有纹理，优化以确保纹理不会加载超过一次。
 
-    QVector3D position;
-    QVector3D Rotation;
-    QVector3D Scale;
-    QMatrix4x4 matrix;
+    glm::vec3 position;
+    glm::vec3 Rotation;
+    glm::vec3 Scale;
+    glm::mat4 matrix;
 
 public:
-
     Model();
     ~Model();
     void Init();
 
-    void SetMesh(QVector<Mesh *>model);
+    void LoadModel(const string &filename);
+    void ProcessNode(aiNode *node, const aiScene *scene);
+    Mesh* ProcessMesh(aiMesh *mesh, const aiScene *scene);
+
+    vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName);
+
+    void SetMesh(vector<Mesh *> model);
     void SetEffect(Technique *effect);
-    void Draw(long long elapsed, const QMatrix4x4 &projection, const QMatrix4x4 &view, const QMatrix4x4 &model, const QVector3D &camera); 
+    void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera);
 };
 
 #endif

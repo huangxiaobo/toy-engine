@@ -1,10 +1,16 @@
 #include "axis.h"
-
-#include <QOpenGLVertexArrayObject>
+#include <glad/gl.h>
+#include "../shader/shader.h"
 #include <iostream>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/transform.hpp>
+
 Axis::Axis()
 {
-    shader_program = new QOpenGLShaderProgram();
+    shader_program = new Shader();
 }
 
 Axis::~Axis()
@@ -29,11 +35,13 @@ void Axis::init(int width, int height)
     };
 
     // ===================== 着色器 =====================
-    this->shader_program->addShaderFromSourceFile(QOpenGLShader::Vertex, "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/axis.vert");
-    this->shader_program->addShaderFromSourceFile(QOpenGLShader::Fragment, "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/axis.frag");
+    this->shader_program->init();
+    this->shader_program->addShaderFromSourceFile(ShaderType::VERTEX_SHADER, "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/axis.vert");
+    this->shader_program->addShaderFromSourceFile(ShaderType::FRAGMENT_SHADER, "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/axis.frag");
     bool success = this->shader_program->link();
-    if (!success)
-        qDebug() << "ERROR: " << this->shader_program->log();
+    if (!success) {
+        exit(-1);
+    }
 
     // ===================== VAO | VBO =====================
     // VAO 和 VBO 对象赋予 ID
@@ -90,24 +98,29 @@ void Axis::init(int width, int height)
     glBindBuffer(GL_ARRAY_BUFFER, 0); // 注意 VAO 不参与管理 VBO
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    QMatrix4x4 mat_projection;
-    mat_projection.perspective(50, (float)width / (float)(1 * height), 0.1f, 100.0f); // 透视
+    glm::mat4 mat_projection;
+    float fov = 45.0f;                                          // 视野角度
+    float aspectRatio = (float)width / (float)(1 * height); // 宽高比
+    float nearPlane = 0.1f;                                     // 近平面距离
+    float farPlane = 100.0f;                                    // 远平面距离
+    // glm::perspective(50, (float)width() / (float)(1 * height()), 0.1f, 100.0f);
+    mat_projection = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
     this->shader_program->setUniformValue("mat_projection", mat_projection);
 }
 
 void Axis::draw(long long elapsed)
 {
-    QMatrix4x4 mat_model; // QMatrix 默认生成的是一个单位矩阵（对角线上的元素为1）
-    QMatrix4x4 mat_view;  // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
+    glm::mat4 mat_model; // QMatrix 默认生成的是一个单位矩阵（对角线上的元素为1）
+    glm::mat4 mat_view;  // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
 
-    mat_model.setToIdentity();
-    mat_model.scale(5, 5, 5);
+    mat_model = glm::mat4(1.0f);
+    mat_model = glm::scale(mat_model, glm::vec3(5.0f, 5.0f, 5.0f));
 
     const float radius = 10.0f;
     float time = elapsed / 1000.0; // 注意是 1000.0
     float cam_x = sin(time) * radius;
     float cam_z = cos(time) * radius;
-    mat_view.lookAt(QVector3D(cam_x, 0.0f, cam_z), QVector3D(0.0, 0.0, 0.0), QVector3D(0.0, 1.0, 0.0));
+    mat_view = glm::lookAt(glm::vec3(cam_x, 0.0f, cam_z), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 
     this->shader_program->bind();
     this->shader_program->setUniformValue("mat_model", mat_model); // 模型矩阵
