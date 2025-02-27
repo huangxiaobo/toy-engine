@@ -7,6 +7,7 @@ using namespace std;
 
 class Model;
 class Axis;
+class Light;
 
 class Renderer 
 {
@@ -27,6 +28,7 @@ private:
     Axis *m_axis;
     vector<Model*> m_models;
     Model* m_ground;
+    vector<Light*> m_lights;
 };
 
 #endif

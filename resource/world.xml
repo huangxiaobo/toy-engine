@@ -18,6 +18,7 @@
     </camera>
     <lights>
         <light>
+            <type>0</type>
             <position>
                 <x>20.0</x>
                 <y>30.0</y>
@@ -37,17 +38,29 @@
                 <intensity>2.0</intensity>
             </diffuse>
             <ambient>
-                <intensity>1.0</intensity>
-            </ambient>
-            <Specular>
                 <color>
                     <r>1.0</r>
                     <g>0.5</g>
                     <b>0.0</b>
                 </color>
-            </Specular>
+                <intensity>1.0</intensity>
+            </ambient>
+            <specular>
+                <color>
+                    <r>1.0</r>
+                    <g>0.5</g>
+                    <b>0.0</b>
+                </color>
+                <intensity>1.0</intensity>
+            </specular>
+            <attenuation>
+                <constant>1.0</constant>
+                <linear>0.0</linear>
+                <exp>0.0</exp>
+            </attenuation>
         </light>
         <light>
+            <type>0</type>
             <position>
                 <x>-20.0</x>
                 <y>30.0</y>
@@ -68,15 +81,26 @@
                 <intensity>2.0</intensity>
             </diffuse>
             <ambient>
-                <intensity>1.0</intensity>
-            </ambient>
-            <Specular>
                 <color>
                     <r>1.0</r>
                     <g>0.5</g>
                     <b>0.0</b>
                 </color>
-            </Specular>
+                <intensity>1.0</intensity>
+            </ambient>
+            <specular>
+                <color>
+                    <r>1.0</r>
+                    <g>0.5</g>
+                    <b>0.0</b>
+                </color>
+                <intensity>1.0</intensity>
+            </specular>
+            <attenuation>
+                <constant>1.0</constant>
+                <linear>0.0</linear>
+                <exp>0.0</exp>
+            </attenuation>
         </light>
     </lights>
 
@@ -90,16 +114,21 @@
                 <z>0</z>
             </postion>
             <scale>
-                <x>8</x>
-                <y>8</y>
-                <z>8</z>
+                <x>1.5</x>
+                <y>1.5</y>
+                <z>1.5</z>
             </scale>
             <mesh name="bunny">
-                <file>./bunny.obj</file>
+                <file>./resource/model/bunny/bunny.obj</file>
             </mesh>
+            <technique>
+                <technique>
+                    <name>light</name>
+                </technique>
+            </technique>
             <shader>
-                <vert>./shader.vert</vert>
-                <frag>./shader.frag</frag>
+                <vert>./resource/model/bunny/shader.vert</vert>
+                <frag>./resource/model/bunny/shader.frag</frag>
             </shader>
             <gammacorrection>false</gammacorrection>
             <material>
@@ -119,46 +148,6 @@
                     <b>1.0</b>
                 </specular>
                 <shininess>6</shininess>
-            </material>
-        </model>
-        <model resource_class="Ground">
-            <name>ground</name>
-            <id>fd8a5eff-32c4-40e4-acfb-5a517c731867</id>
-            <postion>
-                <x>0</x>
-                <y>0</y>
-                <z>0</z>
-            </postion>
-            <scale>
-                <x>1</x>
-                <y>1</y>
-                <z>1</z>
-            </scale>
-            <mesh name="ground">
-                <file></file>
-            </mesh>
-            <shader>
-                <vert>./shader.vert</vert>
-                <frag>./shader.frag</frag>
-            </shader>
-            <gammacorrection>false</gammacorrection>
-            <material>
-                <ambientcolor>
-                    <r>0.05</r>
-                    <g>0.05</g>
-                    <b>0.05</b>
-                </ambientcolor>
-                <diffusecolor>
-                    <r>0.05</r>
-                    <g>0.05</g>
-                    <b>0.05</b>
-                </diffusecolor>
-                <specularcolor>
-                    <r>1.0</r>
-                    <g>0.05</g>
-                    <b>0.05</b>
-                </specularcolor>
-                <shininess>2</shininess>
             </material>
         </model>
     </models>

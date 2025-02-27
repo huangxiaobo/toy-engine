@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28 FATAL_ERROR)
 
 project(ToyEngine LANGUAGES CXX)
 # 设置使用C++17标准
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # 设置可执行文件输出目录
@@ -27,12 +27,22 @@ set(CMAKE_PREFIX_PATH "/opt/Qt/6.8.1/gcc_arm64/lib/cmake/")
 #     engine/technique/technique.cpp
 #     engine/utils/utils.cpp
 # )
-file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.cpp)
+# 查找当前目录及子目录中的所有 .cpp 和 .h 文件
+file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.cpp)
+file(GLOB_RECURSE HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.h)
+ 
+# 将所有文件设置为源文件列表
+set(SOURCE_FILES
+    ${SRC_FILES}
+    ${HEADER_FILES}
+)
 
 # 添加glad
 add_subdirectory(3rdparty/glad)
 add_subdirectory(3rdparty/tinyxml2)
 
+# 添加头文件
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/engine)
 # # 添加glfw头文件
 # include_directories(/opt/homebrew/Cellar/glfw/3.4/include)
 # # glfw 库文件也加进来
@@ -47,7 +57,7 @@ qt_standard_project_setup()
 # 将源代码文件编译为可执行文件
 qt_add_executable(toy-engine
     main.cpp
-    ${SOURCES}
+    ${SOURCE_FILES}
 )
 
 target_link_libraries(toy-engine PRIVATE
