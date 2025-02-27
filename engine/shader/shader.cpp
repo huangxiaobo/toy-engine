@@ -30,6 +30,7 @@ void Shader::init()
 
 void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath)
 {
+    std::cout << "add shader from source file: " << shaderType << std::endl;
     std::ifstream file(filePath);
     std::stringstream buffer;
     if (file.is_open())
@@ -86,6 +87,11 @@ bool Shader::link()
         PrintProgramLog(m_program);
     }
     return success == 1;
+}
+
+void Shader::BindFragDataLocation()
+{
+    glBindFragDataLocation(m_program, 0, "color\x00");
 }
 
 // 捕获链接着色器时的错误的函数

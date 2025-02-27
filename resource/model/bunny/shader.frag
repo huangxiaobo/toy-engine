@@ -1,13 +1,6 @@
-#version 330
+#version 330 core
 
 uniform vec3 gViewPos;
-
-struct Attenuation
-{
-    float Constant;
-    float Linear;
-    float Exp;
-};
 
 struct PointLight {
     vec3    Color;
@@ -17,11 +10,13 @@ struct PointLight {
     float   DiffuseIntensity;
     vec3    DiffuseColor;
     vec3    SpecularColor;
-    Attenuation Atten;
+    float   AttenuationConstant;
+    float   AttenuationLinear;
+    float   AttenuationExp;
 };
 
-uniform PointLight gLight[8];
-uniform int gLightNum;
+uniform PointLight gPointLights[8];
+uniform int gPointLightNum;
 
 // 材质结构体
 struct Material{
@@ -69,14 +64,14 @@ vec4 CalcLightInternal(PointLight Light, vec3 LightDirection, vec3 Normal) {
 
 vec4 CalcPointLight(int Index, vec3 Normal)
 {
-    vec3 LightDirection = v2f.WorldPos0 - gLight[Index].Position;
+    vec3 LightDirection = v2f.WorldPos0 - gPointLights[Index].Position;
     float Distance = length(LightDirection);
     LightDirection = normalize(LightDirection);
 
-    vec4 Color = CalcLightInternal(gLight[Index], LightDirection, Normal);
-    float Attenuation = gLight[Index].Atten.Constant + gLight[Index].Atten.Linear * Distance + gLight[Index].Atten.Exp * Distance * Distance;
+    vec4 Color = CalcLightInternal(gPointLights[Index], LightDirection, Normal);
+    float Attenuation = gPointLights[Index].AttenuationConstant + gPointLights[Index].AttenuationLinear * Distance + gPointLights[Index].AttenuationExp * Distance * Distance;
 
-    return Color / Attenuation;
+    return Color * Attenuation;
 }
 
 void main() {
@@ -84,7 +79,7 @@ void main() {
 
     // 计算多个点光源
     vec4 pointLightColor = vec4(0, 0, 0, 0);
-    for (int i = 0; i < gLightNum; i++) {
+    for (int i = 0; i < gPointLightNum; i++) {
         pointLightColor += CalcPointLight(i, N);
     }
     color = vec4(pointLightColor.rgb, 1.0);
