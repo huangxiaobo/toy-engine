@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-Technique::Technique(string name,  string vertexShader,  string fragmentShader)
+Technique::Technique(string name,  string vertexShader,  string fragmentShader):type(TechniqueType::TechniqueTypeBase)
 {
     shaderVertex = vertexShader;
     shaderFragment = fragmentShader;
@@ -40,7 +40,12 @@ void Technique::init()
 
 }
 
-void Technique::SetWVP(const glm::mat4& wvp)
+Shader *Technique::GetShader() const
+{
+    return shader_program;
+}
+
+void Technique::SetWVP(const glm::mat4 &wvp)
 {
     this->shader_program->setUniformValue(WvpUniform, wvp);
 }

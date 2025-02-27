@@ -3,17 +3,25 @@
 #include <iostream>
 
 #include "../technique/technique.h"
+#include "../technique/technique_light.h"
 #include "../mesh/mesh.h"
 #include "../texture/texture.h"
+#include "../utils/utils.h"
+#include "../light/light.h"
+#include "../shader/shader.h"
+#include "../material/material.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <string>
-Model::Model()
+Model::Model(string name) : Name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f)
 {
+    m_matrix = glm::mat4(1.0f);
 }
 
 Model::~Model()
@@ -28,6 +36,11 @@ Model::~Model()
         delete effect;
         effect = nullptr;
     }
+    if (material)
+    {
+        delete material;
+        material = nullptr;
+    }
 }
 
 void Model::Init()
@@ -39,8 +52,11 @@ void Model::LoadModel(const string &path)
 {
 
     // read file via ASSIMP
-    Assimp::Importer importer;                                                                                                                                         // c++接口
-    const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace); // 读取数据并做部分处理，返回根节点
+    Assimp::Importer importer; // c++接口
+    // aiProcess_GenSmoothNormals
+    // aiProcess_CalcTangentSpace
+    const aiScene *scene = importer.ReadFile(path,
+                                             aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace); // 读取数据并做部分处理，返回根节点
     // check for errors
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // 检查读取是否正确
     {
@@ -56,13 +72,14 @@ void Model::LoadModel(const string &path)
 
 void Model::ProcessNode(aiNode *node, const aiScene *scene)
 {
+    std::cout << "ProcessNode: " << node->mNumMeshes << std::endl;
     // process each mesh located at the current node处理当前结点的每个网络
     for (unsigned int i = 0; i < node->mNumMeshes; i++)
     {
         // the node object only contains indices to index the actual objects in the scene.
         // the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-        // meshes.push_back(ProcessMesh(mesh, scene)); // 递归扫描，将模型数据存储在vector<mesh>中
+        meshes.push_back(ProcessMesh(mesh, scene)); // 递归扫描，将模型数据存储在vector<mesh>中
     }
     // after we've processed all of the meshes (if any) we then recursively process each of the children nodes处理当前结点的所有子节点
     for (unsigned int i = 0; i < node->mNumChildren; i++)
@@ -71,7 +88,7 @@ void Model::ProcessNode(aiNode *node, const aiScene *scene)
     }
 }
 
-Mesh* Model::ProcessMesh(aiMesh *mesh, const aiScene *scene)
+Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene)
 {
     // data to fill
     vector<Vertex> vertices;
@@ -79,41 +96,42 @@ Mesh* Model::ProcessMesh(aiMesh *mesh, const aiScene *scene)
     vector<Texture> textures;
 
     // 遍历网格的每个顶点
-    for (unsigned int i = 0; i < mesh->mNumVertices; i++) // mNumVertices存储了顶点数量
+    for (unsigned int i = 0; i < ai_mesh->mNumVertices; i++) // mNumVertices存储了顶点数量
     {
         Vertex vertex;    // Vertex结构体在Mesh.h中有定义
         glm::vec3 vector; // 我们声明了一个占位符向量，因为assimp使用它自己的向量类，它不会直接转换到glm的vec3类，所以我们首先将数据转换到这个占位符glm::vec3。
         // positions
-        vector.x = mesh->mVertices[i].x;
-        vector.y = mesh->mVertices[i].y;
-        vector.z = mesh->mVertices[i].z;
+        vector.x = ai_mesh->mVertices[i].x;
+        vector.y = ai_mesh->mVertices[i].y;
+        vector.z = ai_mesh->mVertices[i].z;
         vertex.Position = vector; // 将该点数据存储在结构体中
+        vertex.Color = glm::normalize(vector);
         // normals
-        if (mesh->HasNormals()) // 同理存储法线（如果有的话）
+        if (ai_mesh->HasNormals()) // 同理存储法线（如果有的话）
         {
-            vector.x = mesh->mNormals[i].x;
-            vector.y = mesh->mNormals[i].y;
-            vector.z = mesh->mNormals[i].z;
+            vector.x = ai_mesh->mNormals[i].x;
+            vector.y = ai_mesh->mNormals[i].y;
+            vector.z = ai_mesh->mNormals[i].z;
             vertex.Normal = vector;
         }
         // texture coordinates
-        if (mesh->mTextureCoords[0]) // 加载纹理坐标
+        if (ai_mesh->mTextureCoords[0]) // 加载纹理坐标
         {
             glm::vec2 vec;
             // 一个顶点最多可以包含8个不同的纹理坐标. 因此，我们假设我们不会
             // 使用顶点可以有多个纹理坐标的模型，所以我们总是取第一个集合(0)。
-            vec.x = mesh->mTextureCoords[0][i].x;
-            vec.y = mesh->mTextureCoords[0][i].y;
+            vec.x = ai_mesh->mTextureCoords[0][i].x;
+            vec.y = ai_mesh->mTextureCoords[0][i].y;
             vertex.TexCoords = vec;
             // tangent
-            vector.x = mesh->mTangents[i].x;
-            vector.y = mesh->mTangents[i].y;
-            vector.z = mesh->mTangents[i].z;
+            vector.x = ai_mesh->mTangents[i].x;
+            vector.y = ai_mesh->mTangents[i].y;
+            vector.z = ai_mesh->mTangents[i].z;
             vertex.Tangent = vector;
             // bitangent
-            vector.x = mesh->mBitangents[i].x;
-            vector.y = mesh->mBitangents[i].y;
-            vector.z = mesh->mBitangents[i].z;
+            vector.x = ai_mesh->mBitangents[i].x;
+            vector.y = ai_mesh->mBitangents[i].y;
+            vector.z = ai_mesh->mBitangents[i].z;
             vertex.Bitangent = vector;
         }
         else
@@ -122,15 +140,20 @@ Mesh* Model::ProcessMesh(aiMesh *mesh, const aiScene *scene)
         vertices.push_back(vertex);
     }
     // 现在遍历网格的每个面(面是网格的三角形)并检索相应的顶点索引。
-    for (unsigned int i = 0; i < mesh->mNumFaces; i++)
+    for (unsigned int i = 0; i < ai_mesh->mNumFaces; i++)
     {
-        aiFace face = mesh->mFaces[i];
+        aiFace face = ai_mesh->mFaces[i];
         // retrieve all indices of the face and store them in the indices vector
-        for (unsigned int j = 0; j < face.mNumIndices; j++) // 每个面都有顶点索引
-            indices.push_back(face.mIndices[j]);            // 将索引存储在容器中，类似于VEO
+        for (unsigned int j = 0; j < face.mNumIndices; j++)
+        {                                        // 每个面都有顶点索引
+            indices.push_back(face.mIndices[j]); // 将索引存储在容器中，类似于VEO
+        }
     }
+    std::cout << "mesh name: " << std::endl;
+    std::cout << "indices size: " << indices.size() << std::endl;
+    std::cout << "vertices size: " << vertices.size() << std::endl;
     // 处理材料
-    aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+    aiMaterial *material = scene->mMaterials[ai_mesh->mMaterialIndex];
     // 我们假设在着色器中采样器名称有一个约定。每个漫反射纹理都应该被命名
     // 为'texture_diffuseN'，其中N是一个从1到MAX_SAMPLER_NUMBER的连续数字。
     // 这同样适用于其他纹理，如下列表总结:
@@ -152,7 +175,8 @@ Mesh* Model::ProcessMesh(aiMesh *mesh, const aiScene *scene)
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 
     // return a mesh object created from the extracted mesh data
-    return new Mesh(vertices, indices);
+    Mesh *mesh = new Mesh(vertices, indices);
+    return mesh;
 }
 
 // checks all material textures of a given type and loads the textures if they're not loaded yet.
@@ -189,7 +213,6 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
     return textures;
 }
 
-
 void Model::SetMesh(vector<Mesh *> meshes)
 {
     for (auto m : meshes)
@@ -198,20 +221,63 @@ void Model::SetMesh(vector<Mesh *> meshes)
     }
 }
 
+void Model::SetScale(glm::vec3 scale)
+{
+    this->m_scale = scale;
+    m_matrix = glm::scale(m_matrix, scale);
+}
+
+void Model::SetRotate(glm::f32 rotation)
+{
+    m_rotation = rotation;
+    m_matrix = glm::rotate(m_matrix, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+void Model::SetTranslate(glm::vec3 position)
+{
+    m_position = position;
+    m_matrix = glm::translate(m_matrix, position);
+}
+
+void Model::SetMaterial(Material *material)
+{
+    this->material = material;
+}
+
 void Model::SetEffect(Technique *effect)
 {
     this->effect = effect;
 }
 
-void Model::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera)
+void Model::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, vector<Light *> lights)
 {
-    glm::mat4 mvp = projection * view * model;
+    // 以填充模式绘制前后
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    auto model_local = model * m_matrix;
+    // Utils::DebugMatrix(model_local);
+    glm::mat4 mvp = projection * view * model_local;
 
     this->effect->Enable();
     this->effect->SetProjection(projection);
     this->effect->SetView(view);
-    this->effect->SetModel(model);
+    this->effect->SetModel(model_local);
     this->effect->SetCamera(camera);
+    if (this->effect->GetType() == TechniqueTypeLight)
+    {
+        auto light_effect = (TechniqueLight *)(this->effect);
+        int index = 0;
+        for (auto light : lights)
+        {
+            if (light->GetLightType() == LightTypePoint)
+            {
+                light_effect->SetPointLight(index, (PointLight *)light);
+                index += 1;
+            }
+        }
+        light_effect->SetMaterial(this->material);
+    }
+    this->effect->GetShader()->BindFragDataLocation();
 
     for (int i = 0; i < this->meshes.size(); i++)
     {

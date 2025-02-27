@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <glad/gl.h>
+#include <iostream>
 
 using namespace std;
 
@@ -20,6 +21,17 @@ public:
 
     alignas(16) static constexpr int PositionLocation = 0;
     alignas(16) static constexpr int ColorLocation = 1;
+
+    public:
+    void Debug() {
+        std::cout << "Vertex:" << std::endl;
+        std::cout << "  Position: " << Position.x << ", " << Position.y << ", " << Position.z << std::endl;
+        std::cout << "  Color: " << Color.x << ", " << Color.y << ", " << Color.z << std::endl;
+        std::cout << "  Normal: " << Normal.x << ", " << Normal.y << ", " << Normal.z << std::endl;
+        std::cout << "  TexCoords: " << TexCoords.x << ", " << TexCoords.y << std::endl;
+        std::cout << "  Tangent: " << Tangent.x << ", " << Tangent.y << ", " << Tangent.z << std::endl;
+        std::cout << "  Bitangent: " << Bitangent.x << ", " << Bitangent.y << ", " << Bitangent.z << std::endl;
+    }
 };
 
 class Mesh
