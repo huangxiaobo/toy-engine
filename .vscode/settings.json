@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "qwidget": "cpp",
+        "iostream": "cpp",
+        "qopenglfunctions_4_1_core": "cpp",
+        "qopenglfunctions": "cpp"
+    }
+}
