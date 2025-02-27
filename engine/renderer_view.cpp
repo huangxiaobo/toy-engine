@@ -19,7 +19,10 @@ RendererWidget::~RendererWidget()
 
 void RendererWidget::initializeGL()
 {
-    render = new Renderer();
+    // 使用glad原生OpenGL, 无需初始化QT的OpenGL函数
+    // initializeOpenGLFunctions();
+
+    this->render = new Renderer();
     render->init(width(), height());
 }
 

@@ -44,6 +44,10 @@ public:
     void setUniformValue(unsigned int uniform_location, const glm::vec3 &value);
     void setUniformValue(unsigned int uniform_location, const glm::mat4 &value);
 
+    void BindColorAttribute(unsigned int index, const char *name);
+
+    void BindFragDataLocation();
+
 private:
     void PrintProgramLog(unsigned int id);
 
