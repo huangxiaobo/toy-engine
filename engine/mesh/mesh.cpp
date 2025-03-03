@@ -2,12 +2,13 @@
 #include <glad/gl.h>
 #include <iostream>
 
-Mesh::Mesh()
+Mesh::Mesh() : DrawMode(GL_TRIANGLES)
 {
 }
 
-Mesh::Mesh(const vector<Vertex>& vertices, const vector<GLuint>& indices)
+Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices)
 {
+    DrawMode = GL_TRIANGLES;
     this->vertices.insert(this->vertices.end(), vertices.begin(), vertices.end());
     this->indices.insert(this->indices.end(), indices.begin(), indices.end());
     this->SetUpMesh();
@@ -88,14 +89,19 @@ void Mesh::SetUpMesh()
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0); // 注意 VAO 不参与管理 VBO
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
 
+void Mesh::SetDrawMode(GLuint mode)
+{
+    DrawMode = mode;
 }
 
 void Mesh::Draw(long long elapsed)
 {
     /* 重新绑定 VAO */
     glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, (void *)0);
+    // 绘制模式(DrawMode): GL_TRIANGLES, GL_LINES, GL_POINTS
+    glDrawElements(DrawMode, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, (void *)0);
     glBindVertexArray(0);
 }
 
@@ -104,12 +110,12 @@ vector<Mesh *> Mesh::CreatePlaneMesh()
     vector<Mesh *> meshes;
 
     Mesh *mesh = new Mesh();
+    mesh->SetDrawMode(GL_TRIANGLES);
 
-   
     mesh->vertices = {
         {
             // top right
-            glm::vec3(0.5f, 0.5f, -0.5f), // Position
+            glm::vec3(0.5f, 0.5f, 0.0f), // Position
             glm::vec3(1.0f, 0.0f, 0.0f),  // Color
             glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
             glm::vec2(1.0f, 1.0f),        // texture coords
@@ -124,7 +130,7 @@ vector<Mesh *> Mesh::CreatePlaneMesh()
         },
         {
             // bottom left
-            glm::vec3(-0.5f, -0.5f, 0.5f), // Position
+            glm::vec3(-0.5f, -0.5f, 0.0f), // Position
             glm::vec3(0.0f, 0.0f, 1.0f),   // Color
             glm::vec3(0.0f, 0.0f, 0.0f),   // Normal
             glm::vec2(1.0f, 1.0f),         // texture coords
@@ -153,97 +159,167 @@ vector<Mesh *> Mesh::CreateGroundMesh()
     vector<Mesh *> meshes;
 
     Mesh *m1 = new Mesh();
-    m1->DrawMode = GL_LINES;
+    m1->SetDrawMode(GL_LINES);
 
-    int gridNum = 10;
-    float gridStrip = 1;
-    float gridWidth = 1.0f * gridNum * gridStrip / 2;
+    int gridNum = 100;
 
-    // draw grid
+    // draw grid 右手坐标系，逆时针方向排列
+    //   + -------------------------------> x
+    //   |
+    //   |     (xi+0, zi+0)    (xi+1, zi+0)
+    //   |     (xi+0, zi+1)    (xi+1, zi+1)
+    //   |
+    //   v
+    //   z
     GLuint i = 0;
-    for (int k = -gridNum / 2; k <= gridNum / 2; k += 1)
+    for (int xi = -gridNum / 2; xi <= gridNum / 2; xi += 1)
     {
-        if (k == 0)
+        for (int zi = -gridNum / 2; zi <= gridNum / 2; zi += 1)
         {
-            continue;
+            m1->vertices.push_back(Vertex{
+                glm::vec3{xi + 0, 0.0f, zi + 0},
+                glm::vec3{1.0, 1.0, 0.0},
+                glm::vec3{0.0, 1.0, 0.0},
+                glm::vec2{0.0, 0.0},
+            });
+
+            m1->vertices.push_back(Vertex{
+                glm::vec3{xi + 1, 0.0f, zi + 0},
+                glm::vec3{1.0, 1.0, 0.0},
+                glm::vec3{0.0, 1.0, 0.0},
+                glm::vec2{0.0, 0.0},
+            });
+
+            m1->vertices.push_back(Vertex{
+                glm::vec3{xi + 1, 0.0f, zi + 1},
+                glm::vec3{1.0, 1.0, 0.0},
+                glm::vec3{0.0, 1.0, 0.0},
+                glm::vec2{0.0, 0.0},
+            });
+
+            m1->vertices.push_back(Vertex{
+                glm::vec3{xi + 0, 0.0f, zi + 1},
+                glm::vec3{0.0, 1.0, 0.0},
+                glm::vec3{0.0, 1.0, 0.0},
+                glm::vec2{0.0, 0.0},
+            });
+            m1->indices.push_back(i + 0);
+            m1->indices.push_back(i + 1);
+            m1->indices.push_back(i + 1);
+            m1->indices.push_back(i + 2);
+            m1->indices.push_back(i + 2);
+            m1->indices.push_back(i + 3);
+            m1->indices.push_back(i + 3);
+            m1->indices.push_back(i + 0);
+            i += 4;
         }
-        m1->vertices.push_back(Vertex{
-            glm::vec3{1.0f * k * gridStrip, 0.0f, +gridWidth},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec2{0.0, 0.0},
-        });
-        m1->indices.push_back(i++);
-
-        m1->vertices.push_back(Vertex{
-            glm::vec3{1.0f * k * gridStrip, 0.0f, -gridWidth},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec2{0.0, 0.0},
-        });
-        m1->indices.push_back(i++);
-
-        m1->vertices.push_back(Vertex{
-            glm::vec3{+gridWidth, 0.0f, 1.0f * k * gridStrip},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec2{0.0, 0.0},
-        });
-        m1->indices.push_back(i++);
-
-        m1->vertices.push_back(Vertex{
-            glm::vec3{-gridWidth, 0.0f, 1.0f * k * gridStrip},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec3{0.0, 1.0, 0.0},
-            glm::vec2{0.0, 0.0},
-        });
-        m1->indices.push_back(i++);
     }
 
     meshes.push_back(m1);
 
-    Mesh *m = new Mesh();
-    m->DrawMode = GL_LINES;
-
-    i = 0;
-
-    m->vertices.push_back(Vertex{
-        glm::vec3{0.0f, 0.0f, -gridWidth},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec2{0.0, 0.0},
-    });
-    m->indices.push_back(i++);
-
-    m->vertices.push_back(Vertex{
-        glm::vec3{0.0f, 0.0f, +gridWidth},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec2{0.0, 0.0},
-    });
-    m->indices.push_back(i++);
-
-    m->vertices.push_back(Vertex{
-        glm::vec3{+gridWidth, 0.0f, 0.0f},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec2{0.0, 0.0},
-    });
-    m->indices.push_back(i++);
-
-    m->vertices.push_back(Vertex{
-        glm::vec3{-gridWidth, 0.0f, 0.0f},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec3{0.0, 1.0, 0.0},
-        glm::vec2{0.0, 0.0},
-    });
-    m->indices.push_back(i++);
-
-    meshes.push_back(m);
-
-    for (auto mesh: meshes)
+    for (auto mesh : meshes)
     {
         mesh->SetUpMesh();
     }
+    return meshes;
+}
+
+vector<Mesh *> Mesh::CreatePointMesh()
+{
+
+    vector<Mesh *> meshes;
+
+    Mesh *m = new Mesh();
+    m->SetDrawMode(GL_POINTS);
+
+    m->vertices = {
+        {
+            glm::vec3(0.0f, 0.0f, 0.0f), // Position
+            glm::vec3(1.0f, 0.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f, 1.0f),       // texture co
+        }};
+    m->indices.push_back(0);
+
+    meshes.push_back(m);
+
+    for (auto mesh : meshes)
+    {
+        mesh->SetUpMesh();
+    }
+    return meshes;
+}
+
+vector<Mesh *> Mesh::CreateAxisMesh()
+{
+    vector<Mesh *> meshes;
+
+    Mesh *m1 = new Mesh();
+    m1->SetDrawMode(GL_LINES);
+
+
+    // draw grid 右手坐标系，逆时针方向排列
+    //   + -------------------------------> x
+    //   |
+    //   |     (xi+0, zi+0)    (xi+1, zi+0)
+    //   |     (xi+0, zi+1)    (xi+1, zi+1)
+    //   |
+    //   v
+    //   z
+    GLuint i = 0;
+
+    m1->vertices = {
+        // x (0, 0, 0) -> (10, 0, 0)
+        {
+            glm::vec3(0.0f, 0.0f, 0.0f), // Position
+            glm::vec3(1.0f, 0.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f,1.0f),       // texture co
+        },
+        {
+            glm::vec3(10.0f, 0.0f, 0.0f), // Position
+            glm::vec3(1.0f, 0.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f,1.0f),       // texture co
+        },
+        // y (0, 0, 0) -> (0, 10, 0)
+        {
+            glm::vec3(0.0f, 0.0f, 0.0f), // Position
+            glm::vec3(0.0f, 1.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f,1.0f),       // texture co
+        },
+        {
+            glm::vec3(0.0f, 10.0f, 0.0f), // Position
+            glm::vec3(0.0f, 1.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f,1.0f),       // texture co
+        },
+        // z (0, 0, 0) -> (0, 0, 10)
+        {
+            glm::vec3(0.0f, 0.0f, 0.0f), // Position
+            glm::vec3(0.0f, 0.0f, 1.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f,1.0f),       // texture co
+        },
+        {
+            glm::vec3(0.0f, 0.0f, 10.0f), // Position
+            glm::vec3(0.0f, 0.0f, 1.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f,1.0f),       // texture co
+        }
+    };
+    m1->indices = {
+        0, 1, // x
+        2, 3, // y
+        4, 5, // z
+    };
+
+    meshes.push_back(m1);
+    for (auto mesh : meshes)
+    {
+        mesh->SetUpMesh();
+    }
+
     return meshes;
 }
