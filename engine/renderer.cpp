@@ -62,7 +62,7 @@ void Renderer::init(int w, int h)
     }
 
     const char *version = (const char *)glGetString(GL_VERSION);
-    std::cout << "OpenGL version: " << version << std::endl;
+    std::cout << "OpenGL Version: " << version << std::endl;
 
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -71,32 +71,45 @@ void Renderer::init(int w, int h)
     width = w;
     height = h;
 
-    m_axis = new Axis();
-    m_axis->init(w, h);
+    // 创建坐标系模型
+    auto axis_model = new Model("axis");
+    auto axis_mesh = Mesh::CreateAxisMesh();
+    axis_model->SetMesh(axis_mesh);
+
+    Technique *axis_effect = new Technique("axis",
+                                           "./resource/shader/default.vert",
+                                           "./resource/shader/default.frag");
+    axis_effect->init();
+    axis_model->SetEffect(axis_effect);
+
+    axis_model->SetTranslate(glm::vec3(0, 0.01, 0));
+    m_models.push_back(axis_model);
 
     // Create Plane
-    vector<Mesh *> planeMesh = Mesh::CreatePlaneMesh();
-    Technique *planeEffect = new Technique("plane",
-                                           "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/light.vert",
-                                           "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/light.frag");
-    planeEffect->init();
+    vector<Mesh *> plane_mesh = Mesh::CreatePlaneMesh();
+    Technique *plane_effect = new Technique("plane",
+                                            "./resource/shader/light.vert",
+                                            "./resource/shader/light.frag");
+    plane_effect->init();
+
     Model *plane = new Model("plane");
-    plane->SetMesh(planeMesh);
-    plane->SetEffect(planeEffect);
+    plane->SetScale(glm::vec3(5.0f, 5.0f, 5.0f));
+    plane->SetMesh(plane_mesh);
+    plane->SetEffect(plane_effect);
 
     m_models.push_back(plane);
 
     // Create Ground
-    vector<Mesh *> groundMesh = Mesh::CreateGroundMesh();
-    Technique *groundEffect = new Technique("ground",
-                                            "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/light.vert",
-                                            "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/light.frag");
+    vector<Mesh *> ground_mesh = Mesh::CreateGroundMesh();
+    Technique *ground_effect = new Technique("ground",
+                                             "./resource/shader/light.vert",
+                                             "./resource/shader/light.frag");
 
-    groundEffect->init();
+    ground_effect->init();
     m_ground = new Model("ground");
     m_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
-    m_ground->SetMesh(groundMesh);
-    m_ground->SetEffect(groundEffect);
+    m_ground->SetMesh(ground_mesh);
+    m_ground->SetEffect(ground_effect);
 
     tinyxml2::XMLDocument doc;
     auto err = doc.LoadFile("./resource/world.xml");
@@ -126,6 +139,21 @@ void Renderer::init(int w, int h)
             light->Attenuation.Linear = xml_light->FirstChildElement("attenuation")->FirstChildElement("linear")->FloatText();
             light->Attenuation.Exp = xml_light->FirstChildElement("attenuation")->FirstChildElement("exp")->FloatText();
             m_lights.push_back(light);
+
+            // 创建光源模型
+            auto model = new Model("light");
+            auto mesh = Mesh::CreatePointMesh();
+            model->SetMesh(mesh);
+
+            Technique *effect = new Technique("light",
+                                              "./resource/shader/default.vert",
+                                              "./resource/shader/default.frag");
+            effect->init();
+            model->SetEffect(effect);
+            model->SetTranslate(glm::vec3(3, 0, 0));
+
+            m_models.push_back(model);
+            std::cout << "Setup light finish" << std::endl;
         }
     }
     std::cout << "Setup lights finish" << std::endl;
@@ -166,8 +194,7 @@ void Renderer::init(int w, int h)
         auto xml_shader = model->FirstChildElement("shader");
         auto shader_vert_file = xml_shader->FirstChildElement("vert")->GetText();
         auto shader_frag_file = xml_shader->FirstChildElement("frag")->GetText();
-        std::cout << "shader vert: " << shader_vert_file << std::endl;
-        std::cout << "shader frag: " << shader_frag_file << std::endl;
+
         TechniqueLight *effect = new TechniqueLight(model_name, shader_vert_file, shader_frag_file);
         effect->init();
         model_obj->SetEffect(effect);
@@ -175,11 +202,7 @@ void Renderer::init(int w, int h)
         m_models.push_back(model_obj);
 
         auto xml_scale = model->FirstChildElement("scale");
-        auto scale_x = xml_scale->FirstChildElement("x")->FloatText();
-        auto scale_y = xml_scale->FirstChildElement("y")->FloatText();
-        auto scale_z = xml_scale->FirstChildElement("z")->FloatText();
-        model_obj->SetScale(glm::vec3(scale_x, scale_y, scale_z));
-        std::cout << "scale x: " << scale_x << " y: " << scale_y << " z: " << scale_z << std::endl;
+        model_obj->SetScale(Utils::GetXYZ(xml_scale));
     }
     std::cout << "Setup world finish" << std::endl;
 }
@@ -188,6 +211,7 @@ void Renderer::draw(long long elapsed)
 {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glPointSize(5.0f);
     // glEnable(GL_DEPTH_TEST);
     // glEnable(GL_CULL_FACE); //设置 OpenGL 只绘制正面 , 不绘制背面
     // glFrontFace(GL_CW); // 设置顺时针方向 CW : Clock Wind 顺时针方向, 默认是 GL_CCW : Counter Clock Wind 逆时针方向
@@ -204,7 +228,7 @@ void Renderer::draw(long long elapsed)
     mat_model = glm::mat4(1.0f);
 
     const float radius = 10.0f;
-    float time = elapsed / 1000.0; // 注意是 1000.0
+    float time = elapsed / 2000.0; // 注意是 1000.0
     float cam_x = sin(time) * radius;
     float cam_y = sin(M_PI / 2.0) * radius;
     float cam_z = cos(time) * radius;
@@ -212,8 +236,10 @@ void Renderer::draw(long long elapsed)
 
     glm::vec3 cam_pos = glm::vec3(cam_x, cam_y, cam_z);
 
-    this->m_axis->draw(elapsed, mat_projection, mat_view, mat_model);
-    // m_ground->Draw(elapsed, mat_projection, mat_view, mat_model, cam_pos, m_lights);
+    if (m_ground != nullptr)
+    {
+        m_ground->Draw(elapsed, mat_projection, mat_view, mat_model, cam_pos, m_lights);
+    }
     for (auto model : m_models)
     {
         model->Draw(elapsed, mat_projection, mat_view, mat_model, cam_pos, m_lights);
