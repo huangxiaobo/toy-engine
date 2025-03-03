@@ -63,7 +63,7 @@ void main() {
 ### 坐标系
 
 OpenGL是右手坐标系
-
+![CoordinateSystem](assets/coordinate_system.png)
 
 ## ScreenShots
 
