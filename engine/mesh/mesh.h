@@ -44,10 +44,15 @@ public:
     ~Mesh();
     void SetUpMesh();
 
+    void SetDrawMode(GLuint mode);
+
     void Draw(long long elapsed);
 
     static  vector<Mesh*> CreatePlaneMesh();
     static vector<Mesh*> CreateGroundMesh();
+    static vector<Mesh*> CreatePointMesh();
+
+    static vector<Mesh*> CreateAxisMesh();
 
 public:
     string name;

@@ -36,8 +36,8 @@ void Axis::init(int width, int height)
 
     // ===================== 着色器 =====================
     this->shader_program->init();
-    this->shader_program->addShaderFromSourceFile(ShaderType::VERTEX_SHADER, "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/axis.vert");
-    this->shader_program->addShaderFromSourceFile(ShaderType::FRAGMENT_SHADER, "/Users/huangxiaobo/Workspace/github.com@huangxiaobo/toy-engine/resource/shader/axis.frag");
+    this->shader_program->addShaderFromSourceFile(ShaderType::VERTEX_SHADER, "./resource/shader/axis.vert");
+    this->shader_program->addShaderFromSourceFile(ShaderType::FRAGMENT_SHADER, "./resource/shader/axis.frag");
     bool success = this->shader_program->link();
     if (!success)
     {
