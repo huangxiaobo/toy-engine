@@ -23,7 +23,6 @@ ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
 
     timer->start(33);
 
-
 }
 
 ToyEngineMainWindow::~ToyEngineMainWindow()
@@ -33,8 +32,3 @@ ToyEngineMainWindow::~ToyEngineMainWindow()
         renderer = nullptr;
     }
 }
-
-// void ToyEngineMainWindow::paintEvent(QPaintEvent *event)
-// {
-//     this->paintEvent(event);
-// }
