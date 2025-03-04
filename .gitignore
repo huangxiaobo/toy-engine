@@ -11,6 +11,7 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 output
 build
+bin
 .idea
 
 # CMake generated files
@@ -26,3 +27,5 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
+.qt
+*_autogen
