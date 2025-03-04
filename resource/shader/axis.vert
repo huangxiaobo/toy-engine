@@ -1,10 +1,12 @@
-#version 330
-uniform mat4 projection;
-uniform mat4 view;
-uniform mat4 model;
-in vec3 position;
-out vec3 xyz;
+#version 330 core
+
+uniform mat4 mat_model;
+uniform mat4 mat_view;
+uniform mat4 mat_projection;
+
+
+layout (location = 0) in vec3 position;
+
 void main() {
-    gl_Position = projection * view * model * vec4(position, 1);
-    xyz = position;
+    gl_Position = mat_projection * mat_view * mat_model * vec4(position, 1);
 }
