@@ -20,8 +20,8 @@
         <light>
             <type>0</type>
             <position>
-                <x>20.0</x>
-                <y>30.0</y>
+                <x>5.0</x>
+                <y>5.0</y>
                 <z>0.0</z>
             </position>
             <color>
@@ -62,8 +62,8 @@
         <light>
             <type>0</type>
             <position>
-                <x>-20.0</x>
-                <y>30.0</y>
+                <x>-5.0</x>
+                <y>5.0</y>
                 <z>0.0</z>
                 <w>1.0</w>
             </position>
@@ -74,17 +74,17 @@
             </color>
             <diffuse>
                 <color>
-                    <r>1.0</r>
+                    <r>0.0</r>
                     <g>0.5</g>
-                    <b>0.0</b>
+                    <b>1.0</b>
                 </color>
                 <intensity>2.0</intensity>
             </diffuse>
             <ambient>
                 <color>
-                    <r>1.0</r>
+                    <r>0.0</r>
                     <g>0.5</g>
-                    <b>0.0</b>
+                    <b>1.0</b>
                 </color>
                 <intensity>1.0</intensity>
             </ambient>
