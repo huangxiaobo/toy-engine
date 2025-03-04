@@ -22,12 +22,12 @@ class Material;
 
 class Model
 {
-public:
-    string Name;
-    vector<Mesh *> meshes;
-    Material *material;
-    Technique *effect;
-    vector<Texture> textures_loaded; // 存储到目前为止加载的所有纹理，优化以确保纹理不会加载超过一次。
+private:
+    string m_name;
+    vector<Mesh *> m_meshes;
+    Material *m_material;
+    Technique *m_effect;
+    vector<Texture> m_textures_loaded; // 存储到目前为止加载的所有纹理，优化以确保纹理不会加载超过一次。
 
     glm::vec3 m_position;
     glm::f32 m_rotation;
@@ -36,7 +36,7 @@ public:
 
 public:
     Model(string name);
-    ~Model();
+    virtual ~Model();
     void Init();
 
     void LoadModel(const string &filename);
@@ -52,7 +52,7 @@ public:
     void SetTranslate(glm::vec3 position);
     void SetMaterial(Material *material);
     void SetEffect(Technique *effect);
-    void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, vector<Light *> lights);
+    virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *>& lights);
 };
 
 #endif

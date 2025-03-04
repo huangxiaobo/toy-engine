@@ -27,7 +27,6 @@ private:
     int height;
     Axis *m_axis;
     vector<Model*> m_models;
-    Model* m_ground;
     vector<Light*> m_lights;
 };
 
