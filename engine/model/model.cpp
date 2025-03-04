@@ -19,27 +19,27 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <string>
-Model::Model(string name) : Name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f)
+Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f)
 {
     m_matrix = glm::mat4(1.0f);
 }
 
 Model::~Model()
 {
-    while (!meshes.empty())
+    while (!m_meshes.empty())
     {
-        delete meshes[0];
-        meshes.erase(meshes.begin());
+        delete m_meshes[0];
+         m_meshes.erase(m_meshes.begin());
     }
-    if (effect)
+    if (m_effect)
     {
-        delete effect;
-        effect = nullptr;
+        delete m_effect;
+        m_effect = nullptr;
     }
-    if (material)
+    if (m_material)
     {
-        delete material;
-        material = nullptr;
+        delete m_material;
+        m_material = nullptr;
     }
 }
 
@@ -79,7 +79,7 @@ void Model::ProcessNode(aiNode *node, const aiScene *scene)
         // the node object only contains indices to index the actual objects in the scene.
         // the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-        meshes.push_back(ProcessMesh(mesh, scene)); // 递归扫描，将模型数据存储在vector<mesh>中
+        m_meshes.push_back(ProcessMesh(mesh, scene)); // 递归扫描，将模型数据存储在vector<mesh>中
     }
     // after we've processed all of the meshes (if any) we then recursively process each of the children nodes处理当前结点的所有子节点
     for (unsigned int i = 0; i < node->mNumChildren; i++)
@@ -191,11 +191,11 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
         mat->GetTexture(type, i, &str); // 获取每个纹理的文件位置，它会将结果储存在一个aiString中
         // check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
         bool skip = false;
-        for (unsigned int j = 0; j < textures_loaded.size(); j++)
+        for (unsigned int j = 0; j < m_textures_loaded.size(); j++)
         {
-            if (std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0)
+            if (std::strcmp(m_textures_loaded[j].path.data(), str.C_Str()) == 0)
             {
-                textures.push_back(textures_loaded[j]);
+                textures.push_back(m_textures_loaded[j]);
                 skip = true; // a texture with the same filepath has already been loaded, continue to next one. (optimization)
                 break;
             }
@@ -217,7 +217,7 @@ void Model::SetMesh(vector<Mesh *> meshes)
 {
     for (auto m : meshes)
     {
-        this->meshes.push_back(m);
+        this->m_meshes.push_back(m);
     }
 }
 
@@ -241,15 +241,17 @@ void Model::SetTranslate(glm::vec3 position)
 
 void Model::SetMaterial(Material *material)
 {
-    this->material = material;
+    this->m_material = material;
 }
 
 void Model::SetEffect(Technique *effect)
 {
-    this->effect = effect;
+    this->m_effect = effect;
 }
 
-void Model::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, vector<Light *> lights)
+void Model::Draw(long long elapsed, 
+    const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, 
+    const glm::vec3 &camera, const std::vector<Light *>& lights)
 {
     // 以填充模式绘制前后
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -258,14 +260,14 @@ void Model::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4
     // Utils::DebugMatrix(model_local);
     glm::mat4 mvp = projection * view * model_local;
 
-    this->effect->Enable();
-    this->effect->SetProjection(projection);
-    this->effect->SetView(view);
-    this->effect->SetModel(model_local);
-    this->effect->SetCamera(camera);
-    if (this->effect->GetType() == TechniqueTypeLight)
+    this->m_effect->Enable();
+    this->m_effect->SetProjection(projection);
+    this->m_effect->SetView(view);
+    this->m_effect->SetModel(model_local);
+    this->m_effect->SetCamera(camera);
+    if (this->m_effect->GetType() == TechniqueTypeLight)
     {
-        auto light_effect = (TechniqueLight *)(this->effect);
+        auto light_effect = (TechniqueLight *)(this->m_effect);
         int index = 0;
         for (auto light : lights)
         {
@@ -275,12 +277,12 @@ void Model::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4
                 index += 1;
             }
         }
-        light_effect->SetMaterial(this->material);
+        light_effect->SetMaterial(this->m_material);
     }
-    this->effect->GetShader()->BindFragDataLocation();
+    this->m_effect->GetShader()->BindFragDataLocation();
 
-    for (int i = 0; i < this->meshes.size(); i++)
+    for (int i = 0; i < this->m_meshes.size(); i++)
     {
-        this->meshes[i]->Draw(elapsed);
+        this->m_meshes[i]->Draw(elapsed);
     }
 }

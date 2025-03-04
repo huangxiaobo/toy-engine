@@ -22,8 +22,9 @@ public:
     alignas(16) static constexpr int PositionLocation = 0;
     alignas(16) static constexpr int ColorLocation = 1;
 
-    public:
-    void Debug() {
+public:
+    void Debug()
+    {
         std::cout << "Vertex:" << std::endl;
         std::cout << "  Position: " << Position.x << ", " << Position.y << ", " << Position.z << std::endl;
         std::cout << "  Color: " << Color.x << ", " << Color.y << ", " << Color.z << std::endl;
@@ -39,20 +40,21 @@ class Mesh
 
 public:
     Mesh();
-
-    Mesh(const vector<Vertex>& vertices, const vector<GLuint>& indices);
+    Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices);
     ~Mesh();
-    void SetUpMesh();
 
     void SetDrawMode(GLuint mode);
 
-    void Draw(long long elapsed);
+    virtual void Draw(long long elapsed);
 
-    static  vector<Mesh*> CreatePlaneMesh();
-    static vector<Mesh*> CreateGroundMesh();
-    static vector<Mesh*> CreatePointMesh();
+    static vector<Mesh *> CreatePlaneMesh();
+    static vector<Mesh *> CreateGroundMesh();
+    static vector<Mesh *> CreatePointMesh(float x, float y, float z);
 
-    static vector<Mesh*> CreateAxisMesh();
+    static vector<Mesh *> CreateAxisMesh();
+
+private:
+    void SetUpMesh();
 
 public:
     string name;
