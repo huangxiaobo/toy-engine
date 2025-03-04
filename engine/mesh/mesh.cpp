@@ -109,16 +109,13 @@ vector<Mesh *> Mesh::CreatePlaneMesh()
 {
     vector<Mesh *> meshes;
 
-    Mesh *mesh = new Mesh();
-    mesh->SetDrawMode(GL_TRIANGLES);
-
-    mesh->vertices = {
+    vector<Vertex> vertices = {
         {
             // top right
             glm::vec3(0.5f, 0.5f, 0.0f), // Position
-            glm::vec3(1.0f, 0.0f, 0.0f),  // Color
-            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
-            glm::vec2(1.0f, 1.0f),        // texture coords
+            glm::vec3(1.0f, 0.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f, 1.0f),       // texture coords
 
         },
         {
@@ -143,12 +140,13 @@ vector<Mesh *> Mesh::CreatePlaneMesh()
             glm::vec2(1.0f, 1.0f),        // texture coords
         },
     };
-    mesh->indices = {
+    vector<unsigned int> indices = {
         0, 1, 3, // first triangle
         1, 2, 3  // second triangle
     };
 
-    mesh->SetUpMesh();
+    Mesh *mesh = new Mesh(vertices, indices);
+    mesh->SetDrawMode(GL_TRIANGLES);
 
     meshes.push_back(mesh);
     return meshes;
@@ -224,29 +222,26 @@ vector<Mesh *> Mesh::CreateGroundMesh()
     return meshes;
 }
 
-vector<Mesh *> Mesh::CreatePointMesh()
+vector<Mesh *> Mesh::CreatePointMesh(float x, float y, float z)
 {
-
+    std::cout << "CreatePointMesh" << " x: " << x << " y: " << y << " z: " << z << std::endl;
     vector<Mesh *> meshes;
 
-    Mesh *m = new Mesh();
-    m->SetDrawMode(GL_POINTS);
-
-    m->vertices = {
+    vector<Vertex> vertices = {
         {
-            glm::vec3(0.0f, 0.0f, 0.0f), // Position
+            glm::vec3(x, y, z),          // Position
             glm::vec3(1.0f, 0.0f, 0.0f), // Color
             glm::vec3(0.0f, 0.0f, 0.0f), // Normal
             glm::vec2(1.0f, 1.0f),       // texture co
-        }};
-    m->indices.push_back(0);
+        },
+    };
+    vector<unsigned int> indices = {0, 1, 2, 3};
+
+    Mesh *m = new Mesh(vertices, indices);
+    m->SetDrawMode(GL_POINTS);
 
     meshes.push_back(m);
 
-    for (auto mesh : meshes)
-    {
-        mesh->SetUpMesh();
-    }
     return meshes;
 }
 
@@ -256,7 +251,6 @@ vector<Mesh *> Mesh::CreateAxisMesh()
 
     Mesh *m1 = new Mesh();
     m1->SetDrawMode(GL_LINES);
-
 
     // draw grid 右手坐标系，逆时针方向排列
     //   + -------------------------------> x
@@ -274,41 +268,40 @@ vector<Mesh *> Mesh::CreateAxisMesh()
             glm::vec3(0.0f, 0.0f, 0.0f), // Position
             glm::vec3(1.0f, 0.0f, 0.0f), // Color
             glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f,1.0f),       // texture co
+            glm::vec2(1.0f, 1.0f),       // texture co
         },
         {
             glm::vec3(10.0f, 0.0f, 0.0f), // Position
-            glm::vec3(1.0f, 0.0f, 0.0f), // Color
-            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f,1.0f),       // texture co
+            glm::vec3(1.0f, 0.0f, 0.0f),  // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
+            glm::vec2(1.0f, 1.0f),        // texture co
         },
         // y (0, 0, 0) -> (0, 10, 0)
         {
             glm::vec3(0.0f, 0.0f, 0.0f), // Position
             glm::vec3(0.0f, 1.0f, 0.0f), // Color
             glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f,1.0f),       // texture co
+            glm::vec2(1.0f, 1.0f),       // texture co
         },
         {
             glm::vec3(0.0f, 10.0f, 0.0f), // Position
-            glm::vec3(0.0f, 1.0f, 0.0f), // Color
-            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f,1.0f),       // texture co
+            glm::vec3(0.0f, 1.0f, 0.0f),  // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
+            glm::vec2(1.0f, 1.0f),        // texture co
         },
         // z (0, 0, 0) -> (0, 0, 10)
         {
             glm::vec3(0.0f, 0.0f, 0.0f), // Position
             glm::vec3(0.0f, 0.0f, 1.0f), // Color
             glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f,1.0f),       // texture co
+            glm::vec2(1.0f, 1.0f),       // texture co
         },
         {
             glm::vec3(0.0f, 0.0f, 10.0f), // Position
-            glm::vec3(0.0f, 0.0f, 1.0f), // Color
-            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f,1.0f),       // texture co
-        }
-    };
+            glm::vec3(0.0f, 0.0f, 1.0f),  // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
+            glm::vec2(1.0f, 1.0f),        // texture co
+        }};
     m1->indices = {
         0, 1, // x
         2, 3, // y

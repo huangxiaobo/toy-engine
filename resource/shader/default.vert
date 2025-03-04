@@ -19,6 +19,5 @@ out VsOut {
 
 void main() {
     v2f.Color0 = vertcolor;
-
     gl_Position = projection * view * model * vec4(position, 1);
 }

@@ -6,6 +6,8 @@
 #include "technique/technique.h"
 #include "technique/technique_light.h"
 #include "model/model.h"
+#include "model/model_ground.h"
+#include "model/model_point.h"
 #include "axis/axis.h"
 #include "utils/utils.h"
 #include "light/light.h"
@@ -37,11 +39,6 @@ Renderer::~Renderer()
         }
         m_models.clear();
     }
-    if (m_ground != nullptr)
-    {
-        delete m_ground;
-        m_ground = nullptr;
-    }
     while (!m_lights.empty())
     {
         for (auto light : m_lights)
@@ -64,9 +61,11 @@ void Renderer::init(int w, int h)
     const char *version = (const char *)glGetString(GL_VERSION);
     std::cout << "OpenGL Version: " << version << std::endl;
 
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glEnable(GL_PROGRAM_POINT_SIZE);
+    glClearColor(0.1, 0.1, 0.0, 1.0);
     glEnable(GL_DEPTH_TEST);
+    // 禁用了程序点大小模式，使用命令指定派生点大小。
+    // 如果要启用程序点大小模式，则需要在shader中设置gl_PointSize
+    glDisable(GL_PROGRAM_POINT_SIZE);
 
     width = w;
     height = h;
@@ -106,10 +105,11 @@ void Renderer::init(int w, int h)
                                              "./resource/shader/light.frag");
 
     ground_effect->init();
-    m_ground = new Model("ground");
-    m_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
-    m_ground->SetMesh(ground_mesh);
-    m_ground->SetEffect(ground_effect);
+    auto model_ground = new ModelGround();
+    model_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
+    model_ground->SetMesh(ground_mesh);
+    model_ground->SetEffect(ground_effect);
+    m_models.push_back(model_ground);
 
     tinyxml2::XMLDocument doc;
     auto err = doc.LoadFile("./resource/world.xml");
@@ -127,7 +127,7 @@ void Renderer::init(int w, int h)
     {
         auto light_type = xml_light->FirstChildElement("type")->IntText();
         std::cout << "light type: " << light_type << std::endl;
-        if (light_type == 0)
+        if (light_type == LightTypePoint)
         {
             auto light = new PointLight();
             light->Color = Utils::GetRGB(xml_light->FirstChildElement("color"));
@@ -141,8 +141,8 @@ void Renderer::init(int w, int h)
             m_lights.push_back(light);
 
             // 创建光源模型
-            auto model = new Model("light");
-            auto mesh = Mesh::CreatePointMesh();
+            auto model = new ModelPoint("light");
+            auto mesh = Mesh::CreatePointMesh(light->Position.x, light->Position.y, light->Position.z);
             model->SetMesh(mesh);
 
             Technique *effect = new Technique("light",
@@ -150,7 +150,6 @@ void Renderer::init(int w, int h)
                                               "./resource/shader/default.frag");
             effect->init();
             model->SetEffect(effect);
-            model->SetTranslate(glm::vec3(3, 0, 0));
 
             m_models.push_back(model);
             std::cout << "Setup light finish" << std::endl;
@@ -189,7 +188,7 @@ void Renderer::init(int w, int h)
         material->DiffuseColor = Utils::GetRGB(xml_materials->FirstChildElement("diffuse"));
         material->SpecularColor = Utils::GetRGB(xml_materials->FirstChildElement("specular"));
         material->Shininess = xml_materials->FirstChildElement("shininess")->FloatText();
-        model_obj->material = material;
+        model_obj->SetMaterial(material);
 
         auto xml_shader = model->FirstChildElement("shader");
         auto shader_vert_file = xml_shader->FirstChildElement("vert")->GetText();
@@ -209,10 +208,10 @@ void Renderer::init(int w, int h)
 
 void Renderer::draw(long long elapsed)
 {
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClearColor(0.1f, 0.1f, 0.1f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glPointSize(5.0f);
-    // glEnable(GL_DEPTH_TEST);
+    glPointSize(50.0f);
+    glEnable(GL_DEPTH_TEST);
     // glEnable(GL_CULL_FACE); //设置 OpenGL 只绘制正面 , 不绘制背面
     // glFrontFace(GL_CW); // 设置顺时针方向 CW : Clock Wind 顺时针方向, 默认是 GL_CCW : Counter Clock Wind 逆时针方向
     glm::mat4 mat_projection;
@@ -222,12 +221,12 @@ void Renderer::draw(long long elapsed)
     float farPlane = 100.0f;                                                                // 远平面距离
     mat_projection = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
 
-    glm::mat4 mat_model; // QMatrix 默认生成的是一个单位矩阵（对角线上的元素为1）
+    glm::mat4 mat_model; //  默认生成的是一个单位矩阵（对角线上的元素为1）
     glm::mat4 mat_view;  // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
 
     mat_model = glm::mat4(1.0f);
 
-    const float radius = 10.0f;
+    const float radius = 20.0f;
     float time = elapsed / 2000.0; // 注意是 1000.0
     float cam_x = sin(time) * radius;
     float cam_y = sin(M_PI / 2.0) * radius;
@@ -236,10 +235,6 @@ void Renderer::draw(long long elapsed)
 
     glm::vec3 cam_pos = glm::vec3(cam_x, cam_y, cam_z);
 
-    if (m_ground != nullptr)
-    {
-        m_ground->Draw(elapsed, mat_projection, mat_view, mat_model, cam_pos, m_lights);
-    }
     for (auto model : m_models)
     {
         model->Draw(elapsed, mat_projection, mat_view, mat_model, cam_pos, m_lights);
