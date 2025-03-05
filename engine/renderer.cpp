@@ -12,6 +12,7 @@
 #include "utils/utils.h"
 #include "light/light.h"
 #include "material/material.h"
+#include "camera/camera.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -26,6 +27,11 @@ Renderer::Renderer()
 
 Renderer::~Renderer()
 {
+    if (m_camera != nullptr)
+    {
+        delete m_camera;
+        m_camera = nullptr;
+    }
     if (m_axis != nullptr)
     {
         delete m_axis;
@@ -61,11 +67,17 @@ void Renderer::init(int w, int h)
     const char *version = (const char *)glGetString(GL_VERSION);
     std::cout << "OpenGL Version: " << version << std::endl;
 
-    glClearColor(0.1, 0.1, 0.0, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
     glEnable(GL_DEPTH_TEST);
     // 禁用了程序点大小模式，使用命令指定派生点大小。
     // 如果要启用程序点大小模式，则需要在shader中设置gl_PointSize
     glDisable(GL_PROGRAM_POINT_SIZE);
+    // 以填充模式绘制前后
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    // 设置 OpenGL 只绘制正面 , 不绘制背面
+    // glEnable(GL_CULL_FACE);
+    // 设置顺时针方向 CW : Clock Wind 顺时针方向, 默认是 GL_CCW : Counter Clock Wind 逆时针方向
+    // glFrontFace(GL_CW);
 
     width = w;
     height = h;
@@ -122,6 +134,11 @@ void Renderer::init(int w, int h)
     doc.Print(&printer);
     std::cout << printer.CStr() << std::endl;
 
+    auto xml_camera = doc.FirstChildElement("world")->FirstChildElement("camera");
+    auto camera_position = xml_camera->FirstChildElement("position");
+    auto camera_target = xml_camera->FirstChildElement("target");
+    m_camera = new Camera(Utils::GetXYZ(camera_position), Utils::GetXYZ(camera_target), glm::vec3(0, 1.0f, 0));
+
     auto xml_lights = doc.FirstChildElement("world")->FirstChildElement("lights");
     for (auto xml_light = xml_lights->FirstChildElement("light"); xml_light != nullptr; xml_light = xml_light->NextSiblingElement())
     {
@@ -152,6 +169,7 @@ void Renderer::init(int w, int h)
             model->SetEffect(effect);
 
             m_models.push_back(model);
+            light->m_model = model;
             std::cout << "Setup light finish" << std::endl;
         }
     }
@@ -210,10 +228,6 @@ void Renderer::draw(long long elapsed)
 {
     glClearColor(0.1f, 0.1f, 0.1f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glPointSize(50.0f);
-    glEnable(GL_DEPTH_TEST);
-    // glEnable(GL_CULL_FACE); //设置 OpenGL 只绘制正面 , 不绘制背面
-    // glFrontFace(GL_CW); // 设置顺时针方向 CW : Clock Wind 顺时针方向, 默认是 GL_CCW : Counter Clock Wind 逆时针方向
     glm::mat4 mat_projection;
     float fov = 45.0f;                                                                      // 视野角度
     float aspectRatio = (float)width / (float)(1 * height);                                 // 宽高比
@@ -221,23 +235,24 @@ void Renderer::draw(long long elapsed)
     float farPlane = 100.0f;                                                                // 远平面距离
     mat_projection = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
 
-    glm::mat4 mat_model; //  默认生成的是一个单位矩阵（对角线上的元素为1）
-    glm::mat4 mat_view;  // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
+    glm::mat4 mat_model = glm::mat4(1.0f);          //  默认生成的是一个单位矩阵（对角线上的元素为1）
+    glm::mat4 mat_view = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
 
-    mat_model = glm::mat4(1.0f);
+    glm::vec3 eye_pos = m_camera->GetEyePosition();
 
-    const float radius = 20.0f;
-    float time = elapsed / 2000.0; // 注意是 1000.0
-    float cam_x = sin(time) * radius;
-    float cam_y = sin(M_PI / 2.0) * radius;
-    float cam_z = cos(time) * radius;
-    mat_view = glm::lookAt(glm::vec3(cam_x, cam_y, cam_z), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-
-    glm::vec3 cam_pos = glm::vec3(cam_x, cam_y, cam_z);
+    // 更新灯光
+    for (auto light : m_lights)
+    {
+        if (light->GetLightType() == LightTypePoint) {
+            auto point_light = (PointLight *)light;
+            point_light->Position = glm::vec3(glm::rotate(glm::radians(1.0f), glm::vec3(0, 1, 0)) * glm::vec4(point_light->Position, 1.0f));
+            point_light->m_model->SetTranslate(point_light->Position);
+        }
+    }
 
     for (auto model : m_models)
     {
-        model->Draw(elapsed, mat_projection, mat_view, mat_model, cam_pos, m_lights);
+        model->Draw(elapsed, mat_projection, mat_view, mat_model, eye_pos, m_lights);
     }
 }
 

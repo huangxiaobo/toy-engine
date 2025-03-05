@@ -14,6 +14,8 @@ public:
     ToyEngineMainWindow(QWidget *parent = nullptr);
     ~ToyEngineMainWindow();
 
+    void closeEvent(QCloseEvent *event) override;
+
 private:
     RendererWidget *renderer_widget;
 

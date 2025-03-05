@@ -4,6 +4,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QTimer>
+#include <iostream>
 #include "mainwindow.h"
 #include "renderer_view.h"
 
@@ -27,8 +28,27 @@ ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
 
 ToyEngineMainWindow::~ToyEngineMainWindow()
 {
+    if (timer != nullptr){
+        timer->stop();
+        delete timer;
+        timer = nullptr;
+    }
+
     if (renderer_widget != nullptr){
         delete renderer_widget;
         renderer_widget = nullptr;
     }
+}
+
+void ToyEngineMainWindow::closeEvent(QCloseEvent *event)
+{
+    if (timer != nullptr){
+        timer->stop();
+        disconnect(timer, nullptr, nullptr, nullptr); // 断开所有信号连接
+        delete timer;
+        timer = nullptr;
+    }
+    std::cout << "close event" << std::endl;
+    event->accept();
+    qApp->quit();
 }
