@@ -3,14 +3,15 @@
 
 #include <glm/glm.hpp>
 
+
+class Model;
+
 enum LightType
 {
     LightTypePoint,     // 点光源
     LightTypeDirection, // 方向光源
     LightTypeSpot       // 聚光灯
 };
-
-
 
 class Light
 {
@@ -26,7 +27,7 @@ private:
     LightType light_type;
 };
 
-struct DirectionLight: public Light
+struct DirectionLight : public Light
 {
 public:
     glm::vec3 Direction;
@@ -41,7 +42,7 @@ public:
     float SpecularIntensity;
 };
 
-struct PointLight:public Light
+struct PointLight : public Light
 {
 public:
     glm::vec3 Position;
@@ -62,7 +63,9 @@ public:
         float Exp;
     } Attenuation;
 
-    public:
+    Model *m_model;
+
+public:
     PointLight() : Light(LightTypePoint) {}
     ~PointLight() {}
 };

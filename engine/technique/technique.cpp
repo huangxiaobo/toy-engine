@@ -3,71 +3,71 @@
 
 #include <iostream>
 
-Technique::Technique(string name,  string vertexShader,  string fragmentShader):type(TechniqueType::TechniqueTypeBase)
+Technique::Technique(string name,  string vertex_shader,  string fragment_shader):m_type(TechniqueType::TechniqueTypeBase)
 {
-    shaderVertex = vertexShader;
-    shaderFragment = fragmentShader;
+    m_shader_vert = vertex_shader;
+    m_shader_frag = fragment_shader;
 }
 
 Technique::~Technique()
 {
-    if (shader_program != nullptr)
+    if (m_shader != nullptr)
     {
-        delete shader_program;
-        shader_program = nullptr;
+        delete m_shader;
+        m_shader = nullptr;
     }
 }
 
 void Technique::init()
 {
-    this->shader_program = new Shader();
-    this->shader_program->init();
+    this->m_shader = new Shader();
+    this->m_shader->init();
     // ===================== 着色器 =====================
-    this->shader_program->addShaderFromSourceFile(ShaderType::VERTEX_SHADER, shaderVertex.c_str());
-    this->shader_program->addShaderFromSourceFile(ShaderType::FRAGMENT_SHADER, shaderFragment.c_str());
+    this->m_shader->addShaderFromSourceFile(ShaderType::VERTEX_SHADER, m_shader_vert.c_str());
+    this->m_shader->addShaderFromSourceFile(ShaderType::FRAGMENT_SHADER, m_shader_frag.c_str());
 
-    bool success = this->shader_program->link();
+    bool success = this->m_shader->link();
     if (!success){
         exit(-1);
     }
 
-    this->shader_program->bind();                                            // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
-    ProjectionUniform = this->shader_program->uniformLocation("projection"); // 获取顶点着色器中顶点属性 aPos 的位置
-    ViewUniform = this->shader_program->uniformLocation("view");             // 获取顶点着色器中顶点属性 aPos 的位置
-    ModelUniform = this->shader_program->uniformLocation("model");           // 获取顶点着色器中顶点属性 aPos 的位置
-    WvpUniform = this->shader_program->uniformLocation("gWVP");              // 获取顶点着色器中顶点属性 aPos 的位置
-    CameraUniform = this->shader_program->uniformLocation("gViewPos");       // 获取顶点着色器中顶点属性 aPos 的位置
+    this->m_shader->bind();                                            // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
+    ProjectionUniform = this->m_shader->uniformLocation("projection"); // 获取顶点着色器中顶点属性 aPos 的位置
+    ViewUniform = this->m_shader->uniformLocation("view");             // 获取顶点着色器中顶点属性 aPos 的位置
+    ModelUniform = this->m_shader->uniformLocation("model");           // 获取顶点着色器中顶点属性 aPos 的位置
+    WvpUniform = this->m_shader->uniformLocation("gWVP");              // 获取顶点着色器中顶点属性 aPos 的位置
+    CameraUniform = this->m_shader->uniformLocation("gViewPos");       // 获取顶点着色器中顶点属性 aPos 的位置
 
 }
 
 Shader *Technique::GetShader() const
 {
-    return shader_program;
+    return m_shader;
 }
 
 void Technique::SetWVP(const glm::mat4 &wvp)
 {
-    this->shader_program->setUniformValue(WvpUniform, wvp);
+    this->m_shader->setUniformValue(WvpUniform, wvp);
 }
 
 void Technique::SetCamera(const glm::vec3& camera)
 {
-    this->shader_program->setUniformValue(CameraUniform, camera);
+    this->m_shader->setUniformValue(CameraUniform, camera);
 }
 
 void Technique::SetProjection(const glm::mat4& projection)
 {
-    this->shader_program->setUniformValue(ProjectionUniform, projection);
+    this->m_shader->setUniformValue(ProjectionUniform, projection);
 }
 
 void Technique::SetView(const glm::mat4& view)
 {
-    this->shader_program->setUniformValue(ViewUniform, view);
+    this->m_shader->setUniformValue(ViewUniform, view);
 }
 
 void Technique::SetModel( const glm::mat4& model)
 {
-    this->shader_program->setUniformValue(ModelUniform, model);
+    this->m_shader->setUniformValue(ModelUniform, model);
 }
 
 void Technique::draw(long long elapsed)
@@ -100,10 +100,10 @@ void Technique::setUniform()
 
 void Technique::Enable()
 {
-    bool ok = shader_program->bind();
+    bool ok = m_shader->bind();
 }
 
 void Technique::Disable()
 {
-    shader_program->unbind();
+    m_shader->unbind();
 }
