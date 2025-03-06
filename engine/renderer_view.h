@@ -4,6 +4,8 @@
 // #include <QOpenGLFunctions_4_1_Core>
 #include <QElapsedTimer>
 #include <QKeyEvent>
+#include <QTimer>
+#include <QLabel>
 #include "axis/axis.h"
 // #include "model/model.h"
 
@@ -23,9 +25,19 @@ protected:
     void resizeGL(int w, int h);
     void keyPressEvent( QKeyEvent *e );
 
+
 private:
     QElapsedTimer m_time;
-    Renderer *render;
+    Renderer *m_render;
+
+
+    // 绘制刷新定时器
+   QTimer* m_timer;
+
+    // fps显示
+    QLabel *m_fps_label;
+    QTimer *m_fps_timer;
+    int m_frame_count;
 };
 
 #endif // __RENDERER_WIDGET_H__

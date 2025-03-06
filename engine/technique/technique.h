@@ -9,6 +9,9 @@
 using namespace std;
 
 class Shader;
+class Light;
+class Material;
+
 
 enum TechniqueType {
     TechniqueTypeBase,
@@ -27,28 +30,26 @@ enum TechniqueType {
 
 
 
+
+
 class Technique
 {
 protected:
-    string m_shader_vert;
-    string m_shader_frag;
     Shader *m_shader;
 
     TechniqueType m_type;
 
-    unsigned int ProjectionUniform;
-    unsigned int ViewUniform;
-    unsigned int ModelUniform;
-    unsigned int WvpUniform; // 模型视图投影矩阵
-    unsigned int CameraUniform; // 摄像机位置
+    unsigned int m_uniform_projection;
+    unsigned int m_uniform_view;
+    unsigned int m_uniform_model;
+    unsigned int m_uniform_wvp; // 模型视图投影矩阵
+    unsigned int m_uniform_viewpos; // 摄像机位置
 
 public:
     Technique( string name, string vertexShader,  string fragmentShader);
     virtual ~Technique();
 
-    virtual void init();
-
-    TechniqueType GetType() const { return m_type ;};
+    virtual TechniqueType GetType() const { return m_type ;};
 
     Shader* GetShader() const ;
 
@@ -57,13 +58,16 @@ public:
     void SetProjection(const glm::mat4& projection);
     void SetView(const glm::mat4& view);
     void SetModel(const glm::mat4& model);
-    void draw(long long elapsed);
-    void setUniform(const char* name, const glm::vec2& value);
-    void setUniform(const char* name, const glm::vec3& value);
-    void setUniform(const char* name, const glm::vec4& value);
-    void setUniform(const char* name, float value);
-    void setUniform(const char* name, int value);
-    void setUniform();
+    void SetUniform(const char* name, const glm::vec2& value);
+    void SetUniform(const char* name, const glm::vec3& value);
+    void SetUniform(const char* name, const glm::vec4& value);
+    void SetUniform(const char* name, float value);
+    void SetUniform(const char* name, int value);
+    void SetUniform();
+
+
+    virtual void SetLights(const vector<Light *>& lights);
+    virtual void SetMaterial(const Material *material);
 
     void Enable();
 

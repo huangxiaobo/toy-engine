@@ -222,20 +222,21 @@ vector<Mesh *> Mesh::CreateGroundMesh()
     return meshes;
 }
 
-vector<Mesh *> Mesh::CreatePointMesh(float x, float y, float z)
+vector<Mesh *> Mesh::CreatePointMesh(glm::vec3 pos, glm::vec3 color)
 {
-    std::cout << "CreatePointMesh" << " x: " << x << " y: " << y << " z: " << z << std::endl;
     vector<Mesh *> meshes;
 
     vector<Vertex> vertices = {
         {
-            glm::vec3(x, y, z),          // Position
-            glm::vec3(1.0f, 0.0f, 0.0f), // Color
-            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f, 1.0f),       // texture co
+            glm::vec3(pos.x, pos.y, pos.z),       // Position
+            glm::vec3(color.x, color.y, color.z), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f),          // Normal
+            glm::vec2(1.0f, 1.0f),                // texture co
         },
     };
-    vector<unsigned int> indices = {0, 1, 2, 3};
+    vector<unsigned int> indices = {
+        0,
+    };
 
     Mesh *m = new Mesh(vertices, indices);
     m->SetDrawMode(GL_POINTS);
