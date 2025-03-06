@@ -10,7 +10,7 @@
 TechniqueLight::TechniqueLight(string name, string vertexShader, string fragmentShader)
     : Technique(name, vertexShader, fragmentShader)
 {
-    type = TechniqueTypeLight;
+    m_type = TechniqueTypeLight;
 }
 
 TechniqueLight::~TechniqueLight()
@@ -21,48 +21,48 @@ void TechniqueLight::init()
 {
     Technique::init();
     InitPointLightUniform(8);
-    MaterialUniform.Init(this->shader_program);
+    MaterialUniform.Init(this->m_shader);
 }
 
 void TechniqueLight::SetDirectionLight(DirectionLight *light)
 {
-    this->shader_program->setUniformValue(LightColorUniform, light->Color);
-    this->shader_program->setUniformValue(LightAmbientUniform, light->AmbientColor);
-    this->shader_program->setUniformValue(LightDiffuseUniform, light->DiffuseColor);
-    this->shader_program->setUniformValue(LightSpecularUniform, light->SpecularColor);
+    this->m_shader->setUniformValue(LightColorUniform, light->Color);
+    this->m_shader->setUniformValue(LightAmbientUniform, light->AmbientColor);
+    this->m_shader->setUniformValue(LightDiffuseUniform, light->DiffuseColor);
+    this->m_shader->setUniformValue(LightSpecularUniform, light->SpecularColor);
 }
 
 void TechniqueLight::InitPointLightUniform(int num)
 {
-    PointLightCountUniform = this->shader_program->uniformLocation("gPointLightNum");
+    PointLightCountUniform = this->m_shader->uniformLocation("gPointLightNum");
     for (int i = 0; i < num; i++)
     {
         UniformPointLight uniform;
         string name;
 
         name = std::format("gPointLights[{}].Color", i);
-        uniform.Color = this->shader_program->uniformLocation(name.c_str());
+        uniform.Color = this->m_shader->uniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].Position", i);
-        uniform.Position = this->shader_program->uniformLocation(name.c_str());
+        uniform.Position = this->m_shader->uniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].DiffuseColor", i);
-        uniform.DiffuseColor = this->shader_program->uniformLocation(name.c_str());
+        uniform.DiffuseColor = this->m_shader->uniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].SpecularColor", i);
-        uniform.SpecularColor = this->shader_program->uniformLocation(name.c_str());
+        uniform.SpecularColor = this->m_shader->uniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AmbienColor", i);
-        uniform.AmbienColor = this->shader_program->uniformLocation(name.c_str());
+        uniform.AmbienColor = this->m_shader->uniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AttenuationConstant", i);
-        uniform.Atten.Constant = this->shader_program->uniformLocation(name.c_str());
+        uniform.Atten.Constant = this->m_shader->uniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AttenuationLinear", i);
-        uniform.Atten.Linear = this->shader_program->uniformLocation(name.c_str());
+        uniform.Atten.Linear = this->m_shader->uniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AttenuationExp", i);
-        uniform.Atten.Exp = this->shader_program->uniformLocation(name.c_str());
+        uniform.Atten.Exp = this->m_shader->uniformLocation(name.c_str());
 
         PointLightUniforms.push_back(uniform);
     }
@@ -70,24 +70,24 @@ void TechniqueLight::InitPointLightUniform(int num)
 
 void TechniqueLight::SetPointLight(int i, PointLight *light)
 {
-    this->shader_program->setUniformValue(PointLightUniforms[i].Color, light->Color);
-    this->shader_program->setUniformValue(PointLightUniforms[i].Position, light->Position);
-    this->shader_program->setUniformValue(PointLightUniforms[i].DiffuseColor, light->DiffuseColor);
-    this->shader_program->setUniformValue(PointLightUniforms[i].SpecularColor, light->SpecularColor);
-    this->shader_program->setUniformValue(PointLightUniforms[i].AmbienColor, light->AmbientColor);
-    this->shader_program->setUniformValue(PointLightUniforms[i].Atten.Constant, light->Attenuation.Constant);
-    this->shader_program->setUniformValue(PointLightUniforms[i].Atten.Linear, light->Attenuation.Linear);
-    this->shader_program->setUniformValue(PointLightUniforms[i].Atten.Exp, light->Attenuation.Exp);
+    this->m_shader->setUniformValue(PointLightUniforms[i].Color, light->Color);
+    this->m_shader->setUniformValue(PointLightUniforms[i].Position, light->Position);
+    this->m_shader->setUniformValue(PointLightUniforms[i].DiffuseColor, light->DiffuseColor);
+    this->m_shader->setUniformValue(PointLightUniforms[i].SpecularColor, light->SpecularColor);
+    this->m_shader->setUniformValue(PointLightUniforms[i].AmbienColor, light->AmbientColor);
+    this->m_shader->setUniformValue(PointLightUniforms[i].Atten.Constant, light->Attenuation.Constant);
+    this->m_shader->setUniformValue(PointLightUniforms[i].Atten.Linear, light->Attenuation.Linear);
+    this->m_shader->setUniformValue(PointLightUniforms[i].Atten.Exp, light->Attenuation.Exp);
 
-    this->shader_program->setUniformValue(PointLightCountUniform, i + 1);
+    this->m_shader->setUniformValue(PointLightCountUniform, i + 1);
 }
 
 void TechniqueLight::SetMaterial(Material *m)
 {
-    MaterialUniform.SetAmbientColor(this->shader_program, m->AmbientColor);
-    MaterialUniform.SetDiffuseColor(this->shader_program, m->DiffuseColor);
-    MaterialUniform.SetSpecularColor(this->shader_program, m->SpecularColor);
-    MaterialUniform.SetShininess(this->shader_program, m->Shininess);
+    MaterialUniform.SetAmbientColor(this->m_shader, m->AmbientColor);
+    MaterialUniform.SetDiffuseColor(this->m_shader, m->DiffuseColor);
+    MaterialUniform.SetSpecularColor(this->m_shader, m->SpecularColor);
+    MaterialUniform.SetShininess(this->m_shader, m->Shininess);
 }
 
 void TechniqueLight::SetPointLights(vector<PointLight *> lights)

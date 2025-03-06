@@ -6,9 +6,9 @@
     </window>
     <camera>
         <position>
-            <x>0.0</x>
-            <y>60.0</y>
-            <z>100.0</z>
+            <x>10.0</x>
+            <y>10.0</y>
+            <z>10.0</z>
         </position>
         <target>
             <x>0.0</x>

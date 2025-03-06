@@ -30,11 +30,11 @@ enum TechniqueType {
 class Technique
 {
 protected:
-    string shaderVertex;
-    string shaderFragment;
-    Shader *shader_program;
+    string m_shader_vert;
+    string m_shader_frag;
+    Shader *m_shader;
 
-    TechniqueType type;
+    TechniqueType m_type;
 
     unsigned int ProjectionUniform;
     unsigned int ViewUniform;
@@ -48,7 +48,7 @@ public:
 
     virtual void init();
 
-    TechniqueType GetType() const { return type ;};
+    TechniqueType GetType() const { return m_type ;};
 
     Shader* GetShader() const ;
 

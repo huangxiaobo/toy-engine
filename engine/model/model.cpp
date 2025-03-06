@@ -236,7 +236,7 @@ void Model::SetRotate(glm::f32 rotation)
 void Model::SetTranslate(glm::vec3 position)
 {
     m_position = position;
-    m_matrix = glm::translate(m_matrix, position);
+    m_matrix = glm::translate(glm::mat4(1.0f), position);
 }
 
 void Model::SetMaterial(Material *material)
@@ -253,10 +253,13 @@ void Model::Draw(long long elapsed,
     const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, 
     const glm::vec3 &camera, const std::vector<Light *>& lights)
 {
-    // 以填充模式绘制前后
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    auto model_local = model * m_matrix;
+    auto model_local = glm::mat4(1.0f);
+    model_local = glm::translate(model_local, m_position);
+    model_local = glm::scale(model_local, m_scale);
+    model_local = glm::rotate(m_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    model_local = model * model_local;
     // Utils::DebugMatrix(model_local);
     glm::mat4 mvp = projection * view * model_local;
 

@@ -8,6 +8,7 @@ using namespace std;
 class Model;
 class Axis;
 class Light;
+class Camera;
 
 class Renderer 
 {
@@ -26,6 +27,7 @@ private:
     int width;
     int height;
     Axis *m_axis;
+    Camera *m_camera;
     vector<Model*> m_models;
     vector<Light*> m_lights;
 };

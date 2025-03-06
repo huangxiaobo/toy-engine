@@ -3,6 +3,7 @@
 #include <QOpenGLWidget>
 // #include <QOpenGLFunctions_4_1_Core>
 #include <QElapsedTimer>
+#include <QKeyEvent>
 #include "axis/axis.h"
 // #include "model/model.h"
 
@@ -20,6 +21,7 @@ protected:
     void initializeGL();
     void paintGL();
     void resizeGL(int w, int h);
+    void keyPressEvent( QKeyEvent *e );
 
 private:
     QElapsedTimer m_time;
