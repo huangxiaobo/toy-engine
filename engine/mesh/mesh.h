@@ -49,7 +49,7 @@ public:
 
     static vector<Mesh *> CreatePlaneMesh();
     static vector<Mesh *> CreateGroundMesh();
-    static vector<Mesh *> CreatePointMesh(float x, float y, float z);
+    static vector<Mesh *> CreatePointMesh(glm::vec3 pos, glm::vec3 color);
 
     static vector<Mesh *> CreateAxisMesh();
 

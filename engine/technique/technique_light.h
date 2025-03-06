@@ -56,6 +56,8 @@ public:
 
     virtual void init();
 
+    virtual void SetLights(const vector<Light *>& lights);
+
     void SetDirectionLight(DirectionLight *light);
 
     void InitPointLightUniform(int num);
@@ -63,7 +65,7 @@ public:
 
     void SetPointLight(int index, PointLight *light);
 
-    void SetMaterial(Material* m);
+    virtual void SetMaterial(const Material *material);
 
 private:
     // 材质

@@ -1,6 +1,8 @@
 #include <glad/gl.h>
 #include "renderer.h"
 #include <iostream>
+#include <string>
+#include <format>
 
 #include "mesh/mesh.h"
 #include "technique/technique.h"
@@ -82,6 +84,12 @@ void Renderer::init(int w, int h)
     width = w;
     height = h;
 
+    float fov = 45.0f;                                                                           // 视野角度
+    float aspectRatio = (float)width / (float)(1 * height);                                      // 宽高比
+    float nearPlane = 0.1f;                                                                      // 近平面距离
+    float farPlane = 100.0f;                                                                     // 远平面距离
+    m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
+
     // 创建坐标系模型
     auto axis_model = new Model("axis");
     auto axis_mesh = Mesh::CreateAxisMesh();
@@ -90,7 +98,7 @@ void Renderer::init(int w, int h)
     Technique *axis_effect = new Technique("axis",
                                            "./resource/shader/default.vert",
                                            "./resource/shader/default.frag");
-    axis_effect->init();
+
     axis_model->SetEffect(axis_effect);
 
     axis_model->SetTranslate(glm::vec3(0, 0.01, 0));
@@ -101,7 +109,6 @@ void Renderer::init(int w, int h)
     Technique *plane_effect = new Technique("plane",
                                             "./resource/shader/light.vert",
                                             "./resource/shader/light.frag");
-    plane_effect->init();
 
     Model *plane = new Model("plane");
     plane->SetScale(glm::vec3(5.0f, 5.0f, 5.0f));
@@ -116,7 +123,6 @@ void Renderer::init(int w, int h)
                                              "./resource/shader/light.vert",
                                              "./resource/shader/light.frag");
 
-    ground_effect->init();
     auto model_ground = new ModelGround();
     model_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
     model_ground->SetMesh(ground_mesh);
@@ -140,6 +146,7 @@ void Renderer::init(int w, int h)
     m_camera = new Camera(Utils::GetXYZ(camera_position), Utils::GetXYZ(camera_target), glm::vec3(0, 1.0f, 0));
 
     auto xml_lights = doc.FirstChildElement("world")->FirstChildElement("lights");
+    auto xml_light_index = 0;
     for (auto xml_light = xml_lights->FirstChildElement("light"); xml_light != nullptr; xml_light = xml_light->NextSiblingElement())
     {
         auto light_type = xml_light->FirstChildElement("type")->IntText();
@@ -158,14 +165,14 @@ void Renderer::init(int w, int h)
             m_lights.push_back(light);
 
             // 创建光源模型
-            auto model = new ModelPoint("light");
-            auto mesh = Mesh::CreatePointMesh(light->Position.x, light->Position.y, light->Position.z);
+            auto model = new ModelPoint(std::format("light-{}", xml_light_index++));
+            auto mesh = Mesh::CreatePointMesh(light->Position, light->Color);
             model->SetMesh(mesh);
 
             Technique *effect = new Technique("light",
                                               "./resource/shader/default.vert",
                                               "./resource/shader/default.frag");
-            effect->init();
+
             model->SetEffect(effect);
 
             m_models.push_back(model);
@@ -215,6 +222,7 @@ void Renderer::init(int w, int h)
         TechniqueLight *effect = new TechniqueLight(model_name, shader_vert_file, shader_frag_file);
         effect->init();
         model_obj->SetEffect(effect);
+        effect->SetLights(m_lights);
 
         m_models.push_back(model_obj);
 
@@ -226,14 +234,11 @@ void Renderer::init(int w, int h)
 
 void Renderer::draw(long long elapsed)
 {
+    // 绘制帧数量加1
+    m_frame_count++;
+
     glClearColor(0.1f, 0.1f, 0.1f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glm::mat4 mat_projection;
-    float fov = 45.0f;                                                                      // 视野角度
-    float aspectRatio = (float)width / (float)(1 * height);                                 // 宽高比
-    float nearPlane = 0.1f;                                                                 // 近平面距离
-    float farPlane = 100.0f;                                                                // 远平面距离
-    mat_projection = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
 
     glm::mat4 mat_model = glm::mat4(1.0f);          //  默认生成的是一个单位矩阵（对角线上的元素为1）
     glm::mat4 mat_view = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
@@ -243,16 +248,17 @@ void Renderer::draw(long long elapsed)
     // 更新灯光
     for (auto light : m_lights)
     {
-        if (light->GetLightType() == LightTypePoint) {
+        if (light->GetLightType() == LightTypePoint)
+        {
             auto point_light = (PointLight *)light;
-            point_light->Position = glm::vec3(glm::rotate(glm::radians(1.0f), glm::vec3(0, 1, 0)) * glm::vec4(point_light->Position, 1.0f));
+            point_light->Position = glm::vec3(glm::rotate(glm::radians(0.5f), glm::vec3(0, 1, 0)) * glm::vec4(point_light->Position, 1.0f));
             point_light->m_model->SetTranslate(point_light->Position);
         }
     }
 
     for (auto model : m_models)
     {
-        model->Draw(elapsed, mat_projection, mat_view, mat_model, eye_pos, m_lights);
+        model->Draw(elapsed, m_projection_matrix, mat_view, mat_model, eye_pos, m_lights);
     }
 }
 

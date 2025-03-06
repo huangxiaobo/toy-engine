@@ -74,7 +74,7 @@ void Axis::init(int width, int height)
         )
     */
     this->shader_program->bind();                                                             // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
-    GLint aPosLocation = this->shader_program->attributeLocation("position");                 // 获取顶点着色器中顶点属性 aPos 的位置
+    GLint aPosLocation = this->shader_program->GetAttributeLocation("position");                 // 获取顶点着色器中顶点属性 aPos 的位置
     glVertexAttribPointer(aPosLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0); // 手动传入第几个属性
     glEnableVertexAttribArray(aPosLocation);                                                  // 开始 VAO 管理的第一个属性值
 #endif
@@ -106,9 +106,9 @@ void Axis::draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
     mat_model = glm::scale(mat_model, glm::vec3(5.0f, 5.0f, 5.0f));
 
     this->shader_program->bind();
-    this->shader_program->setUniformValue("mat_projection", projection); // 投影矩阵
-    this->shader_program->setUniformValue("mat_model", mat_model);       // 模型矩阵
-    this->shader_program->setUniformValue("mat_view", view);             // 摄像机矩阵
+    this->shader_program->SetUniformValue("mat_projection", projection); // 投影矩阵
+    this->shader_program->SetUniformValue("mat_model", mat_model);       // 模型矩阵
+    this->shader_program->SetUniformValue("mat_view", view);             // 摄像机矩阵
 
     /* 重新绑定 VAO */
     glBindVertexArray(VAO);

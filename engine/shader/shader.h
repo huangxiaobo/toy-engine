@@ -26,23 +26,23 @@ public:
 
     bool link();
 
-    unsigned int attributeLocation(const char *name);
+    unsigned int GetAttributeLocation(const char *name);
 
-    unsigned int uniformLocation(const char *name);
+    unsigned int GetUniformLocation(const char *name);
 
-    void setUniformValue(const char *name, float value);
-    void setUniformValue(const char *name, int value);
-    void setUniformValue(const char *name, bool value);
-    void setUniformValue(const char *name, const glm::vec2 &value);
-    void setUniformValue(const char *name, const glm::vec3 &value);
-    void setUniformValue(const char *name, const glm::mat4 &value);
+    void SetUniformValue(const char *name, float value);
+    void SetUniformValue(const char *name, int value);
+    void SetUniformValue(const char *name, bool value);
+    void SetUniformValue(const char *name, const glm::vec2 &value);
+    void SetUniformValue(const char *name, const glm::vec3 &value);
+    void SetUniformValue(const char *name, const glm::mat4 &value);
 
-    void setUniformValue(unsigned int uniform_location, float value);
-    void setUniformValue(unsigned int uniform_location, int value);
-    void setUniformValue(unsigned int uniform_location, bool value);
-    void setUniformValue(unsigned int uniform_location, const glm::vec2 &value);
-    void setUniformValue(unsigned int uniform_location, const glm::vec3 &value);
-    void setUniformValue(unsigned int uniform_location, const glm::mat4 &value);
+    void SetUniformValue(unsigned int uniform_location, float value);
+    void SetUniformValue(unsigned int uniform_location, int value);
+    void SetUniformValue(unsigned int uniform_location, bool value);
+    void SetUniformValue(unsigned int uniform_location, const glm::vec2 &value);
+    void SetUniformValue(unsigned int uniform_location, const glm::vec3 &value);
+    void SetUniformValue(unsigned int uniform_location, const glm::mat4 &value);
 
     void BindColorAttribute(unsigned int index, const char *name);
 

@@ -2,5 +2,14 @@
 
 Light::Light()
 {
-    light_type = LightTypePoint;
+    m_light_type = LightTypeNone;
 }
+
+PointLight::PointLight(): Light(LightTypePoint) 
+{
+}
+
+PointLight::~PointLight()
+{
+}
+

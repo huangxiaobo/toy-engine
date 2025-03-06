@@ -29,7 +29,7 @@ Model::~Model()
     while (!m_meshes.empty())
     {
         delete m_meshes[0];
-         m_meshes.erase(m_meshes.begin());
+        m_meshes.erase(m_meshes.begin());
     }
     if (m_effect)
     {
@@ -249,9 +249,9 @@ void Model::SetEffect(Technique *effect)
     this->m_effect = effect;
 }
 
-void Model::Draw(long long elapsed, 
-    const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, 
-    const glm::vec3 &camera, const std::vector<Light *>& lights)
+void Model::Draw(long long elapsed,
+                 const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
+                 const glm::vec3 &camera, const std::vector<Light *> &lights)
 {
 
     auto model_local = glm::mat4(1.0f);
@@ -260,28 +260,17 @@ void Model::Draw(long long elapsed,
     model_local = glm::rotate(m_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 1.0f, 0.0f));
 
     model_local = model * model_local;
-    // Utils::DebugMatrix(model_local);
     glm::mat4 mvp = projection * view * model_local;
 
     this->m_effect->Enable();
     this->m_effect->SetProjection(projection);
     this->m_effect->SetView(view);
     this->m_effect->SetModel(model_local);
+    this->m_effect->SetWVP(mvp);
     this->m_effect->SetCamera(camera);
-    if (this->m_effect->GetType() == TechniqueTypeLight)
-    {
-        auto light_effect = (TechniqueLight *)(this->m_effect);
-        int index = 0;
-        for (auto light : lights)
-        {
-            if (light->GetLightType() == LightTypePoint)
-            {
-                light_effect->SetPointLight(index, (PointLight *)light);
-                index += 1;
-            }
-        }
-        light_effect->SetMaterial(this->m_material);
-    }
+
+    this->m_effect->SetLights(lights);
+    this->m_effect->SetMaterial(this->m_material);
     this->m_effect->GetShader()->BindFragDataLocation();
 
     for (int i = 0; i < this->m_meshes.size(); i++)
