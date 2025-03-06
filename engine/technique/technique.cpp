@@ -37,12 +37,6 @@ void Technique::init()
     ModelUniform = this->m_shader->uniformLocation("model");           // 获取顶点着色器中顶点属性 aPos 的位置
     WvpUniform = this->m_shader->uniformLocation("gWVP");              // 获取顶点着色器中顶点属性 aPos 的位置
     CameraUniform = this->m_shader->uniformLocation("gViewPos");       // 获取顶点着色器中顶点属性 aPos 的位置
-
-}
-
-Shader *Technique::GetShader() const
-{
-    return m_shader;
 }
 
 void Technique::SetWVP(const glm::mat4 &wvp)
@@ -68,10 +62,6 @@ void Technique::SetView(const glm::mat4& view)
 void Technique::SetModel( const glm::mat4& model)
 {
     this->m_shader->setUniformValue(ModelUniform, model);
-}
-
-void Technique::draw(long long elapsed)
-{
 }
 
 void Technique::setUniform(const char* name, const glm::vec2& value)
