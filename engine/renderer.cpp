@@ -15,6 +15,7 @@
 #include "light/light.h"
 #include "material/material.h"
 #include "camera/camera.h"
+#include "fps/fps.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -55,10 +56,15 @@ Renderer::~Renderer()
         }
         m_lights.clear();
     }
+    if (m_fps_counter!= nullptr)
+    {
+        delete m_fps_counter;
+        m_fps_counter = nullptr;
+    }
 }
 
 void Renderer::init(int w, int h)
-{
+{    
     // glad 初始化
     if (!gladLoaderLoadGL())
     {
@@ -84,11 +90,16 @@ void Renderer::init(int w, int h)
     width = w;
     height = h;
 
+    m_fps_counter = new FPSCounter();
+
     float fov = 45.0f;                                                                           // 视野角度
     float aspectRatio = (float)width / (float)(1 * height);                                      // 宽高比
     float nearPlane = 0.1f;                                                                      // 近平面距离
     float farPlane = 100.0f;                                                                     // 远平面距离
     m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
+    m_view_matrix = glm::mat4(1.0f);  //  默认生成的是一个单位矩阵（对角线上的元素为1）
+    m_model_matrix = glm::mat4(1.0f);// 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
+    m_eye_pos = glm::vec3(0, 0, 0);
 
     // 创建坐标系模型
     auto axis_model = new Model("axis");
@@ -143,7 +154,7 @@ void Renderer::init(int w, int h)
     auto xml_camera = doc.FirstChildElement("world")->FirstChildElement("camera");
     auto camera_position = xml_camera->FirstChildElement("position");
     auto camera_target = xml_camera->FirstChildElement("target");
-    m_camera = new Camera(Utils::GetXYZ(camera_position), Utils::GetXYZ(camera_target), glm::vec3(0, 1.0f, 0));
+    m_camera = new Camera(Utils::GetXYZ(camera_position), Utils::GetXYZ(camera_target), glm::vec3(0.0f, 1.0f, 0.0f));
 
     auto xml_lights = doc.FirstChildElement("world")->FirstChildElement("lights");
     auto xml_light_index = 0;
@@ -220,7 +231,6 @@ void Renderer::init(int w, int h)
         auto shader_frag_file = xml_shader->FirstChildElement("frag")->GetText();
 
         TechniqueLight *effect = new TechniqueLight(model_name, shader_vert_file, shader_frag_file);
-        effect->init();
         model_obj->SetEffect(effect);
         effect->SetLights(m_lights);
 
@@ -235,15 +245,14 @@ void Renderer::init(int w, int h)
 void Renderer::draw(long long elapsed)
 {
     // 绘制帧数量加1
-    m_frame_count++;
+    m_fps_counter->Add();
 
     glClearColor(0.1f, 0.1f, 0.1f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glm::mat4 mat_model = glm::mat4(1.0f);          //  默认生成的是一个单位矩阵（对角线上的元素为1）
-    glm::mat4 mat_view = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
+    m_view_matrix = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
 
-    glm::vec3 eye_pos = m_camera->GetEyePosition();
+    m_eye_pos = m_camera->GetEyePosition();
 
     // 更新灯光
     for (auto light : m_lights)
@@ -258,7 +267,7 @@ void Renderer::draw(long long elapsed)
 
     for (auto model : m_models)
     {
-        model->Draw(elapsed, m_projection_matrix, mat_view, mat_model, eye_pos, m_lights);
+        model->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
     }
 }
 
@@ -267,4 +276,26 @@ void Renderer::resize(int w, int h)
     width = w;
     height = h;
     glViewport(0, 0, w, h);
+}
+
+void Renderer::update(long long elapsed)
+{
+
+    m_eye_pos = m_camera->GetEyePosition();
+
+    // 更新灯光
+    for (auto light : m_lights)
+    {
+        if (light->GetLightType() == LightTypePoint)
+        {
+            auto point_light = (PointLight *)light;
+            point_light->Position = glm::vec3(glm::rotate(glm::radians(0.5f), glm::vec3(0, 1, 0)) * glm::vec4(point_light->Position, 1.0f));
+            point_light->m_model->SetTranslate(point_light->Position);
+        }
+    }
+}
+
+float Renderer::GetFPS()
+{
+    return m_fps_counter->GetFPS();
 }

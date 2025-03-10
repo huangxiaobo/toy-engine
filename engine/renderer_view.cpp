@@ -1,5 +1,6 @@
 #include "renderer_view.h"
 #include "renderer.h"
+#include "camera/camera.h"
 #include <iostream>
 
 #include <QLabel>
@@ -13,7 +14,7 @@ RendererWidget::RendererWidget(QWidget *parent) : QOpenGLWidget(parent)
 
     m_timer = new QTimer(this);
     m_timer->setInterval(25);
-    connect(m_timer, SIGNAL(timeout()), this, SLOT(updateGL()),Qt::QueuedConnection);
+    connect(m_timer, SIGNAL(timeout()), this, SLOT(updateGL()), Qt::QueuedConnection);
 
     m_fps_label = new QLabel(this);
     m_fps_label->setStyleSheet("QLabel { color : white; }");
@@ -25,15 +26,8 @@ RendererWidget::RendererWidget(QWidget *parent) : QOpenGLWidget(parent)
     m_frame_count = 0;
     connect(m_fps_timer, &QTimer::timeout, this, [this]
             {
-      double elapsed = m_time.elapsed();
-      if (elapsed > 0)
-      {
-         auto frame_count_delta = m_render->GetFrameCount() - m_frame_count;
-         m_frame_count += frame_count_delta;
-         
-         auto fps = 1.0f * frame_count_delta / (elapsed / 1000.0f);
-         m_fps_label->setText(QString("FPS: %1").arg(fps));
-      } });
+         auto fps = m_render->GetFPS();
+         m_fps_label->setText(QString("FPS: %1").arg(fps)); });
     m_fps_timer->start(1000);
 }
 
@@ -64,6 +58,16 @@ RendererWidget::~RendererWidget()
     doneCurrent();
 }
 
+void RendererWidget::updateStatusBar(QStatusBar *status_bar)
+{
+    QList<QLabel *> labels = status_bar->findChildren<QLabel *>();
+    if (labels.size() >= 2)
+    {
+        labels[0]->setText(QString("帧率: %1").arg(m_render->GetFPS()));
+        labels[1]->setText(QString("模型数量: %1").arg(m_render->GetModelCount()));
+    }
+}
+
 void RendererWidget::initializeGL()
 {
     // 使用glad原生OpenGL, 无需初始化QT的OpenGL函数
@@ -75,7 +79,9 @@ void RendererWidget::initializeGL()
 
 void RendererWidget::paintGL()
 {
-    m_render->draw(m_time.elapsed());
+    auto elapsed = m_time.elapsed();
+    m_render->update(elapsed);
+    m_render->draw(elapsed);
 }
 
 void RendererWidget::resizeGL(int w, int h)
@@ -101,15 +107,19 @@ void RendererWidget::keyPressEvent(QKeyEvent *e)
         break;
 
     case Qt::Key_Up:
+        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::FORWARD, 0.1f);
         break;
 
     case Qt::Key_Down:
+        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::BACKWARD, 0.1f);
         break;
 
     case Qt::Key_Right:
+        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::RIGHT, 0.1f);
         break;
 
     case Qt::Key_Left:
+        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::LEFT, 0.1f);
         break;
 
     case Qt::Key_A:

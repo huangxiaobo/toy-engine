@@ -10,6 +10,7 @@ class Model;
 class Axis;
 class Light;
 class Camera;
+class FPSCounter;
 
 class Renderer
 {
@@ -22,16 +23,26 @@ public:
     void init(int w, int h);
     void draw(long long elapsed);
     void resize(int w, int h);
+    void update(long long elapsed);
 
 public:
     long long GetFrameCount() { return m_frame_count; }
+    long long GetModelCount(){return m_models.size();}
+    float GetFPS() ;
+    Camera *GetCamera() { return m_camera; }
 
 private:
     int width;
     int height;
 
+    // 世界矩阵
     glm::mat4 m_projection_matrix;
+    glm::mat4 m_view_matrix;
+    glm::mat4 m_model_matrix;
+    glm::mat4 m_mvp_matrix;
+    glm::vec3 m_eye_pos;
 
+    FPSCounter *m_fps_counter;
     Axis *m_axis;
     Camera *m_camera;
     vector<Model *> m_models;

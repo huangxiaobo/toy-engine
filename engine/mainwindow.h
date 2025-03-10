@@ -20,6 +20,7 @@ private:
     RendererWidget *renderer_widget;
 
     QTimer *timer;
+    QStatusBar *m_status_bar;
 };
 
 #endif

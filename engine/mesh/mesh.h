@@ -61,10 +61,11 @@ public:
     vector<Vertex> vertices;
     vector<GLuint> indices;
 
-    GLuint VAO, VBO;
+    GLuint VAO; // 创建 VAO 顶点数组对象
+    GLuint VBO; // 创建 VBO 顶点缓冲对象
     GLuint EBO; // 创建 EBO 元素缓冲对象
 
-    GLuint DrawMode;
+    GLuint DrawMode; // 绘制模式
 };
 
 #endif

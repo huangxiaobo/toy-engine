@@ -21,10 +21,6 @@ TechniqueLight::~TechniqueLight()
 {
 }
 
-void TechniqueLight::init()
-{
-}
-
 void TechniqueLight::SetLights(const vector<Light *> &lights)
 {
     int point_light_count = 0;

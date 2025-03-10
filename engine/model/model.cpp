@@ -233,6 +233,21 @@ void Model::SetRotate(glm::f32 rotation)
     m_matrix = glm::rotate(m_matrix, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
+// 绕指定轴旋转
+void Model::SetRotate(glm::f32 rotation, glm::vec3 axis)
+{
+    m_rotation = rotation;
+    // 先将模型平移到原点
+    glm::mat4 translateToOrigin = glm::translate(glm::mat4(1.0f), -m_position);
+    // 进行旋转操作
+    glm::mat4 rotate =glm::rotate(glm::mat4(1.0f), glm::radians(rotation), axis);
+    // 再将模型平移回原来的位置
+    glm::mat4 translateBack = glm::translate(glm::mat4(1.0f), m_position);
+
+    // 组合变换矩阵
+    m_matrix = translateBack * rotate * translateToOrigin * m_matrix;
+}
+
 void Model::SetTranslate(glm::vec3 position)
 {
     m_position = position;
@@ -263,10 +278,10 @@ void Model::Draw(long long elapsed,
     glm::mat4 mvp = projection * view * model_local;
 
     this->m_effect->Enable();
-    this->m_effect->SetProjection(projection);
-    this->m_effect->SetView(view);
-    this->m_effect->SetModel(model_local);
-    this->m_effect->SetWVP(mvp);
+    this->m_effect->SetProjectionMatrix(projection);
+    this->m_effect->SetViewMatrix(view);
+    this->m_effect->SetModelMatrix(model_local);
+    this->m_effect->SetWVPMatrix(mvp);
     this->m_effect->SetCamera(camera);
 
     this->m_effect->SetLights(lights);
