@@ -49,6 +49,7 @@ public:
 
     void SetScale(glm::vec3 scale);
     void SetRotate(glm::f32 rotation);
+    void SetRotate(glm::f32 rotation, glm::vec3 axis);
     void SetTranslate(glm::vec3 position);
     void SetMaterial(Material *material);
     void SetEffect(Technique *effect);

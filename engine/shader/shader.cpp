@@ -12,21 +12,20 @@ using namespace std;
 
 Shader::Shader()
 {
+    m_program = glCreateProgram();
 }
 
 Shader::~Shader()
 {
 }
 
-void Shader::init()
+Shader::Shader(const char *vertexShaderPath, const char *fragmentShaderPath)
 {
-    // glad 初始化
-    if (!gladLoaderLoadGL())
-    {
-        std::cout << "gladLoadGLLoader error!" << std::endl;
-    }
     m_program = glCreateProgram();
+    addShaderFromSourceFile(VERTEX_SHADER, vertexShaderPath);
+    addShaderFromSourceFile(FRAGMENT_SHADER, fragmentShaderPath);
 }
+
 
 void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath)
 {
@@ -74,7 +73,7 @@ void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath
     glDeleteShader(vertexShader);
 }
 
-bool Shader::link()
+bool Shader::Link()
 {
     int success;
 
@@ -129,22 +128,17 @@ unsigned int Shader::GetUniformLocation(const char *name)
     return 0;
 }
 
-void Shader::use()
+void Shader::Use()
 {
     glUseProgram(m_program);
 }
 
-bool Shader::unbind()
+bool Shader::UnUse()
 {
     glUseProgram(0);
     return true;
 }
 
-bool Shader::bind()
-{
-    glUseProgram(m_program);
-    return true;
-}
 
 void Shader::SetUniformValue(const char *name, float value)
 {

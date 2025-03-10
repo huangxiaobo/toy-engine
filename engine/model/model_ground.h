@@ -13,8 +13,9 @@ class Light;
 class ModelGround : public Model
 {
 public:
-    // 构造和西沟函数
+    // 构造函数
     ModelGround();
+    // 析构函数
     ~ModelGround();
 
     // 重写父类的Draw方法， 画地面

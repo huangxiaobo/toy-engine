@@ -5,9 +5,9 @@
 #include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QTimer>
+#include <QStatusBar>
 #include <QLabel>
 #include "axis/axis.h"
-// #include "model/model.h"
 
 class Renderer;
 class RendererWidget : public QOpenGLWidget //, protected QOpenGLFunctions_4_1_Core
@@ -18,6 +18,8 @@ class RendererWidget : public QOpenGLWidget //, protected QOpenGLFunctions_4_1_C
 public:
     explicit RendererWidget(QWidget *parent = Q_NULLPTR);
     virtual ~RendererWidget();
+
+    void updateStatusBar(QStatusBar *status_bar);
 
 protected:
     void initializeGL();

@@ -53,9 +53,6 @@ class TechniqueLight : public Technique
 public:
     TechniqueLight(string name, string vertexShader, string fragmentShader);
     ~TechniqueLight();
-
-    virtual void init();
-
     virtual void SetLights(const vector<Light *>& lights);
 
     void SetDirectionLight(DirectionLight *light);

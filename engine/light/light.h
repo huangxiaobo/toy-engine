@@ -2,6 +2,7 @@
 #define __LIGHT_H__
 
 #include <glm/glm.hpp>
+#include <memory>
 
 class Model;
 
@@ -69,7 +70,7 @@ public:
         float Exp;
     } Attenuation;
 
-    Model *m_model;
+    Model* m_model;
 
 public:
     PointLight();

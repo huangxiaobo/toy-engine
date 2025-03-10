@@ -53,17 +53,21 @@ public:
 
     Shader* GetShader() const ;
 
-    void SetWVP(const glm::mat4& wvp);
+    void SetWVPMatrix(const glm::mat4& wvp);
     void SetCamera(const glm::vec3 &camera);
-    void SetProjection(const glm::mat4& projection);
-    void SetView(const glm::mat4& view);
-    void SetModel(const glm::mat4& model);
+    void SetProjectionMatrix(const glm::mat4& projection);
+    void SetViewMatrix(const glm::mat4& view);
+    void SetModelMatrix(const glm::mat4& model);
+    void SetEyeWorldPos(const glm::vec3& pos);
+    void SetDirectionalLightTransform(const glm::mat4& lvp);
     void SetUniform(const char* name, const glm::vec2& value);
     void SetUniform(const char* name, const glm::vec3& value);
     void SetUniform(const char* name, const glm::vec4& value);
     void SetUniform(const char* name, float value);
     void SetUniform(const char* name, int value);
     void SetUniform();
+
+    void SetTextureUnit(unsigned int textureUnit);
 
 
     virtual void SetLights(const vector<Light *>& lights);

@@ -6,25 +6,20 @@
 enum ShaderType
 {
     VERTEX_SHADER,
-    FRAGMENT_SHADER
+    FRAGMENT_SHADER,
 };
 
 class Shader
 {
 public:
     Shader();
+
+    Shader(const char *vertexShaderPath, const char *fragmentShaderPath);
     ~Shader();
-
-    void init();
-
     void addShaderFromSourceFile(ShaderType shaderType, const char *filePath);
-    void load(const char *vertexShaderPath, const char *fragmentShaderPath);
-    void use();
-
-    bool unbind();
-    bool bind();
-
-    bool link();
+    void Use();
+    bool UnUse();
+    bool Link();
 
     unsigned int GetAttributeLocation(const char *name);
 
