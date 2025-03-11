@@ -2,11 +2,10 @@
 #include <thread>
 #include <chrono>
 
-FPSCounter::FPSCounter() : m_frame_count(0),m_fps(0),m_stop(false)
+FPSCounter::FPSCounter() : m_fps_now(0), m_fps(0), m_stop(false)
 {
-// 启动定时器线程
-m_timer_thread = std::thread(&FPSCounter::UpdateFPS, this);
-
+    // 启动定时器线程
+    m_timer_thread = std::thread(&FPSCounter::UpdateFPS, this);
 }
 
 FPSCounter::~FPSCounter()
@@ -16,7 +15,8 @@ FPSCounter::~FPSCounter()
         m_stop = true;
     }
     m_cv.notify_one();
-    if (m_timer_thread.joinable()) {
+    if (m_timer_thread.joinable())
+    {
         m_timer_thread.join();
     }
 }
@@ -24,7 +24,7 @@ FPSCounter::~FPSCounter()
 void FPSCounter::Add()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
-    m_frame_count++;
+    m_fps_now++;
 }
 
 float FPSCounter::GetFPS()
@@ -36,12 +36,13 @@ float FPSCounter::GetFPS()
 void FPSCounter::UpdateFPS()
 {
     std::unique_lock<std::mutex> lock(m_mutex);
-    while (!m_stop) {
+    while (!m_stop)
+    {
         // 等待 1 秒
         m_cv.wait_for(lock, std::chrono::seconds(1));
         // 更新帧率
-        m_fps = static_cast<float>(m_frame_count);
+        m_fps = m_fps_now;
         // 重置帧数计数器
-        m_frame_count = 0;
+        m_fps_now = 0;
     }
 }

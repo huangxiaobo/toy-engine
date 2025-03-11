@@ -56,7 +56,7 @@ Renderer::~Renderer()
         }
         m_lights.clear();
     }
-    if (m_fps_counter!= nullptr)
+    if (m_fps_counter != nullptr)
     {
         delete m_fps_counter;
         m_fps_counter = nullptr;
@@ -64,7 +64,7 @@ Renderer::~Renderer()
 }
 
 void Renderer::init(int w, int h)
-{    
+{
     // glad 初始化
     if (!gladLoaderLoadGL())
     {
@@ -75,7 +75,6 @@ void Renderer::init(int w, int h)
     const char *version = (const char *)glGetString(GL_VERSION);
     std::cout << "OpenGL Version: " << version << std::endl;
 
-    glClearColor(0.0, 0.0, 0.0, 1.0);
     glEnable(GL_DEPTH_TEST);
     // 禁用了程序点大小模式，使用命令指定派生点大小。
     // 如果要启用程序点大小模式，则需要在shader中设置gl_PointSize
@@ -92,14 +91,11 @@ void Renderer::init(int w, int h)
 
     m_fps_counter = new FPSCounter();
 
-    float fov = 45.0f;                                                                           // 视野角度
-    float aspectRatio = (float)width / (float)(1 * height);                                      // 宽高比
-    float nearPlane = 0.1f;                                                                      // 近平面距离
-    float farPlane = 100.0f;                                                                     // 远平面距离
-    m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
+    m_projection_matrix = glm::mat4(1.0f);
     m_view_matrix = glm::mat4(1.0f);  //  默认生成的是一个单位矩阵（对角线上的元素为1）
-    m_model_matrix = glm::mat4(1.0f);// 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
+    m_model_matrix = glm::mat4(1.0f); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
     m_eye_pos = glm::vec3(0, 0, 0);
+    calculateProjectMatrix(w, h);
 
     // 创建坐标系模型
     auto axis_model = new Model("axis");
@@ -247,23 +243,11 @@ void Renderer::draw(long long elapsed)
     // 绘制帧数量加1
     m_fps_counter->Add();
 
-    glClearColor(0.1f, 0.1f, 0.1f, 0.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_view_matrix = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
-
     m_eye_pos = m_camera->GetEyePosition();
-
-    // 更新灯光
-    for (auto light : m_lights)
-    {
-        if (light->GetLightType() == LightTypePoint)
-        {
-            auto point_light = (PointLight *)light;
-            point_light->Position = glm::vec3(glm::rotate(glm::radians(0.5f), glm::vec3(0, 1, 0)) * glm::vec4(point_light->Position, 1.0f));
-            point_light->m_model->SetTranslate(point_light->Position);
-        }
-    }
 
     for (auto model : m_models)
     {
@@ -275,6 +259,7 @@ void Renderer::resize(int w, int h)
 {
     width = w;
     height = h;
+    calculateProjectMatrix(w, h);
     glViewport(0, 0, w, h);
 }
 
@@ -298,4 +283,13 @@ void Renderer::update(long long elapsed)
 float Renderer::GetFPS()
 {
     return m_fps_counter->GetFPS();
+}
+
+void Renderer::calculateProjectMatrix(int w, int h)
+{
+    float fov = 45.0f;                                                                           // 视野角度
+    float aspectRatio = (float)w / (float)(1 * h);                                               // 宽高比
+    float nearPlane = 0.1f;                                                                      // 近平面距离
+    float farPlane = 100.0f;                                                                     // 远平面距离
+    m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
 }

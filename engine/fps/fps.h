@@ -17,8 +17,8 @@ private:
     void UpdateFPS();
 
 private:
-    int m_frame_count;
-    float m_fps;
+    unsigned int m_fps_now;
+    unsigned int m_fps;
     bool m_stop;
     std::thread m_timer_thread;
     std::mutex m_mutex;

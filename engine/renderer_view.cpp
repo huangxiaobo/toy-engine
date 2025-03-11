@@ -1,10 +1,15 @@
-#include "renderer_view.h"
+#include "globals.h"
 #include "renderer.h"
 #include "camera/camera.h"
+#include "model/model.h"
 #include <iostream>
 
 #include <QLabel>
 #include <QTimer>
+#include <QStandardItemModel>
+#include <QStandardItem>
+
+#include "renderer_view.h"
 
 RendererWidget::RendererWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
@@ -26,7 +31,7 @@ RendererWidget::RendererWidget(QWidget *parent) : QOpenGLWidget(parent)
     m_frame_count = 0;
     connect(m_fps_timer, &QTimer::timeout, this, [this]
             {
-         auto fps = m_render->GetFPS();
+         auto fps = gRenderer->GetFPS();
          m_fps_label->setText(QString("FPS: %1").arg(fps)); });
     m_fps_timer->start(1000);
 }
@@ -34,11 +39,6 @@ RendererWidget::RendererWidget(QWidget *parent) : QOpenGLWidget(parent)
 RendererWidget::~RendererWidget()
 {
     makeCurrent();
-    if (m_render != nullptr)
-    {
-        delete m_render;
-        m_render = nullptr;
-    }
     if (m_time.isValid())
     {
         m_time.invalidate();
@@ -63,9 +63,14 @@ void RendererWidget::updateStatusBar(QStatusBar *status_bar)
     QList<QLabel *> labels = status_bar->findChildren<QLabel *>();
     if (labels.size() >= 2)
     {
-        labels[0]->setText(QString("帧率: %1").arg(m_render->GetFPS()));
-        labels[1]->setText(QString("模型数量: %1").arg(m_render->GetModelCount()));
+        labels[0]->setText(QString("帧率: %1").arg(gRenderer->GetFPS()));
+        labels[1]->setText(QString("模型数量: %1").arg(gRenderer->GetModelCount()));
     }
+}
+
+void RendererWidget::updateModelList(QTreeView *tree_view)
+{
+    
 }
 
 void RendererWidget::initializeGL()
@@ -73,20 +78,20 @@ void RendererWidget::initializeGL()
     // 使用glad原生OpenGL, 无需初始化QT的OpenGL函数
     // initializeOpenGLFunctions();
 
-    this->m_render = new Renderer();
-    m_render->init(width(), height());
+    gRenderer->init(width(), height());
+    emit updateTreeListView();
 }
 
 void RendererWidget::paintGL()
 {
     auto elapsed = m_time.elapsed();
-    m_render->update(elapsed);
-    m_render->draw(elapsed);
+    gRenderer->update(elapsed);
+    gRenderer->draw(elapsed);
 }
 
 void RendererWidget::resizeGL(int w, int h)
 {
-    m_render->resize(w, h);
+    gRenderer->resize(w, h);
 }
 
 void RendererWidget::keyPressEvent(QKeyEvent *e)
@@ -107,19 +112,19 @@ void RendererWidget::keyPressEvent(QKeyEvent *e)
         break;
 
     case Qt::Key_Up:
-        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::FORWARD, 0.1f);
+        gRenderer->GetCamera()->ProcessKeyboard(CameraMoveType::FORWARD, 0.1f);
         break;
 
     case Qt::Key_Down:
-        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::BACKWARD, 0.1f);
+        gRenderer->GetCamera()->ProcessKeyboard(CameraMoveType::BACKWARD, 0.1f);
         break;
 
     case Qt::Key_Right:
-        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::RIGHT, 0.1f);
+        gRenderer->GetCamera()->ProcessKeyboard(CameraMoveType::RIGHT, 0.1f);
         break;
 
     case Qt::Key_Left:
-        this->m_render->GetCamera()->ProcessKeyboard(CameraMoveType::LEFT, 0.1f);
+    gRenderer->GetCamera()->ProcessKeyboard(CameraMoveType::LEFT, 0.1f);
         break;
 
     case Qt::Key_A:

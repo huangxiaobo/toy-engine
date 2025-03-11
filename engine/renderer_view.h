@@ -6,8 +6,8 @@
 #include <QKeyEvent>
 #include <QTimer>
 #include <QStatusBar>
+#include <QTreeView>
 #include <QLabel>
-#include "axis/axis.h"
 
 class Renderer;
 class RendererWidget : public QOpenGLWidget //, protected QOpenGLFunctions_4_1_Core
@@ -20,6 +20,7 @@ public:
     virtual ~RendererWidget();
 
     void updateStatusBar(QStatusBar *status_bar);
+    void updateModelList(QTreeView *tree_view);
 
 protected:
     void initializeGL();
@@ -27,10 +28,11 @@ protected:
     void resizeGL(int w, int h);
     void keyPressEvent( QKeyEvent *e );
 
+signals:
+    void updateTreeListView();
 
 private:
     QElapsedTimer m_time;
-    Renderer *m_render;
 
 
     // 绘制刷新定时器
