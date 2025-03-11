@@ -1,20 +1,26 @@
+#include "renderer_view.h"
+#include "treelist_view.h"
 
 #include <QWidget>
 #include <QMainWindow>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QTimer>
+#include <QObject>
 #include <QStatusBar>
+#include <QSplitter>
+#include <QTreeView>
+#include <QStandardItemModel>
 #include <iostream>
 #include "mainwindow.h"
-#include "renderer_view.h"
+
 
 ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
 {
 
     renderer_widget = new RendererWidget(this);
 
-    this->setCentralWidget(renderer_widget);
+    // this->setCentralWidget(renderer_widget);
     // 设置窗口大小
     this->setGeometry(0, 0, 800, 600);
     // 创建定时器，定时刷新QOpenGLWidget
@@ -32,6 +38,24 @@ ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
     m_status_bar->addWidget(label);
     QLabel *fpsLabel = new QLabel("FPS: 0", this);
     m_status_bar->addWidget(fpsLabel);
+
+    // 左侧树形组件
+    m_tree_view = new TreeListView(this);
+    
+    // 创建一个分割器，将主窗口分为左右两部分
+    QSplitter *splitter = new QSplitter(Qt::Horizontal, this);
+    splitter->addWidget(m_tree_view);
+    splitter->addWidget(renderer_widget);
+
+    // 设置主窗口的中央部件为分割器
+    this->setCentralWidget(splitter);
+
+    QObject::connect(renderer_widget, 
+        &RendererWidget::updateTreeListView, 
+        m_tree_view,
+        &TreeListView::onUpdateTreeListView  
+    );
+
 }
 
 ToyEngineMainWindow::~ToyEngineMainWindow()

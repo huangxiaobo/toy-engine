@@ -269,6 +269,7 @@ void Model::Draw(long long elapsed,
                  const glm::vec3 &camera, const std::vector<Light *> &lights)
 {
 
+    glLineWidth(5);
     auto model_local = glm::mat4(1.0f);
     model_local = glm::translate(model_local, m_position);
     model_local = glm::scale(model_local, m_scale);

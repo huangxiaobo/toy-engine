@@ -98,6 +98,7 @@ void Mesh::SetDrawMode(GLuint mode)
 
 void Mesh::Draw(long long elapsed)
 {
+    glLineWidth(5.0f);
     /* 重新绑定 VAO */
     glBindVertexArray(VAO);
     // 绘制模式(DrawMode): GL_TRIANGLES, GL_LINES, GL_POINTS
@@ -176,28 +177,28 @@ vector<Mesh *> Mesh::CreateGroundMesh()
         {
             m1->vertices.push_back(Vertex{
                 glm::vec3{xi + 0, 0.0f, zi + 0},
-                glm::vec3{1.0, 1.0, 0.0},
+                glm::vec3{0.5, 0.5, 0.5},
                 glm::vec3{0.0, 1.0, 0.0},
                 glm::vec2{0.0, 0.0},
             });
 
             m1->vertices.push_back(Vertex{
                 glm::vec3{xi + 1, 0.0f, zi + 0},
-                glm::vec3{1.0, 1.0, 0.0},
+                glm::vec3{0.5, 0.5, 0.5},
                 glm::vec3{0.0, 1.0, 0.0},
                 glm::vec2{0.0, 0.0},
             });
 
             m1->vertices.push_back(Vertex{
                 glm::vec3{xi + 1, 0.0f, zi + 1},
-                glm::vec3{1.0, 1.0, 0.0},
+                glm::vec3{0.5, 0.5, 0.5},
                 glm::vec3{0.0, 1.0, 0.0},
                 glm::vec2{0.0, 0.0},
             });
 
             m1->vertices.push_back(Vertex{
                 glm::vec3{xi + 0, 0.0f, zi + 1},
-                glm::vec3{0.0, 1.0, 0.0},
+                glm::vec3{0.5, 0.5, 0.5},
                 glm::vec3{0.0, 1.0, 0.0},
                 glm::vec2{0.0, 0.0},
             });
