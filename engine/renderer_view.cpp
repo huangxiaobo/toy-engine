@@ -19,7 +19,7 @@ RendererWidget::RendererWidget(QWidget *parent) : QOpenGLWidget(parent)
 
     m_timer = new QTimer(this);
     m_timer->setInterval(25);
-    connect(m_timer, SIGNAL(timeout()), this, SLOT(updateGL()), Qt::QueuedConnection);
+    // connect(m_timer, SIGNAL(timeout()), this, SLOT(updateGL()), Qt::QueuedConnection);
 
     m_fps_label = new QLabel(this);
     m_fps_label->setStyleSheet("QLabel { color : white; }");
@@ -70,7 +70,6 @@ void RendererWidget::updateStatusBar(QStatusBar *status_bar)
 
 void RendererWidget::updateModelList(QTreeView *tree_view)
 {
-    
 }
 
 void RendererWidget::initializeGL()
@@ -124,7 +123,7 @@ void RendererWidget::keyPressEvent(QKeyEvent *e)
         break;
 
     case Qt::Key_Left:
-    gRenderer->GetCamera()->ProcessKeyboard(CameraMoveType::LEFT, 0.1f);
+        gRenderer->GetCamera()->ProcessKeyboard(CameraMoveType::LEFT, 0.1f);
         break;
 
     case Qt::Key_A:

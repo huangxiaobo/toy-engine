@@ -27,15 +27,17 @@ public:
 
 public:
     long long GetFrameCount() { return m_frame_count; }
-    long long GetModelCount(){return m_models.size();}
+    long long GetModelCount() { return m_models.size(); }
     std::vector<Model *> GetModels() { return m_models; }
+
+    const Model *GetModel(string name);
+
     std::vector<Light *> GetLights() { return m_lights; }
-    float GetFPS() ;
+    float GetFPS();
     Camera *GetCamera() { return m_camera; }
 
-    private:
+private:
     void calculateProjectMatrix(int w, int h);
-
 
 private:
     int width;

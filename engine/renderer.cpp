@@ -109,7 +109,8 @@ void Renderer::init(int w, int h)
     axis_model->SetEffect(axis_effect);
 
     axis_model->SetTranslate(glm::vec3(0, 0.01, 0));
-    m_models.push_back(axis_model);
+    m_axis = new Axis();
+    m_axis->SetModel(axis_model);
 
     // Create Plane
     vector<Mesh *> plane_mesh = Mesh::CreatePlaneMesh();
@@ -176,9 +177,7 @@ void Renderer::init(int w, int h)
             auto mesh = Mesh::CreatePointMesh(light->Position, light->Color);
             model->SetMesh(mesh);
 
-            Technique *effect = new Technique("light",
-                                              "./resource/shader/default.vert",
-                                              "./resource/shader/default.frag");
+            Technique *effect = Technique::GetDefaultTechnique();
 
             model->SetEffect(effect);
 
@@ -249,6 +248,8 @@ void Renderer::draw(long long elapsed)
     m_view_matrix = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
     m_eye_pos = m_camera->GetEyePosition();
 
+    m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights); // 【重点】 绘制坐标轴
+
     for (auto model : m_models)
     {
         model->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
@@ -278,6 +279,18 @@ void Renderer::update(long long elapsed)
             point_light->m_model->SetTranslate(point_light->Position);
         }
     }
+}
+
+const Model *Renderer::GetModel(string name)
+{
+    for (auto model : m_models)
+    {
+        if (model->GetName() == name)
+        {
+            return model;
+        }
+    }
+    return nullptr;
 }
 
 float Renderer::GetFPS()

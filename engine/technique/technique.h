@@ -76,6 +76,10 @@ public:
     void Enable();
 
     void Disable();
+
+
+    public:
+  static  Technique *GetDefaultTechnique();
 };
 
 #endif

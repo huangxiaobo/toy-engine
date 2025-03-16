@@ -240,7 +240,7 @@ void Model::SetRotate(glm::f32 rotation, glm::vec3 axis)
     // 先将模型平移到原点
     glm::mat4 translateToOrigin = glm::translate(glm::mat4(1.0f), -m_position);
     // 进行旋转操作
-    glm::mat4 rotate =glm::rotate(glm::mat4(1.0f), glm::radians(rotation), axis);
+    glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), glm::radians(rotation), axis);
     // 再将模型平移回原来的位置
     glm::mat4 translateBack = glm::translate(glm::mat4(1.0f), m_position);
 
@@ -262,6 +262,11 @@ void Model::SetMaterial(Material *material)
 void Model::SetEffect(Technique *effect)
 {
     this->m_effect = effect;
+}
+
+glm::vec3 Model::GetPosition() const
+{
+    return m_position;
 }
 
 void Model::Draw(long long elapsed,

@@ -13,9 +13,15 @@ public:
 
     void init(int width, int height);
 
+public:
+
+    void SetModel(Model* model);
+    Model* GetModel();
+    void Update(long long elapsed);
+
 
 private:
-    Model* model;
+    Model* m_model;
 };
 
 #endif
