@@ -21,6 +21,10 @@ public:
 
     alignas(16) static constexpr int PositionLocation = 0;
     alignas(16) static constexpr int ColorLocation = 1;
+    alignas(16) static constexpr int NormalLocation = 2;
+    alignas(16) static constexpr int TexCoordsLocation = 3;
+    alignas(16) static constexpr int TangentLocation = 4;
+    alignas(16) static constexpr int BitangentLocation = 5;
 
 public:
     void Debug()
@@ -50,8 +54,10 @@ public:
     static vector<Mesh *> CreatePlaneMesh();
     static vector<Mesh *> CreateGroundMesh();
     static vector<Mesh *> CreatePointMesh(glm::vec3 pos, glm::vec3 color);
-
+    static vector<Mesh *> CreateIcosphereMesh(int subdivisions = 0);
     static vector<Mesh *> CreateAxisMesh();
+
+    Mesh * Clone();
 
 private:
     void SetUpMesh();

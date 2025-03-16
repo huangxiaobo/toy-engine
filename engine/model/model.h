@@ -54,6 +54,8 @@ public:
     void SetMaterial(Material *material);
     void SetEffect(Technique *effect);
 
+    glm::vec3 GetPosition() const ;
+
 
     const string GetName() const { return m_name; }
 

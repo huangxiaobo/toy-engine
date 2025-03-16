@@ -113,3 +113,11 @@ void Technique::Disable()
 {
     m_shader->UnUse();
 }
+
+// 获取一个默认的Technique
+Technique* Technique::GetDefaultTechnique()
+{
+    return new Technique("default",
+        "./resource/shader/default.vert",
+        "./resource/shader/default.frag");
+}

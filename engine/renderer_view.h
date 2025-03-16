@@ -26,7 +26,7 @@ protected:
     void initializeGL();
     void paintGL();
     void resizeGL(int w, int h);
-    void keyPressEvent( QKeyEvent *e );
+    void keyPressEvent(QKeyEvent *e);
 
 signals:
     void updateTreeListView();
@@ -34,9 +34,8 @@ signals:
 private:
     QElapsedTimer m_time;
 
-
     // 绘制刷新定时器
-   QTimer* m_timer;
+    QTimer *m_timer;
 
     // fps显示
     QLabel *m_fps_label;
