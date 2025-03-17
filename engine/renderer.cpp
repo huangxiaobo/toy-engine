@@ -103,8 +103,8 @@ void Renderer::init(int w, int h)
     axis_model->SetMesh(axis_mesh);
 
     Technique *axis_effect = new Technique("axis",
-                                           "./resource/shader/default.vert",
-                                           "./resource/shader/default.frag");
+                                           "./resource/shader/axis.vert",
+                                           "./resource/shader/axis.frag");
 
     axis_model->SetEffect(axis_effect);
 

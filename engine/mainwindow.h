@@ -26,7 +26,6 @@ public:
 public slots:
     void onUpdateTreeListView();
     void onTreeListMenuItemClicked();
-
     void onUpdatePropertyView(QString name);
 
 private:

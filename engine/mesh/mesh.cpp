@@ -320,24 +320,32 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     auto axisRadius = 0.05f;
     auto arrowRadius = 0.2f;
     auto arrowLength = 0.7f;
-    vector<glm::vec3> arrow_circle_points;
-    vector<glm::vec3> circle_start_points;
-    vector<glm::vec3> circle_end_points;
+    vector<glm::vec3> axis_arrow_btm_circle_points;
+    vector<glm::vec3> axis_cyber_btm_circle_points;
+    vector<glm::vec3> axis_cyber_top_circle_points;
+    glm::vec3 axisStartPoint = glm::vec3(0.0f);
+    glm::vec3 axisEndPoint = glm::vec3(0.0f);
+    glm::vec3 axisDirection = glm::vec3(0.0f);
+    glm::vec3 axisColor = glm::vec3(1.0f);
 
     // 绘制x轴
-    circle_start_points = createCirclePoints(axisRadius, 20, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    circle_end_points = createCirclePoints(axisRadius, 20, glm::vec3(10.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    axisColor = glm::vec3(1.0f, 0.0f, 0.0f);
+    axisStartPoint = glm::vec3(0.0f, 0.0f, 0.0f);
+    axisEndPoint = glm::vec3(axislength, 0.0f, 0.0f);
+    axisDirection = glm::vec3(1.0f, 0.0f, 0.0f);
+    axis_cyber_btm_circle_points = createCirclePoints(axisRadius, 20, axisStartPoint, axisDirection);
+    axis_cyber_top_circle_points = createCirclePoints(axisRadius, 20, axisEndPoint, axisDirection);
 
     Mesh *m_x = new Mesh();
-    for (size_t i = 0; i < circle_start_points.size(); i += 1)
+    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1)
     {
-        m_x->vertices.push_back({circle_start_points[i],
-                                 glm::vec3(1.0f, 0.0f, 0.0f),
-                                 glm::vec3(0.0f),
+        m_x->vertices.push_back({axis_cyber_btm_circle_points[i],
+                                 axisColor,
+                                 axis_cyber_btm_circle_points[i] - axisStartPoint,
                                  glm::vec2(0.0f)});
-        m_x->vertices.push_back({circle_end_points[i],
-                                 glm::vec3(1.0f, 0.0f, 0.0f),
-                                 glm::vec3(0.0f),
+        m_x->vertices.push_back({axis_cyber_top_circle_points[i],
+                                 axisColor,
+                                 axis_cyber_top_circle_points[i] - axisEndPoint,
                                  glm::vec2(0.0f)});
     }
     for (int i = 0; i < m_x->vertices.size() - 2; i += 2)
@@ -354,17 +362,17 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     // 绘制x箭头
     Mesh *m_x_arrow = new Mesh();
     // 圆锥底部的圆
-    arrow_circle_points = createCirclePoints(arrowRadius, 20, glm::vec3(10.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    axis_arrow_btm_circle_points = createCirclePoints(arrowRadius, 20, axisEndPoint, axisDirection);
 
-    m_x_arrow->vertices.push_back({glm::vec3(10.0f + arrowLength, 0.0f, 0.0f),
+    m_x_arrow->vertices.push_back({axisEndPoint + axisDirection * arrowLength,
+                                   axisColor,
                                    glm::vec3(1.0f, 0.0f, 0.0f),
-                                   glm::vec3(0.0f),
                                    glm::vec2(0.0f)});
-    for (size_t i = 0; i < arrow_circle_points.size(); i += 1)
+    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1)
     {
-        m_x_arrow->vertices.push_back({arrow_circle_points[i],
-                                       glm::vec3(1.0f, 0.0f, 0.0f),
-                                       glm::vec3(0.0f),
+        m_x_arrow->vertices.push_back({axis_arrow_btm_circle_points[i],
+                                       axisColor,
+                                       axis_arrow_btm_circle_points[i] - axisEndPoint,
                                        glm::vec2(0.0f)});
     }
 
@@ -377,19 +385,23 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     meshes.push_back(m_x_arrow);
 
     // 绘制y轴
-    circle_start_points = createCirclePoints(axisRadius, 20, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    circle_end_points = createCirclePoints(axisRadius, 20, glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    axisColor = glm::vec3(0.0f, 1.0f, 0.0f);
+    axisStartPoint = glm::vec3(0.0f, 0.0f, 0.0f);
+    axisEndPoint = glm::vec3(0.0f, axislength, 0.0f);
+    axisDirection = glm::vec3(0.0f, 1.0f, 0.0f);
+    axis_cyber_btm_circle_points = createCirclePoints(axisRadius, 20, axisStartPoint, axisDirection);
+    axis_cyber_top_circle_points = createCirclePoints(axisRadius, 20, axisEndPoint, axisDirection);
 
     Mesh *m_y = new Mesh();
-    for (size_t i = 0; i < circle_start_points.size(); i += 1)
+    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1)
     {
-        m_y->vertices.push_back({circle_start_points[i],
-                                 glm::vec3(0.0f, 1.0f, 0.0f),
-                                 glm::vec3(0.0f),
+        m_y->vertices.push_back({axis_cyber_btm_circle_points[i],
+                                 axisColor,
+                                 axis_cyber_btm_circle_points[i] - axisStartPoint,
                                  glm::vec2(0.0f)});
-        m_y->vertices.push_back({circle_end_points[i],
-                                 glm::vec3(0.0f, 1.0f, 0.0f),
-                                 glm::vec3(0.0f),
+        m_y->vertices.push_back({axis_cyber_top_circle_points[i],
+                                 axisColor,
+                                 axis_cyber_top_circle_points[i] - axisEndPoint,
                                  glm::vec2(0.0f)});
     }
     for (int i = 0; i < m_y->vertices.size() - 2; i += 2)
@@ -406,17 +418,17 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     // 绘制y箭头
     Mesh *m_y_arrow = new Mesh();
     // 圆锥底部的圆
-    arrow_circle_points = createCirclePoints(arrowRadius, 20, glm::vec3(0.0f, 10.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    axis_arrow_btm_circle_points = createCirclePoints(arrowRadius, 20, axisEndPoint, axisDirection);
 
-    m_y_arrow->vertices.push_back({glm::vec3(0.0f, 10.0f + arrowLength, 0.0f),
+    m_y_arrow->vertices.push_back({axisEndPoint + axisDirection * arrowLength,
+                                   axisColor,
                                    glm::vec3(0.0f, 1.0f, 0.0f),
-                                   glm::vec3(0.0f),
                                    glm::vec2(0.0f)});
-    for (size_t i = 0; i < arrow_circle_points.size(); i += 1)
+    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1)
     {
-        m_y_arrow->vertices.push_back({arrow_circle_points[i],
-                                       glm::vec3(0.0f, 1.0f, 0.0f),
-                                       glm::vec3(0.0f),
+        m_y_arrow->vertices.push_back({axis_arrow_btm_circle_points[i],
+                                       axisColor,
+                                       axis_arrow_btm_circle_points[i] - axisEndPoint,
                                        glm::vec2(0.0f)});
     }
 
@@ -429,19 +441,24 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     meshes.push_back(m_y_arrow);
 
     // 绘制z轴
-    circle_start_points = createCirclePoints(axisRadius, 20, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    circle_end_points = createCirclePoints(axisRadius, 20, glm::vec3(0.0f, 0.0f, 10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    axisColor = glm::vec3(0.0f, 0.0f, 1.0f);
+    axisStartPoint = glm::vec3(0.0f, 0.0f, 0.0f);
+    axisEndPoint = glm::vec3(0.0f, 0.0f, axislength);
+    axisDirection = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    axis_cyber_btm_circle_points = createCirclePoints(axisRadius, 20, axisStartPoint, axisDirection);
+    axis_cyber_top_circle_points = createCirclePoints(axisRadius, 20, axisEndPoint, axisDirection);
 
     Mesh *m_z = new Mesh();
-    for (size_t i = 0; i < circle_start_points.size(); i += 1)
+    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1)
     {
-        m_z->vertices.push_back({circle_start_points[i],
-                                 glm::vec3(0.0f, 0.0f, 1.0f),
-                                 glm::vec3(0.0f),
+        m_z->vertices.push_back({axis_cyber_btm_circle_points[i],
+                                 axisColor,
+                                 axis_cyber_btm_circle_points[i] - axisStartPoint,
                                  glm::vec2(0.0f)});
-        m_z->vertices.push_back({circle_end_points[i],
-                                 glm::vec3(0.0f, 0.0f, 1.0f),
-                                 glm::vec3(0.0f),
+        m_z->vertices.push_back({axis_cyber_top_circle_points[i],
+                                 axisColor,
+                                 axis_cyber_top_circle_points[i] - axisEndPoint,
                                  glm::vec2(0.0f)});
     }
     for (int i = 0; i < m_z->vertices.size() - 2; i += 2)
@@ -458,17 +475,17 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     // 绘制z箭头
     Mesh *m_z_arrow = new Mesh();
     // 圆锥底部的圆
-    arrow_circle_points = createCirclePoints(arrowRadius, 20, glm::vec3(0.0f, 0.0f, 10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    axis_arrow_btm_circle_points = createCirclePoints(arrowRadius, 20, axisEndPoint, axisDirection);
 
-    m_z_arrow->vertices.push_back({glm::vec3(0.0f, 0.0f, 10.0f + arrowLength),
+    m_z_arrow->vertices.push_back({axisEndPoint + axisDirection * arrowLength,
+                                   axisColor,
                                    glm::vec3(0.0f, 0.0f, 1.0f),
-                                   glm::vec3(0.0f),
                                    glm::vec2(0.0f)});
-    for (size_t i = 0; i < arrow_circle_points.size(); i += 1)
+    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1)
     {
-        m_z_arrow->vertices.push_back({arrow_circle_points[i],
-                                       glm::vec3(0.0f, 0.0f, 1.0f),
-                                       glm::vec3(0.0f),
+        m_z_arrow->vertices.push_back({axis_arrow_btm_circle_points[i],
+                                       axisColor,
+                                       axis_arrow_btm_circle_points[i] - axisEndPoint,
                                        glm::vec2(0.0f)});
     }
 
@@ -479,63 +496,6 @@ vector<Mesh *> Mesh::CreateAxisMesh()
         m_z_arrow->indices.push_back(i);
     }
     meshes.push_back(m_z_arrow);
-
-    // // 绘制箭头
-    // Mesh *m2 = new Mesh();
-    // // 圆锥底部的圆
-    // auto arrowRadius = 0.2f;
-    // std::vector<glm::vec3> circleVertices = drawConeArrow(10.0f, 1.0f, arrowRadius);
-    // for (size_t i = 0; i < circleVertices.size(); i += 1)
-    // {
-    //     m2->vertices.push_back({circleVertices[i],
-    //                             glm::vec3(1.0f),
-    //                             glm::vec3(0.0f),
-    //                             glm::vec2(0.0f)});
-    // }
-
-    // for (size_t i = 2; i < m2->vertices.size(); i += 1)
-    // {
-    //     m2->indices.push_back(0);
-    //     m2->indices.push_back(i - 1);
-    //     m2->indices.push_back(i);
-    // }
-    // meshes.push_back(m2);
-
-    // Mesh *m3 = new Mesh();
-    // m3->vertices = vector<Vertex>(m2->vertices);
-    // m3->indices = vector<unsigned int>(m2->indices);
-
-    // // 定义旋转角度（45度）和旋转轴（Z轴）
-    // float angle = glm::radians(-90.0f); // 将角度转换为弧度
-    // glm::vec3 axis(1.0f, 0.0f, 0.0f);   // 绕Z轴旋转
-
-    // // 创建旋转矩阵
-    // glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), angle, axis);
-
-    // for (auto &v : m3->vertices)
-    // {
-    //     auto point = rotationMatrix * glm::vec4(v.Position, 0.0);
-    //     v.Position = glm::vec3(point);
-    // }
-    // meshes.push_back(m3);
-
-    // Mesh *m4 = new Mesh();
-    // m4->vertices = vector<Vertex>(m2->vertices);
-    // m4->indices = vector<unsigned int>(m2->indices);
-
-    // // 定义旋转角度（45度）和旋转轴（Z轴）
-    // float angleY = glm::radians(90.0f); // 将角度转换为弧度
-    // glm::vec3 axisY(0.0f, 1.0f, 0.0f);  // 绕Z轴旋转
-
-    // // 创建旋转矩阵
-    // glm::mat4 rotationMatrixY = glm::rotate(glm::mat4(1.0f), angleY, axisY);
-
-    // for (auto &v : m4->vertices)
-    // {
-    //     auto point = rotationMatrixY * glm::vec4(v.Position, 0.0);
-    //     v.Position = glm::vec3(point);
-    // }
-    // meshes.push_back(m4);
 
     for (auto mesh : meshes)
     {
