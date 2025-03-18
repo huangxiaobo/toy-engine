@@ -7,8 +7,7 @@ Technique::Technique(string name, string vertex_shader, string fragment_shader) 
 {
     this->m_shader = new Shader(
         vertex_shader.c_str(),
-        fragment_shader.c_str()
-    );
+        fragment_shader.c_str());
 
     bool success = this->m_shader->Link();
     if (!success)
@@ -16,7 +15,7 @@ Technique::Technique(string name, string vertex_shader, string fragment_shader) 
         exit(-1);
     }
 
-    this->m_shader->Use();                                                  // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
+    this->m_shader->Use();                                                   // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
     m_uniform_projection = this->m_shader->GetUniformLocation("projection"); // 获取顶点着色器中顶点属性 aPos 的位置
     m_uniform_view = this->m_shader->GetUniformLocation("view");             // 获取顶点着色器中顶点属性 aPos 的位置
     m_uniform_model = this->m_shader->GetUniformLocation("model");           // 获取顶点着色器中顶点属性 aPos 的位置
@@ -115,9 +114,7 @@ void Technique::Disable()
 }
 
 // 获取一个默认的Technique
-Technique* Technique::GetDefaultTechnique()
+Technique *Technique::GetDefaultTechnique()
 {
-    return new Technique("default",
-        "./resource/shader/default.vert",
-        "./resource/shader/default.frag");
+    return new Technique("default", "./resource/shader/default.vert", "./resource/shader/default.frag");
 }
