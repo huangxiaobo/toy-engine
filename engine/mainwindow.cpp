@@ -1,4 +1,5 @@
 #include "globals.h"
+#include "config.h"
 #include "renderer.h"
 #include "model/model.h"
 
@@ -9,6 +10,8 @@
 #include <QVBoxLayout>
 #include <QTimer>
 #include <QObject>
+#include <QMenu>
+#include <QMenuBar>
 #include <QStatusBar>
 #include <QSplitter>
 #include <QTreeView>
@@ -19,11 +22,44 @@
 ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
 {
 
+    gConfig = Config::LoadFromXml("./resource/world.xml");
+
+    // 菜单
+    // 创建菜单栏
+    QMenuBar *menuBar = new QMenuBar(this);
+    menuBar->setNativeMenuBar(false);
+    setMenuBar(menuBar);
+
+    // 创建文件菜单
+    QMenu *fileMenu = menuBar->addMenu("&文件");
+
+    // 添加菜单项
+    QAction *openAction = fileMenu->addAction("&打开");
+    QAction *saveAction = fileMenu->addAction("&保存");
+    QAction *exitAction = fileMenu->addAction("&退出");
+
+    // 连接菜单项的点击事件到槽函数
+    connect(openAction, &QAction::triggered, this, &ToyEngineMainWindow::onMenuOpen);
+    connect(saveAction, &QAction::triggered, this, &ToyEngineMainWindow::onMenuSave);
+    connect(exitAction, &QAction::triggered, this, &ToyEngineMainWindow::close);
+
+    // 创建编辑菜单
+    QMenu *editMenu = menuBar->addMenu("&引擎");
+
+    // 添加菜单项
+    QAction *redoAction = editMenu->addAction("&关于");
+
+    // 连接菜单项的点击事件到槽函数
+    connect(redoAction, &QAction::triggered, this, &ToyEngineMainWindow::onMenuAbout);
+
     renderer_widget = new RendererWidget(this);
 
     // this->setCentralWidget(renderer_widget);
     // 设置窗口大小
-    this->setGeometry(0, 0, 800, 600);
+    this->setGeometry(
+        0, 0,
+        gConfig->Window.WindowWidth,
+        gConfig->Window.WindowHeight);
     // 创建定时器，定时刷新QOpenGLWidget
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, [this]
@@ -134,6 +170,21 @@ void ToyEngineMainWindow::onUpdatePropertyView(QString name)
     m_property_view->setModel(new QStandardItemModel(0, 1, this));
     QStandardItemModel *model = new QStandardItemModel(0, 1, this);
     QStandardItem *rootItem = model->invisibleRootItem();
+}
+
+void ToyEngineMainWindow::onMenuOpen()
+{
+    qDebug() << "打开菜单被点击";
+}
+
+void ToyEngineMainWindow::onMenuSave()
+{
+    qDebug() << "保存菜单被点击";
+}
+
+void ToyEngineMainWindow::onMenuAbout()
+{
+    qDebug() << "关于菜单被点击";
 }
 
 void ToyEngineMainWindow::onUpdateTreeListView()

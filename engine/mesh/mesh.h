@@ -55,9 +55,10 @@ public:
     static vector<Mesh *> CreateGroundMesh();
     static vector<Mesh *> CreatePointMesh(glm::vec3 pos, glm::vec3 color);
     static vector<Mesh *> CreateIcosphereMesh(int subdivisions = 0);
+    static vector<Mesh *> CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color);
     static vector<Mesh *> CreateAxisMesh();
 
-    Mesh * Clone();
+    Mesh *Clone();
 
 private:
     void SetUpMesh();

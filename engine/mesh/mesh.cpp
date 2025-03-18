@@ -567,8 +567,9 @@ void subdivide(vector<Vertex> &vertices, vector<unsigned int> &indices)
     indices = newIndices;
 }
 
-vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions)
+vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color)
 {
+
     vector<Mesh *> meshes;
 
     // 二十面体的顶点和索引数据
@@ -617,6 +618,7 @@ vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions)
     // 细分三角形
     for (int i = 0; i < subdivisions; ++i)
     {
+        std::cout << "xx    " << i << std::endl;
         subdivide(vertices, indices);
     }
 
@@ -627,4 +629,9 @@ vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions)
     meshes.push_back(m);
 
     return meshes;
+}
+
+vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions)
+{
+    return CreateIcosphereMesh(subdivisions, glm::vec3(0.0f), glm::vec3(1.0f));
 }

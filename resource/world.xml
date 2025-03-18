@@ -4,6 +4,12 @@
         <width>1296</width>
         <height>800</height>
     </window>
+    <clip>
+        <near>0.1</near>
+        <far>1000.0</far>
+        <fov>45.0f</fov>
+        <aspect></aspect>
+    </clip>
     <camera>
         <position>
             <x>20.0</x>
@@ -15,13 +21,18 @@
             <y>0.0</y>
             <z>0.0</z>
         </target>
+        <up>
+            <x>0.0</x>
+            <y>1.0</y>
+            <z>0.0</z>
+        </up>
     </camera>
     <lights>
         <light>
             <type>1</type>
             <position>
-                <x>5.0</x>
-                <y>3.0</y>
+                <x>10.0</x>
+                <y>10.0</y>
                 <z>0.0</z>
             </position>
             <color>
@@ -62,8 +73,8 @@
         <light>
             <type>1</type>
             <position>
-                <x>-5.0</x>
-                <y>3.0</y>
+                <x>-10.0</x>
+                <y>10.0</y>
                 <z>0.0</z>
                 <w>1.0</w>
             </position>
@@ -118,6 +129,7 @@
                 <y>2</y>
                 <z>2</z>
             </scale>
+            <rotation> 0 </rotation>
             <mesh name="bunny">
                 <file>./resource/model/bunny/bunny.obj</file>
             </mesh>
@@ -133,9 +145,9 @@
             <gammacorrection>false</gammacorrection>
             <material>
                 <ambient>
-                    <r>0.15</r>
-                    <g>0.15</g>
-                    <b>0.15</b>
+                    <r>0.25</r>
+                    <g>0.25</g>
+                    <b>0.25</b>
                 </ambient>
                 <diffuse>
                     <r>0.45</r>
@@ -147,7 +159,7 @@
                     <g>1.0</g>
                     <b>1.0</b>
                 </specular>
-                <shininess>6</shininess>
+                <shininess>15</shininess>
             </material>
         </model>
     </models>

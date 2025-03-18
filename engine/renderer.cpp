@@ -1,4 +1,6 @@
 #include <glad/gl.h>
+#include "globals.h"
+#include "config.h"
 #include "renderer.h"
 #include <iostream>
 #include <string>
@@ -137,102 +139,74 @@ void Renderer::init(int w, int h)
     model_ground->SetEffect(ground_effect);
     m_models.push_back(model_ground);
 
-    tinyxml2::XMLDocument doc;
-    auto err = doc.LoadFile("./resource/world.xml");
-    if (err != tinyxml2::XML_SUCCESS)
+    m_camera = new Camera(
+        gConfig->Camera.Position,
+        gConfig->Camera.Target,
+        gConfig->Camera.Up);
+
+    int i = 0;
+    for (auto lightConfig : gConfig->PointLights)
     {
-        std::cout << "Load failed" << std::endl;
-        exit(-1);
-    }
-    tinyxml2::XMLPrinter printer;
-    doc.Print(&printer);
-    std::cout << printer.CStr() << std::endl;
 
-    auto xml_camera = doc.FirstChildElement("world")->FirstChildElement("camera");
-    auto camera_position = xml_camera->FirstChildElement("position");
-    auto camera_target = xml_camera->FirstChildElement("target");
-    m_camera = new Camera(Utils::GetXYZ(camera_position), Utils::GetXYZ(camera_target), glm::vec3(0.0f, 1.0f, 0.0f));
+        auto light = new PointLight();
+        light->Color = lightConfig.Color;
+        light->Position = lightConfig.Position;
+        light->AmbientColor = lightConfig.AmbientColor;
+        light->DiffuseColor = lightConfig.DiffuseColor;
+        light->SpecularColor = lightConfig.SpecularColor;
+        light->Attenuation.Constant = lightConfig.Attenuation.Constant;
+        light->Attenuation.Linear = lightConfig.Attenuation.Linear;
+        light->Attenuation.Exp = lightConfig.Attenuation.Exp;
+        m_lights.push_back(light);
 
-    auto xml_lights = doc.FirstChildElement("world")->FirstChildElement("lights");
-    auto xml_light_index = 0;
-    for (auto xml_light = xml_lights->FirstChildElement("light"); xml_light != nullptr; xml_light = xml_light->NextSiblingElement())
-    {
-        auto light_type = xml_light->FirstChildElement("type")->IntText();
-        std::cout << "light type: " << light_type << std::endl;
-        if (light_type == LightTypePoint)
-        {
-            auto light = new PointLight();
-            light->Color = Utils::GetRGB(xml_light->FirstChildElement("color"));
-            light->Position = Utils::GetXYZ(xml_light->FirstChildElement("position"));
-            light->AmbientColor = Utils::GetRGB(xml_light->FirstChildElement("ambient")->FirstChildElement("color"));
-            light->DiffuseColor = Utils::GetRGB(xml_light->FirstChildElement("diffuse")->FirstChildElement("color"));
-            light->SpecularColor = Utils::GetRGB(xml_light->FirstChildElement("specular")->FirstChildElement("color"));
-            light->Attenuation.Constant = xml_light->FirstChildElement("attenuation")->FirstChildElement("constant")->FloatText();
-            light->Attenuation.Linear = xml_light->FirstChildElement("attenuation")->FirstChildElement("linear")->FloatText();
-            light->Attenuation.Exp = xml_light->FirstChildElement("attenuation")->FirstChildElement("exp")->FloatText();
-            m_lights.push_back(light);
+        // 创建光源模型
+        auto model = new ModelPoint(std::format("light-{}", i++));
+        // auto mesh = Mesh::CreatePointMesh(light->Position, light->Color);
+        auto mesh = Mesh::CreateIcosphereMesh(5, light->Position, light->Color);
+        model->SetMesh(mesh);
+        model->SetScale(glm::vec3(0.5f));
 
-            // 创建光源模型
-            auto model = new ModelPoint(std::format("light-{}", xml_light_index++));
-            auto mesh = Mesh::CreatePointMesh(light->Position, light->Color);
-            model->SetMesh(mesh);
+        Technique *effect = Technique::GetDefaultTechnique();
 
-            Technique *effect = Technique::GetDefaultTechnique();
+        model->SetEffect(effect);
 
-            model->SetEffect(effect);
-
-            m_models.push_back(model);
-            light->m_model = model;
-            std::cout << "Setup light finish" << std::endl;
-        }
+        m_models.push_back(model);
+        light->m_model = model;
+        std::cout << "Setup light finish" << std::endl;
     }
     std::cout << "Setup lights finish" << std::endl;
 
-    auto models = doc.FirstChildElement("world")->FirstChildElement("models");
-    for (auto model = models->FirstChildElement("model"); model != nullptr; model = model->NextSiblingElement())
+    for (auto modelConfig : gConfig->Models)
     {
-        auto model_name = model->FirstChildElement("name")->GetText();
-
-        auto mesh = model->FirstChildElement("mesh");
-        auto mesh_name = mesh->Attribute("name");
-
-        auto mesh_file = mesh->FirstChildElement("file")->GetText();
-        if (mesh_file == nullptr || std::string(mesh_file).empty())
-        {
-            // 处理空元素的情况，例如设置一个默认值
-            mesh_file = "";
-        }
-
-        std::cout << "model name : " << model_name << std::endl;
-        std::cout << "mesh name  : " << mesh_name << std::endl;
-        std::cout << "mesh file  : " << mesh_file << std::endl;
-        if (strcmp(mesh_file, "") == 0)
+        std::cout << "model name : " << modelConfig.Name << std::endl;
+        std::cout << "mesh name  : " << modelConfig.Mesh.Name << std::endl;
+        std::cout << "mesh file  : " << modelConfig.Mesh.File << std::endl;
+        if (modelConfig.Mesh.File.length() == 0)
         {
             continue;
         }
-        auto model_obj = new Model(model_name);
-        model_obj->LoadModel(mesh_file);
+        auto model_obj = new Model(modelConfig.Name);
+        model_obj->LoadModel(modelConfig.Mesh.File);
 
-        auto xml_materials = model->FirstChildElement("material");
         Material *material = new Material();
-        material->AmbientColor = Utils::GetRGB(xml_materials->FirstChildElement("ambient"));
-        material->DiffuseColor = Utils::GetRGB(xml_materials->FirstChildElement("diffuse"));
-        material->SpecularColor = Utils::GetRGB(xml_materials->FirstChildElement("specular"));
-        material->Shininess = xml_materials->FirstChildElement("shininess")->FloatText();
+        material->AmbientColor = modelConfig.Material.AmbientColor;
+        material->DiffuseColor = modelConfig.Material.DiffuseColor;
+        material->SpecularColor = modelConfig.Material.SpecularColor;
+        material->Shininess = modelConfig.Material.Shininess;
         model_obj->SetMaterial(material);
 
-        auto xml_shader = model->FirstChildElement("shader");
-        auto shader_vert_file = xml_shader->FirstChildElement("vert")->GetText();
-        auto shader_frag_file = xml_shader->FirstChildElement("frag")->GetText();
-
-        TechniqueLight *effect = new TechniqueLight(model_name, shader_vert_file, shader_frag_file);
+        TechniqueLight *effect = new TechniqueLight(
+            "default",
+            modelConfig.ShaderVertFile,
+            modelConfig.ShaderFragFile);
         model_obj->SetEffect(effect);
         effect->SetLights(m_lights);
 
-        m_models.push_back(model_obj);
+        model_obj->SetScale(modelConfig.Scale);
+        model_obj->SetTranslate(modelConfig.Position);
+        model_obj->SetRotate(modelConfig.Rotation);
 
-        auto xml_scale = model->FirstChildElement("scale");
-        model_obj->SetScale(Utils::GetXYZ(xml_scale));
+        m_models.push_back(model_obj);
     }
     std::cout << "Setup world finish" << std::endl;
 }
@@ -300,9 +274,9 @@ float Renderer::GetFPS()
 
 void Renderer::calculateProjectMatrix(int w, int h)
 {
-    float fov = 45.0f;                                                                           // 视野角度
+    float fov = gConfig->Clip.ClipFov;                                                           // 视野角度
     float aspectRatio = (float)w / (float)(1 * h);                                               // 宽高比
-    float nearPlane = 0.1f;                                                                      // 近平面距离
-    float farPlane = 100.0f;                                                                     // 远平面距离
+    float nearPlane = gConfig->Clip.ClipNear;                                                    // 近平面距离
+    float farPlane = gConfig->Clip.ClipFar;                                                      // 远平面距离
     m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
 }

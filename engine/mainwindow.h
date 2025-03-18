@@ -28,6 +28,10 @@ public slots:
     void onTreeListMenuItemClicked();
     void onUpdatePropertyView(QString name);
 
+    void onMenuOpen();
+    void onMenuSave();
+    void onMenuAbout();
+
 private:
     RendererWidget *renderer_widget;
 

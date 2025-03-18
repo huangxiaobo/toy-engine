@@ -250,8 +250,12 @@ void Model::SetRotate(glm::f32 rotation, glm::vec3 axis)
 
 void Model::SetTranslate(glm::vec3 position)
 {
+    // 先将模型平移到原点
+    m_matrix = glm::translate(m_matrix, -m_position);
+    // 更新位置
     m_position = position;
-    m_matrix = glm::translate(glm::mat4(1.0f), position);
+    // 再将模型平移到新的位置
+    m_matrix = glm::translate(m_matrix, m_position);
 }
 
 void Model::SetMaterial(Material *material)
