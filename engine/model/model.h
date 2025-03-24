@@ -23,6 +23,7 @@ class Material;
 class Model
 {
 private:
+    string m_uuid;
     string m_name;
     vector<Mesh *> m_meshes;
     Material *m_material;
@@ -54,7 +55,9 @@ public:
     void SetMaterial(Material *material);
     void SetEffect(Technique *effect);
     glm::vec3 GetPosition() const;
+    glm::vec3 GetScale() const;
     const string GetName() const { return m_name; }
+    const string GetUUID() const { return m_uuid; }
     virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *> &lights);
 };
 

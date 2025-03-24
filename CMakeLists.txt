@@ -27,6 +27,7 @@ set(SOURCE_FILES
 # 添加glad
 add_subdirectory(3rdparty/glad)
 add_subdirectory(3rdparty/tinyxml2)
+add_subdirectory(3rdparty/qtpropertybrowser)
 
 # 添加头文件
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/engine)
@@ -57,5 +58,6 @@ target_link_libraries(toy-engine PRIVATE
     glad
     # glfw
     tinyxml2
+    qtpropertybrowser
     assimp::assimp
 )

@@ -133,11 +133,10 @@ void Renderer::init(int w, int h)
                                              "./resource/shader/light.vert",
                                              "./resource/shader/light.frag");
 
-    auto model_ground = new ModelGround();
-    model_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
-    model_ground->SetMesh(ground_mesh);
-    model_ground->SetEffect(ground_effect);
-    m_models.push_back(model_ground);
+    m_ground = new ModelGround();
+    m_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
+    m_ground->SetMesh(ground_mesh);
+    m_ground->SetEffect(ground_effect);
 
     m_camera = new Camera(
         gConfig->Camera.Position,
@@ -148,7 +147,7 @@ void Renderer::init(int w, int h)
     for (auto lightConfig : gConfig->PointLights)
     {
 
-        auto light = new PointLight();
+        auto light = new PointLight(std::format("light-{}", i+1));
         light->Color = lightConfig.Color;
         light->Position = lightConfig.Position;
         light->AmbientColor = lightConfig.AmbientColor;
@@ -170,7 +169,7 @@ void Renderer::init(int w, int h)
 
         model->SetEffect(effect);
 
-        m_models.push_back(model);
+        // m_models.push_back(model);
         light->m_model = model;
         std::cout << "Setup light finish" << std::endl;
     }
@@ -224,6 +223,13 @@ void Renderer::draw(long long elapsed)
 
     m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights); // 【重点】 绘制坐标轴
 
+    m_ground->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+
+    for (auto light : m_lights)
+    {
+        light->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    }
+
     for (auto model : m_models)
     {
         model->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
@@ -260,6 +266,17 @@ const Model *Renderer::GetModel(string name)
     for (auto model : m_models)
     {
         if (model->GetName() == name)
+        {
+            return model;
+        }
+    }
+    return nullptr;
+}
+
+const Model *Renderer::GetModelByUUID(string uuid)
+{ for (auto model : m_models)
+    {
+        if (model->GetUUID() == uuid)
         {
             return model;
         }

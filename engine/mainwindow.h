@@ -14,6 +14,8 @@
 class RendererWidget;
 class TreeListView;
 class PropertyView;
+class QtTreePropertyBrowser;
+
 class ToyEngineMainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -43,6 +45,7 @@ private:
     QStandardItemModel *m_tree_model;
     // 右侧属性组件
     QTreeView *m_property_view;
+    QtTreePropertyBrowser* m_property_browser;;
 };
 
 #endif

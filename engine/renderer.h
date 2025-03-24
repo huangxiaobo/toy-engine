@@ -31,6 +31,7 @@ public:
     std::vector<Model *> GetModels() { return m_models; }
 
     const Model *GetModel(string name);
+    const Model* GetModelByUUID(string uuid);
 
     std::vector<Light *> GetLights() { return m_lights; }
     float GetFPS();
@@ -53,6 +54,7 @@ private:
     FPSCounter *m_fps_counter;
     Axis *m_axis;
     Camera *m_camera;
+    Model* m_ground;
     vector<Model *> m_models;
     vector<Light *> m_lights;
 

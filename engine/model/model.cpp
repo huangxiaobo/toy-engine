@@ -21,6 +21,7 @@
 #include <string>
 Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f)
 {
+    m_uuid = Utils::GenerateUUID();
     m_matrix = glm::mat4(1.0f);
 }
 
@@ -271,6 +272,11 @@ void Model::SetEffect(Technique *effect)
 glm::vec3 Model::GetPosition() const
 {
     return m_position;
+}
+
+glm::vec3 Model::GetScale() const
+{
+    return m_scale;
 }
 
 void Model::Draw(long long elapsed,

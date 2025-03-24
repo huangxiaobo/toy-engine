@@ -621,6 +621,11 @@ vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm
         std::cout << "xx    " << i << std::endl;
         subdivide(vertices, indices);
     }
+    for (int i = 0; i < vertices.size(); ++i)
+    {
+        vertices[i].Color = color;
+        vertices[i].Normal = glm::normalize(vertices[i].Position);
+    }
 
     // 创建 Mesh 对象
     Mesh *m = new Mesh(vertices, indices);
