@@ -261,7 +261,7 @@ void Renderer::update(long long elapsed)
     }
 }
 
-const Model *Renderer::GetModel(string name)
+Model *Renderer::GetModel(string name)
 {
     for (auto model : m_models)
     {
@@ -273,7 +273,7 @@ const Model *Renderer::GetModel(string name)
     return nullptr;
 }
 
-const Model *Renderer::GetModelByUUID(string uuid)
+Model *Renderer::GetModelByUUID(string uuid)
 { for (auto model : m_models)
     {
         if (model->GetUUID() == uuid)

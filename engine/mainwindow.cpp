@@ -103,17 +103,6 @@ ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent)
     m_property_browser = new QtTreePropertyBrowser(m_property_view);
     m_property_browser->setMaximumWidth(200);
     m_property_browser->setMinimumWidth(150);
-    // QtIntPropertyManager *intManager = new QtIntPropertyManager(m_property_view);
-    // QtStringPropertyManager *stringManager = new QtStringPropertyManager(m_property_view);
-    // QtVariantPropertyManager *variantManager = new QtVariantPropertyManager(m_property_view);
-
-    // QtProperty *intProp = intManager->addProperty("Integer Property");
-    // QtProperty *stringProp = stringManager->addProperty("String Property");
-    // QtProperty *variantProp = variantManager->addProperty(1, "Variant Property");
-
-    // m_property_browser->addProperty(intProp);
-    // m_property_browser->addProperty(stringProp);
-    // m_property_browser->addProperty(variantProp);
 
     // 创建一个分割器，将主窗口分为左右两部分
     QSplitter *splitter = new QSplitter(Qt::Horizontal, this);
@@ -214,42 +203,102 @@ void ToyEngineMainWindow::onUpdatePropertyView(QString name)
         return;
     }
 
-    QtVariantPropertyManager *m_pVarManager = new QtVariantPropertyManager(m_property_browser);
+    m_pVarMgrEdit = new QtVariantPropertyManager(m_property_view);     // 关联factory，属性可以修改
+    m_pVarMgrOnlyRead = new QtVariantPropertyManager(m_property_view); // 这个管理器不关联factory，属性不可修改
+    m_pVarFactory = new QtVariantEditorFactory(m_property_view);
+    connect(m_pVarMgrEdit, &QtVariantPropertyManager::valueChanged, this, &ToyEngineMainWindow::onPropertyChanged); // 绑定信号槽，当值改变的时候会发送信号
 
-    // group 1 ----------------------------------------------------------------------------------------------------------
-    QtProperty *groupPosition = m_pVarManager->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("位置"));
+    // 位置
+    QtProperty *groupPosition = m_pVarMgrEdit->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("位置"));
 
-    QtVariantProperty *item_x = m_pVarManager->addProperty(QVariant::Double, QStringLiteral("x: "));
+    QtVariantProperty *item_x = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("x"));
     item_x->setValue(model->GetPosition().x);
     groupPosition->addSubProperty(item_x);
 
-    QtVariantProperty *item_y = m_pVarManager->addProperty(QVariant::Double, QStringLiteral("y: "));
+    QtVariantProperty *item_y = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("y"));
     item_y->setValue(model->GetPosition().y);
     groupPosition->addSubProperty(item_y);
 
-    QtVariantProperty *item_z = m_pVarManager->addProperty(QVariant::Double, QStringLiteral("z: "));
+    QtVariantProperty *item_z = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("z"));
     item_z->setValue(model->GetPosition().z);
     groupPosition->addSubProperty(item_z);
 
     m_property_browser->addProperty(groupPosition);
 
     // 缩放
-    // group 1 ----------------------------------------------------------------------------------------------------------
-    QtProperty *groupScale = m_pVarManager->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("缩放"));
+    QtProperty *groupScale = m_pVarMgrOnlyRead->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("缩放"));
 
-    QtVariantProperty *item_scale_x = m_pVarManager->addProperty(QVariant::Double, QStringLiteral("x: "));
+    QtVariantProperty *item_scale_x = m_pVarMgrOnlyRead->addProperty(QVariant::Double, QStringLiteral("x"));
     item_scale_x->setValue(model->GetScale().x);
     groupScale->addSubProperty(item_scale_x);
 
-    QtVariantProperty *item_scale_y = m_pVarManager->addProperty(QVariant::Double, QStringLiteral("y: "));
+    QtVariantProperty *item_scale_y = m_pVarMgrOnlyRead->addProperty(QVariant::Double, QStringLiteral("y"));
     item_scale_y->setValue(model->GetScale().y);
     groupScale->addSubProperty(item_scale_y);
 
-    QtVariantProperty *item_scale_z = m_pVarManager->addProperty(QVariant::Double, QStringLiteral("z: "));
+    QtVariantProperty *item_scale_z = m_pVarMgrOnlyRead->addProperty(QVariant::Double, QStringLiteral("z"));
     item_scale_z->setValue(model->GetScale().z);
     groupScale->addSubProperty(item_scale_z);
 
     m_property_browser->addProperty(groupScale);
+
+    // 旋转
+    QtProperty *groupRotation = m_pVarMgrEdit->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("旋转"));
+
+    QtVariantProperty *item_rotation = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("rotation"));
+    item_rotation->setValue(model->GetRotation());
+    groupRotation->addSubProperty(item_rotation);
+
+    m_property_browser->addProperty(groupRotation);
+
+    m_property_browser->setFactoryForManager(m_pVarMgrEdit, m_pVarFactory); // 将一个工厂与manger关联起来，即可修改内容。
+}
+
+void ToyEngineMainWindow::AddProperty(PropertyType type, QString propertyName, bool bEditFlag, QString params)
+{
+}
+
+void ToyEngineMainWindow::onPropertyChanged(QtProperty *property, const QVariant &value)
+{
+    // 获取当前选中的树形视图项
+    QModelIndex currentIndex = m_tree_view->currentIndex();
+    if (!currentIndex.isValid())
+        return;
+
+    // 获取选中项的类型和 UUID
+    QString itemType = currentIndex.data(Qt::UserRole + TreeItemTypeRoleOffset).toString();
+    QString itemUUID = currentIndex.data(Qt::UserRole + TreeItemUUIDRoleOffset).toString();
+
+    if (itemType == QString::fromStdString(TreeItemModel))
+    {
+        // 找到对应的模型
+        auto model = gRenderer->GetModelByUUID(itemUUID.toStdString());
+        if (!model)
+            return;
+
+        // 根据属性名称更新模型状态
+        auto position = model->GetPosition();
+        if (property->propertyName() == "x")
+        {
+            position.x = value.toDouble();
+            model->SetPosition(position);
+        }
+        else if (property->propertyName() == "y")
+        {
+            position.y = value.toDouble();
+            model->SetPosition(position);
+        }
+        else if (property->propertyName() == "z")
+        {
+            position.z = value.toDouble();
+            model->SetPosition(position);
+        }
+        else if (property->propertyName() == "rotation")
+        {
+            // 处理缩放逻辑（类似位置逻辑）
+            model->SetRotate(value.toFloat());
+        }
+    }
 }
 
 void ToyEngineMainWindow::onMenuOpen()

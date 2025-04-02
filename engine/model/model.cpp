@@ -259,6 +259,16 @@ void Model::SetTranslate(glm::vec3 position)
     m_matrix = glm::translate(m_matrix, m_position);
 }
 
+void Model::SetPosition(glm::vec3 position)
+{
+    // 先将模型平移到原点
+    m_matrix = glm::translate(m_matrix, -m_position);
+    // 更新位置
+    m_position = position;
+    // 再将模型平移到新的位置
+    m_matrix = glm::translate(m_matrix, m_position);
+}
+
 void Model::SetMaterial(Material *material)
 {
     this->m_material = material;
@@ -277,6 +287,11 @@ glm::vec3 Model::GetPosition() const
 glm::vec3 Model::GetScale() const
 {
     return m_scale;
+}
+
+glm::f32 Model::GetRotation() const
+{
+    return m_rotation;
 }
 
 void Model::Draw(long long elapsed,

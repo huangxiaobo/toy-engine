@@ -15,6 +15,13 @@ class RendererWidget;
 class TreeListView;
 class PropertyView;
 class QtTreePropertyBrowser;
+class QtVariantPropertyManager;
+class QtVariantEditorFactory;
+class QtProperty;
+class QVariant;
+
+enum PropertyType{BOOL_TYPE, STRING_TYPE, INT_TYPE, DOUBLE_TYPE, ENUM_TYPE};
+
 
 class ToyEngineMainWindow : public QMainWindow
 {
@@ -29,6 +36,10 @@ public slots:
     void onUpdateTreeListView();
     void onTreeListMenuItemClicked();
     void onUpdatePropertyView(QString name);
+
+    void AddProperty(PropertyType type, QString propertyName, bool bEditFlag, QString params);
+
+    void onPropertyChanged(QtProperty *property, const QVariant &value);
 
     void onMenuOpen();
     void onMenuSave();
@@ -46,6 +57,9 @@ private:
     // 右侧属性组件
     QTreeView *m_property_view;
     QtTreePropertyBrowser* m_property_browser;;
+    QtVariantPropertyManager *m_pVarMgrEdit;
+    QtVariantPropertyManager *m_pVarMgrOnlyRead;
+    QtVariantEditorFactory *m_pVarFactory;
 };
 
 #endif

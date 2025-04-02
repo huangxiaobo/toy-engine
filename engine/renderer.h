@@ -30,8 +30,8 @@ public:
     long long GetModelCount() { return m_models.size(); }
     std::vector<Model *> GetModels() { return m_models; }
 
-    const Model *GetModel(string name);
-    const Model* GetModelByUUID(string uuid);
+    Model *GetModel(string name);
+    Model* GetModelByUUID(string uuid);
 
     std::vector<Light *> GetLights() { return m_lights; }
     float GetFPS();
