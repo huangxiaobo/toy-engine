@@ -21,6 +21,7 @@
 #include <string>
 Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f)
 {
+    m_uuid = Utils::GenerateUUID();
     m_matrix = glm::mat4(1.0f);
 }
 
@@ -30,16 +31,6 @@ Model::~Model()
     {
         delete m_meshes[0];
         m_meshes.erase(m_meshes.begin());
-    }
-    if (m_effect)
-    {
-        delete m_effect;
-        m_effect = nullptr;
-    }
-    if (m_material)
-    {
-        delete m_material;
-        m_material = nullptr;
     }
 }
 
@@ -258,19 +249,44 @@ void Model::SetTranslate(glm::vec3 position)
     m_matrix = glm::translate(m_matrix, m_position);
 }
 
-void Model::SetMaterial(Material *material)
+void Model::SetPosition(glm::vec3 position)
 {
-    this->m_material = material;
+    // 先将模型平移到原点
+    m_matrix = glm::translate(m_matrix, -m_position);
+    // 更新位置
+    m_position = position;
+    // 再将模型平移到新的位置
+    m_matrix = glm::translate(m_matrix, m_position);
 }
 
-void Model::SetEffect(Technique *effect)
+// void Model::SetMaterial(Material *material)
+// {
+//     this->m_material = material;
+// }
+
+// void Model::SetEffect(Technique *effect)
+// {
+//     this->m_effect = effect;
+// }
+
+vector<Mesh *> Model::GetMeshes() const
 {
-    this->m_effect = effect;
+   return m_meshes;
 }
 
 glm::vec3 Model::GetPosition() const
 {
     return m_position;
+}
+
+glm::vec3 Model::GetScale() const
+{
+    return m_scale;
+}
+
+glm::f32 Model::GetRotation() const
+{
+    return m_rotation;
 }
 
 void Model::Draw(long long elapsed,
@@ -287,19 +303,19 @@ void Model::Draw(long long elapsed,
     model_local = model * model_local;
     glm::mat4 mvp = projection * view * model_local;
 
-    this->m_effect->Enable();
-    this->m_effect->SetProjectionMatrix(projection);
-    this->m_effect->SetViewMatrix(view);
-    this->m_effect->SetModelMatrix(model_local);
-    this->m_effect->SetWVPMatrix(mvp);
-    this->m_effect->SetCamera(camera);
+    // this->m_effect->Enable();
+    // this->m_effect->SetProjectionMatrix(projection);
+    // this->m_effect->SetViewMatrix(view);
+    // this->m_effect->SetModelMatrix(model_local);
+    // this->m_effect->SetWVPMatrix(mvp);
+    // this->m_effect->SetCamera(camera);
 
-    this->m_effect->SetLights(lights);
-    this->m_effect->SetMaterial(this->m_material);
-    this->m_effect->GetShader()->BindFragDataLocation();
+    // this->m_effect->SetLights(lights);
+    // this->m_effect->SetMaterial(this->m_material);
+    // this->m_effect->GetShader()->BindFragDataLocation();
 
     for (int i = 0; i < this->m_meshes.size(); i++)
     {
-        this->m_meshes[i]->Draw(elapsed);
+        this->m_meshes[i]->Draw(elapsed, projection, view, model_local, camera, lights);
     }
 }

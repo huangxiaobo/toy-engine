@@ -26,14 +26,26 @@ public:
     void update(long long elapsed);
 
 public:
-    long long GetFrameCount() { return m_frame_count; }
+
+
+    // 获取模型数量
     long long GetModelCount() { return m_models.size(); }
+    // 获取全部模型
     std::vector<Model *> GetModels() { return m_models; }
+    // 通过名字获取模型
+    Model* GetModel(string name);
+    // 通过uuid获取模型
+    Model* GetModelByUUID(string uuid);
 
-    const Model *GetModel(string name);
-
+    // 获取全部灯光
     std::vector<Light *> GetLights() { return m_lights; }
+    // 通过uuid获取灯光
+    Light* GetLightByUUID(std::string uuid);
+
+    // 获取帧率
     float GetFPS();
+
+    // 获取相机
     Camera *GetCamera() { return m_camera; }
 
 private:
@@ -53,10 +65,9 @@ private:
     FPSCounter *m_fps_counter;
     Axis *m_axis;
     Camera *m_camera;
+    Model* m_ground;
     vector<Model *> m_models;
     vector<Light *> m_lights;
-
-    long long m_frame_count;
 };
 
 #endif

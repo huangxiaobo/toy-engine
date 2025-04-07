@@ -8,6 +8,9 @@
 
 #include <cmath>
 
+#include "../utils/utils.h"
+#include "../technique/technique.h"
+
 Mesh::Mesh() : DrawMode(GL_TRIANGLES)
 {
 }
@@ -22,6 +25,11 @@ Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices)
 
 Mesh::~Mesh()
 {
+    if (m_effect)
+    {
+        delete m_effect;
+        m_effect = nullptr;
+    }
 }
 
 void Mesh::SetUpMesh()
@@ -110,9 +118,28 @@ void Mesh::SetDrawMode(GLuint mode)
     DrawMode = mode;
 }
 
-void Mesh::Draw(long long elapsed)
+void Mesh::SetEffect(Technique *effect)
 {
-    glLineWidth(5.0f);
+    m_effect = effect;
+}
+
+Technique *Mesh::GetEffect() const
+{
+    return m_effect;
+}
+
+void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *> &lights)
+{
+    this->m_effect->Enable();
+    this->m_effect->SetProjectionMatrix(projection);
+    this->m_effect->SetViewMatrix(view);
+    this->m_effect->SetModelMatrix(model);
+    // this->m_effect->SetWVPMatrix(mvp);
+    this->m_effect->SetCamera(camera);
+
+    this->m_effect->SetLights(lights);
+
+    // glLineWidth(5.0f);
     /* 重新绑定 VAO */
     glBindVertexArray(VAO);
     // 绘制模式(DrawMode): GL_TRIANGLES, GL_LINES, GL_POINTS
@@ -618,8 +645,12 @@ vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm
     // 细分三角形
     for (int i = 0; i < subdivisions; ++i)
     {
-        std::cout << "xx    " << i << std::endl;
         subdivide(vertices, indices);
+    }
+    for (int i = 0; i < vertices.size(); ++i)
+    {
+        vertices[i].Color = color;
+        vertices[i].Normal = glm::normalize(vertices[i].Position);
     }
 
     // 创建 Mesh 对象

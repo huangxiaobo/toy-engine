@@ -9,6 +9,9 @@
 
 using namespace std;
 
+class Light;
+class Technique;
+
 class Vertex
 {
 public:
@@ -49,7 +52,10 @@ public:
 
     void SetDrawMode(GLuint mode);
 
-    virtual void Draw(long long elapsed);
+    void SetEffect(Technique *effect);
+    Technique* GetEffect() const;
+
+    virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *> &lights);
 
     static vector<Mesh *> CreatePlaneMesh();
     static vector<Mesh *> CreateGroundMesh();
@@ -73,6 +79,8 @@ public:
     GLuint EBO; // 创建 EBO 元素缓冲对象
 
     GLuint DrawMode; // 绘制模式
+
+    Technique *m_effect;
 };
 
 #endif

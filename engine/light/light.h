@@ -3,6 +3,7 @@
 
 #include <glm/glm.hpp>
 #include <memory>
+#include <string>
 
 class Model;
 
@@ -14,18 +15,30 @@ enum LightType
     LightTypeSpot       // 聚光灯
 };
 
+const std::string LightTypeNameNone = "未定义";
+const std::string LightTypeNamePoint = "点光源";
+const std::string LightTypeNameDirection = "方向光源";
+const std::string LightTypeNameSpot = "聚光灯";
+
 class Light
 {
 public:
     Light();
 
-    Light(const LightType &light_type) : m_light_type(light_type) {}
+    Light(std::string name, const LightType &light_type);
     virtual const LightType &GetLightType() const { return m_light_type; };
+    virtual const std::string GetLightTypeName() const;
 
+    std::string GetName() const;
+    std::string GetUUID() const;
+
+    virtual Model *GetModel() = 0;
     virtual ~Light() {}
 
 private:
     LightType m_light_type;
+    std::string m_name;
+    std::string m_uuid;
 };
 
 class DirectionLight : public Light
@@ -42,7 +55,6 @@ public:
     float DiffuseIntensity;
     float SpecularIntensity;
 };
-
 
 // Atten参数参考表
 // Distance	Constant    Linear    Quadratic
@@ -70,11 +82,13 @@ public:
         float Exp;
     } Attenuation;
 
-    Model* m_model;
+    Model *m_model;
 
 public:
-    PointLight();
+    PointLight(std::string name);
     ~PointLight();
+
+    Model *GetModel() override { return m_model; }
 };
 
 #endif // __LIGHT_H__
