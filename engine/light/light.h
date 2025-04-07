@@ -30,6 +30,7 @@ public:
     virtual const std::string GetLightTypeName() const;
 
     std::string GetName() const;
+    std::string GetUUID() const;
 
     virtual Model *GetModel() = 0;
     virtual ~Light() {}
@@ -37,6 +38,7 @@ public:
 private:
     LightType m_light_type;
     std::string m_name;
+    std::string m_uuid;
 };
 
 class DirectionLight : public Light

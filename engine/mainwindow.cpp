@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QObject>
 #include <QMenu>
+#include <QColor>
 #include <QMenuBar>
 #include <QStatusBar>
 #include <QSplitter>
@@ -185,73 +186,25 @@ void ToyEngineMainWindow::onUpdatePropertyView(QString name)
     // QStandardItemModel *model = new QStandardItemModel(0, 1, this);
     // QStandardItem *rootItem = model->invisibleRootItem();
 
+    m_property_label_map.clear();
     for (auto m : m_property_browser->properties())
     {
         m_property_browser->removeProperty(m);
     }
 
-    auto ItemType = m_tree_view->currentIndex().data(Qt::UserRole + TreeItemTypeRoleOffset).toString().toStdString();
-    if (ItemType != TreeItemModel)
+    auto item_type = m_tree_view->currentIndex().data(Qt::UserRole + TreeItemTypeRoleOffset).toString().toStdString();
+    auto item_uuid = m_tree_view->currentIndex().data(Qt::UserRole + TreeItemUUIDRoleOffset).toString().toStdString();
+
+    if (item_type == TreeItemModel)
     {
+        InitPropertyViewOfModel(item_uuid);
         return;
     }
-    auto model_uuid = m_tree_view->currentIndex().data(Qt::UserRole + TreeItemUUIDRoleOffset).toString().toStdString();
-    auto model = gRenderer->GetModelByUUID(model_uuid);
-
-    if (model == nullptr)
+    if (item_type == TreeItemLight)
     {
+        InitPropertyViewOfLight(item_uuid);
         return;
     }
-
-    m_pVarMgrEdit = new QtVariantPropertyManager(m_property_view);     // 关联factory，属性可以修改
-    m_pVarMgrOnlyRead = new QtVariantPropertyManager(m_property_view); // 这个管理器不关联factory，属性不可修改
-    m_pVarFactory = new QtVariantEditorFactory(m_property_view);
-    connect(m_pVarMgrEdit, &QtVariantPropertyManager::valueChanged, this, &ToyEngineMainWindow::onPropertyChanged); // 绑定信号槽，当值改变的时候会发送信号
-
-    // 位置
-    QtProperty *groupPosition = m_pVarMgrEdit->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("位置"));
-
-    QtVariantProperty *item_x = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("x"));
-    item_x->setValue(model->GetPosition().x);
-    groupPosition->addSubProperty(item_x);
-
-    QtVariantProperty *item_y = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("y"));
-    item_y->setValue(model->GetPosition().y);
-    groupPosition->addSubProperty(item_y);
-
-    QtVariantProperty *item_z = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("z"));
-    item_z->setValue(model->GetPosition().z);
-    groupPosition->addSubProperty(item_z);
-
-    m_property_browser->addProperty(groupPosition);
-
-    // 缩放
-    QtProperty *groupScale = m_pVarMgrOnlyRead->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("缩放"));
-
-    QtVariantProperty *item_scale_x = m_pVarMgrOnlyRead->addProperty(QVariant::Double, QStringLiteral("x"));
-    item_scale_x->setValue(model->GetScale().x);
-    groupScale->addSubProperty(item_scale_x);
-
-    QtVariantProperty *item_scale_y = m_pVarMgrOnlyRead->addProperty(QVariant::Double, QStringLiteral("y"));
-    item_scale_y->setValue(model->GetScale().y);
-    groupScale->addSubProperty(item_scale_y);
-
-    QtVariantProperty *item_scale_z = m_pVarMgrOnlyRead->addProperty(QVariant::Double, QStringLiteral("z"));
-    item_scale_z->setValue(model->GetScale().z);
-    groupScale->addSubProperty(item_scale_z);
-
-    m_property_browser->addProperty(groupScale);
-
-    // 旋转
-    QtProperty *groupRotation = m_pVarMgrEdit->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("旋转"));
-
-    QtVariantProperty *item_rotation = m_pVarMgrEdit->addProperty(QVariant::Double, QStringLiteral("rotation"));
-    item_rotation->setValue(model->GetRotation());
-    groupRotation->addSubProperty(item_rotation);
-
-    m_property_browser->addProperty(groupRotation);
-
-    m_property_browser->setFactoryForManager(m_pVarMgrEdit, m_pVarFactory); // 将一个工厂与manger关联起来，即可修改内容。
 }
 
 void ToyEngineMainWindow::AddProperty(PropertyType type, QString propertyName, bool bEditFlag, QString params)
@@ -264,6 +217,20 @@ void ToyEngineMainWindow::onPropertyChanged(QtProperty *property, const QVariant
     QModelIndex currentIndex = m_tree_view->currentIndex();
     if (!currentIndex.isValid())
         return;
+
+    PropertyLabel label = PROPERTY_LABEL_NONE;
+    for (auto it = m_property_label_map.begin(); it != m_property_label_map.end(); ++it)
+    {
+        if (it->first == property)
+        {
+            label = it->second;
+            break;
+        }
+    }
+    if (label == PROPERTY_LABEL_NONE)
+    {
+        return;
+    }
 
     // 获取选中项的类型和 UUID
     QString itemType = currentIndex.data(Qt::UserRole + TreeItemTypeRoleOffset).toString();
@@ -278,25 +245,79 @@ void ToyEngineMainWindow::onPropertyChanged(QtProperty *property, const QVariant
 
         // 根据属性名称更新模型状态
         auto position = model->GetPosition();
-        if (property->propertyName() == "x")
+        auto scale = model->GetScale();
+        switch (label)
         {
+        case PROPERTY_LABEL_MODEL_POSITION_X:
             position.x = value.toDouble();
             model->SetPosition(position);
-        }
-        else if (property->propertyName() == "y")
-        {
+            break;
+        case PROPERTY_LABEL_MODEL_POSITION_Y:
             position.y = value.toDouble();
             model->SetPosition(position);
-        }
-        else if (property->propertyName() == "z")
-        {
+            break;
+        case PROPERTY_LABEL_MODEL_POSITION_Z:
             position.z = value.toDouble();
             model->SetPosition(position);
-        }
-        else if (property->propertyName() == "rotation")
-        {
-            // 处理缩放逻辑（类似位置逻辑）
+            break;
+        case PROPERTY_LABEL_MODEL_SCALE_X:
+            scale.x = value.toDouble();
+            model->SetScale(scale);
+            break;
+        case PROPERTY_LABEL_MODEL_SCALE_Y:
+            scale.y = value.toDouble();
+            model->SetScale(scale);
+            break;
+        case PROPERTY_LABEL_MODEL_SCALE_Z:
+            scale.z = value.toDouble();
+            model->SetScale(scale);
+            break;
+        case PROPERTY_LABEL_MODEL_ROTATION:
             model->SetRotate(value.toFloat());
+            break;
+        default:
+            break;
+        }
+    }
+    if (itemType == QString::fromStdString(TreeItemLight))
+    {
+        // 找到对应的模型
+        auto light = gRenderer->GetLightByUUID(itemUUID.toStdString());
+        if (!light)
+            return;
+
+        auto lightType = light->GetLightType();
+        if (lightType == LightType::LightTypePoint)
+        {
+            auto pointLight = dynamic_cast<PointLight *>(light);
+            if (!pointLight)
+                return;
+
+            switch (label)
+            {
+            case PROPERTY_LABEL_LIGHT_COLOR_RGBA:
+                pointLight->Color.r = value.value<QColor>().redF();
+                pointLight->Color.g = value.value<QColor>().greenF();
+                pointLight->Color.b = value.value<QColor>().blueF();
+                break;
+            case PROPERTY_LABEL_LIGHT_AMBIENT:
+                pointLight->AmbientColor.r = value.value<QColor>().redF();
+                pointLight->AmbientColor.g = value.value<QColor>().greenF();
+                pointLight->AmbientColor.b = value.value<QColor>().blueF();
+                break;
+            case PROPERTY_LABEL_LIGHT_SPECULAR:
+                pointLight->SpecularColor.r = value.value<QColor>().redF();
+                pointLight->SpecularColor.g = value.value<QColor>().greenF();
+                pointLight->SpecularColor.b = value.value<QColor>().blueF();
+                break;
+            case PROPERTY_LABEL_LIGHT_DIFFUSE:
+                pointLight->DiffuseColor.r = value.value<QColor>().redF();
+                pointLight->DiffuseColor.g = value.value<QColor>().greenF();
+                pointLight->DiffuseColor.b = value.value<QColor>().blueF();
+                break;
+            default:
+                break;
+            }
         }
     }
 }
@@ -314,6 +335,137 @@ void ToyEngineMainWindow::onMenuSave()
 void ToyEngineMainWindow::onMenuAbout()
 {
     qDebug() << "关于菜单被点击";
+}
+
+void ToyEngineMainWindow::InitPropertyViewOfLight(string uuid)
+{
+    auto light = gRenderer->GetLightByUUID(uuid);
+
+    if (light == nullptr)
+    {
+        return;
+    }
+
+    m_pVarMgrEdit = new QtVariantPropertyManager(m_property_view);     // 关联factory，属性可以修改
+    m_pVarMgrOnlyRead = new QtVariantPropertyManager(m_property_view); // 这个管理器不关联factory，属性不可修改
+    m_pVarFactory = new QtVariantEditorFactory(m_property_view);
+    connect(m_pVarMgrEdit, &QtVariantPropertyManager::valueChanged, this, &ToyEngineMainWindow::onPropertyChanged); // 绑定信号槽，当值改变的时候会发送信号
+
+    switch (light->GetLightType())
+    {
+    case LightType::LightTypePoint:
+    {
+        auto pointLight = dynamic_cast<PointLight *>(light);
+
+        // 光源颜色
+        auto color = pointLight->Color;
+        QtVariantProperty *item_color = m_pVarMgrEdit->addProperty(QMetaType::QColor, QStringLiteral("光源颜色"));
+        item_color->setValue(QColor(Qt::red, Qt::green, Qt::blue));
+        item_color->setValue(QColor(color.r * 255, color.g * 255, color.b * 255));
+
+        m_property_label_map.insert({item_color, PROPERTY_LABEL_LIGHT_COLOR_RGBA});
+        m_property_browser->addProperty(item_color);
+
+        // Ambient
+        auto ambient = pointLight->AmbientColor;
+        QtVariantProperty *item_ambient = m_pVarMgrEdit->addProperty(QMetaType::QColor, QStringLiteral("漫反射"));
+        item_ambient->setValue(QColor(Qt::red, Qt::green, Qt::blue));
+        item_ambient->setValue(QColor(ambient.r * 255, ambient.g * 255, ambient.b * 255));
+
+        m_property_label_map.insert({item_ambient, PROPERTY_LABEL_LIGHT_AMBIENT});
+        m_property_browser->addProperty(item_ambient);
+
+        // Specular
+        auto specularColor = pointLight->SpecularColor;
+        QtVariantProperty *item_specular = m_pVarMgrEdit->addProperty(QMetaType::QColor, QStringLiteral("镜面反射"));
+        item_specular->setValue(QColor(specularColor.r * 255, specularColor.g * 255, specularColor.b * 255));
+
+        m_property_label_map.insert({item_specular, PROPERTY_LABEL_LIGHT_SPECULAR});
+        m_property_browser->addProperty(item_specular);
+
+        // Diffuse
+        auto diffuseColor = pointLight->DiffuseColor;
+        QtVariantProperty *item_diffuse = m_pVarMgrEdit->addProperty(QMetaType::QColor, QStringLiteral("散射"));
+        item_diffuse->setValue(QColor(diffuseColor.r * 255, diffuseColor.g * 255, diffuseColor.b * 255));
+
+        m_property_label_map.insert({item_diffuse, PROPERTY_LABEL_LIGHT_DIFFUSE});
+        m_property_browser->addProperty(item_diffuse);
+    }
+    break;
+    case LightType::LightTypeDirection:
+        break;
+    default:
+        break;
+    }
+
+    m_property_browser->setFactoryForManager(m_pVarMgrEdit, m_pVarFactory); // 将一个工厂与manger关联起来，即可修改内容。
+}
+
+void ToyEngineMainWindow::InitPropertyViewOfModel(string modelUUID)
+{
+    auto model = gRenderer->GetModelByUUID(modelUUID);
+
+    if (model == nullptr)
+    {
+        return;
+    }
+
+    m_pVarMgrEdit = new QtVariantPropertyManager(m_property_view);     // 关联factory，属性可以修改
+    m_pVarMgrOnlyRead = new QtVariantPropertyManager(m_property_view); // 这个管理器不关联factory，属性不可修改
+    m_pVarFactory = new QtVariantEditorFactory(m_property_view);
+    connect(m_pVarMgrEdit, &QtVariantPropertyManager::valueChanged, this, &ToyEngineMainWindow::onPropertyChanged); // 绑定信号槽，当值改变的时候会发送信号
+
+    // 位置
+    QtProperty *groupPosition = m_pVarMgrEdit->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("位置"));
+
+    QtVariantProperty *item_x = m_pVarMgrEdit->addProperty(QMetaType::Double, QStringLiteral("x"));
+    item_x->setValue(model->GetPosition().x);
+    groupPosition->addSubProperty(item_x);
+
+    QtVariantProperty *item_y = m_pVarMgrEdit->addProperty(QMetaType::Double, QStringLiteral("y"));
+    item_y->setValue(model->GetPosition().y);
+    groupPosition->addSubProperty(item_y);
+
+    QtVariantProperty *item_z = m_pVarMgrEdit->addProperty(QMetaType::Double, QStringLiteral("z"));
+    item_z->setValue(model->GetPosition().z);
+    groupPosition->addSubProperty(item_z);
+
+    m_property_browser->addProperty(groupPosition);
+    m_property_label_map.insert({item_x, PROPERTY_LABEL_MODEL_POSITION_X});
+    m_property_label_map.insert({item_y, PROPERTY_LABEL_MODEL_POSITION_Y});
+    m_property_label_map.insert({item_z, PROPERTY_LABEL_MODEL_POSITION_Z});
+
+    // 缩放
+    QtProperty *groupScale = m_pVarMgrOnlyRead->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("缩放"));
+
+    QtVariantProperty *item_scale_x = m_pVarMgrOnlyRead->addProperty(QMetaType::Double, QStringLiteral("x"));
+    item_scale_x->setValue(model->GetScale().x);
+    groupScale->addSubProperty(item_scale_x);
+
+    QtVariantProperty *item_scale_y = m_pVarMgrOnlyRead->addProperty(QMetaType::Double, QStringLiteral("y"));
+    item_scale_y->setValue(model->GetScale().y);
+    groupScale->addSubProperty(item_scale_y);
+
+    QtVariantProperty *item_scale_z = m_pVarMgrOnlyRead->addProperty(QMetaType::Double, QStringLiteral("z"));
+    item_scale_z->setValue(model->GetScale().z);
+    groupScale->addSubProperty(item_scale_z);
+
+    m_property_browser->addProperty(groupScale);
+    m_property_label_map.insert({item_scale_x, PROPERTY_LABEL_MODEL_SCALE_X});
+    m_property_label_map.insert({item_scale_y, PROPERTY_LABEL_MODEL_SCALE_Y});
+    m_property_label_map.insert({item_scale_z, PROPERTY_LABEL_MODEL_SCALE_Z});
+
+    // 旋转
+    QtProperty *groupRotation = m_pVarMgrEdit->addProperty(QtVariantPropertyManager::groupTypeId(), QStringLiteral("旋转"));
+
+    QtVariantProperty *item_rotation = m_pVarMgrEdit->addProperty(QMetaType::Double, QStringLiteral("rotation"));
+    item_rotation->setValue(model->GetRotation());
+    groupRotation->addSubProperty(item_rotation);
+
+    m_property_browser->addProperty(groupRotation);
+    m_property_label_map.insert({item_rotation, PROPERTY_LABEL_MODEL_ROTATION});
+
+    m_property_browser->setFactoryForManager(m_pVarMgrEdit, m_pVarFactory); // 将一个工厂与manger关联起来，即可修改内容。
 }
 
 void ToyEngineMainWindow::onUpdateTreeListView()
@@ -339,7 +491,7 @@ void ToyEngineMainWindow::onUpdateTreeListView()
 
         auto item = new QStandardItem(QString::fromStdString(light->GetName()));
         item->setData(QString::fromStdString(TreeItemLight), Qt::UserRole + TreeItemTypeRoleOffset);
-        item->setData(QString::fromStdString(""), Qt::UserRole + TreeItemUUIDRoleOffset);
+        item->setData(QString::fromStdString(light->GetUUID()), Qt::UserRole + TreeItemUUIDRoleOffset);
         lightsItem->appendRow(item);
     }
     m_tree_view->expandAll();

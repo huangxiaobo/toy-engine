@@ -10,8 +10,6 @@
 #include "technique/technique.h"
 #include "technique/technique_light.h"
 #include "model/model.h"
-#include "model/model_ground.h"
-#include "model/model_point.h"
 #include "axis/axis.h"
 #include "utils/utils.h"
 #include "light/light.h"
@@ -108,7 +106,10 @@ void Renderer::init(int w, int h)
                                            "./resource/shader/axis.vert",
                                            "./resource/shader/axis.frag");
 
-    axis_model->SetEffect(axis_effect);
+    for (auto m : axis_mesh)
+    {
+        m->SetEffect(axis_effect);
+    }
 
     axis_model->SetTranslate(glm::vec3(0, 0.01, 0));
     m_axis = new Axis();
@@ -123,7 +124,10 @@ void Renderer::init(int w, int h)
     Model *plane = new Model("plane");
     plane->SetScale(glm::vec3(5.0f, 5.0f, 5.0f));
     plane->SetMesh(plane_mesh);
-    plane->SetEffect(plane_effect);
+    for (auto m : plane_mesh)
+    {
+        m->SetEffect(plane_effect);
+    }
 
     m_models.push_back(plane);
 
@@ -133,10 +137,13 @@ void Renderer::init(int w, int h)
                                              "./resource/shader/light.vert",
                                              "./resource/shader/light.frag");
 
-    m_ground = new ModelGround();
+    m_ground = new Model("ground");
     m_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
     m_ground->SetMesh(ground_mesh);
-    m_ground->SetEffect(ground_effect);
+    for (auto m : ground_mesh)
+    {
+        m->SetEffect(ground_effect);
+    }
 
     m_camera = new Camera(
         gConfig->Camera.Position,
@@ -147,7 +154,7 @@ void Renderer::init(int w, int h)
     for (auto lightConfig : gConfig->PointLights)
     {
 
-        auto light = new PointLight(std::format("light-{}", i+1));
+        auto light = new PointLight(std::format("light-{}", i + 1));
         light->Color = lightConfig.Color;
         light->Position = lightConfig.Position;
         light->AmbientColor = lightConfig.AmbientColor;
@@ -159,17 +166,18 @@ void Renderer::init(int w, int h)
         m_lights.push_back(light);
 
         // 创建光源模型
-        auto model = new ModelPoint(std::format("light-{}", i++));
+        auto model = new Model(std::format("light-{}", i++));
         // auto mesh = Mesh::CreatePointMesh(light->Position, light->Color);
         auto mesh = Mesh::CreateIcosphereMesh(5, light->Position, light->Color);
         model->SetMesh(mesh);
         model->SetScale(glm::vec3(0.5f));
 
         Technique *effect = Technique::GetDefaultTechnique();
+        for (auto m : mesh)
+        {
+            m->SetEffect(effect);
+        }
 
-        model->SetEffect(effect);
-
-        // m_models.push_back(model);
         light->m_model = model;
         std::cout << "Setup light finish" << std::endl;
     }
@@ -192,14 +200,18 @@ void Renderer::init(int w, int h)
         material->DiffuseColor = modelConfig.Material.DiffuseColor;
         material->SpecularColor = modelConfig.Material.SpecularColor;
         material->Shininess = modelConfig.Material.Shininess;
-        model_obj->SetMaterial(material);
 
         TechniqueLight *effect = new TechniqueLight(
             "default",
             modelConfig.ShaderVertFile,
-            modelConfig.ShaderFragFile);
-        model_obj->SetEffect(effect);
+            modelConfig.ShaderFragFile
+        );
+        effect->SetMaterial(material);
         effect->SetLights(m_lights);
+        for (auto m : model_obj->GetMeshes())
+        {
+            m->SetEffect(effect);
+        }
 
         model_obj->SetScale(modelConfig.Scale);
         model_obj->SetTranslate(modelConfig.Position);
@@ -274,11 +286,22 @@ Model *Renderer::GetModel(string name)
 }
 
 Model *Renderer::GetModelByUUID(string uuid)
-{ for (auto model : m_models)
+{
+    for (auto model : m_models)
     {
         if (model->GetUUID() == uuid)
         {
             return model;
+        }
+    }
+    return nullptr;
+}
+
+Light *Renderer::GetLightByUUID(std::string uuid)
+{
+    for (auto light : m_lights) {
+        if (light->GetUUID() == uuid) {
+            return light;
         }
     }
     return nullptr;

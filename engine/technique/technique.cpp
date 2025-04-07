@@ -16,11 +16,11 @@ Technique::Technique(string name, string vertex_shader, string fragment_shader) 
     }
 
     this->m_shader->Use();                                                   // 如果使用 QShaderProgram，那么最好在获取顶点属性位置前，先 bind()
-    m_uniform_projection = this->m_shader->GetUniformLocation("projection"); // 获取顶点着色器中顶点属性 aPos 的位置
-    m_uniform_view = this->m_shader->GetUniformLocation("view");             // 获取顶点着色器中顶点属性 aPos 的位置
-    m_uniform_model = this->m_shader->GetUniformLocation("model");           // 获取顶点着色器中顶点属性 aPos 的位置
-    m_uniform_wvp = this->m_shader->GetUniformLocation("gWVP");              // 获取顶点着色器中顶点属性 aPos 的位置
-    m_uniform_viewpos = this->m_shader->GetUniformLocation("gViewPos");      // 获取顶点着色器中顶点属性 aPos 的位置
+    m_uniform_projection = this->m_shader->GetUniformLocation("projection"); // 获取顶点着色器中顶点属性 projection 的位置
+    m_uniform_view = this->m_shader->GetUniformLocation("view");             // 获取顶点着色器中顶点属性 view 的位置
+    m_uniform_model = this->m_shader->GetUniformLocation("model");           // 获取顶点着色器中顶点属性 model 的位置
+    m_uniform_wvp = this->m_shader->GetUniformLocation("gWVP");              // 获取顶点着色器中顶点属性 gWVP 的位置
+    m_uniform_viewpos = this->m_shader->GetUniformLocation("gViewPos");      // 获取顶点着色器中顶点属性 gViewPos 的位置
 }
 
 Technique::~Technique()
@@ -105,7 +105,8 @@ void Technique::SetMaterial(const Material *material)
 
 void Technique::Enable()
 {
-    return m_shader->Use();
+    m_shader->Use();
+    m_shader->BindFragDataLocation();
 }
 
 void Technique::Disable()

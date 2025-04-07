@@ -34,13 +34,13 @@ public:
     MaterialUniform();
     ~MaterialUniform();
 
-    void SetAmbientColor(Shader* shader, const glm::vec3 &color);
-    void SetDiffuseColor(Shader* shader, const glm::vec3 &color);
-    void SetSpecularColor(Shader* shader, const glm::vec3 &color);
-    void SetShininess(Shader* shader, float shininess);
+    void SetAmbientColor(Shader *shader, const glm::vec3 &color);
+    void SetDiffuseColor(Shader *shader, const glm::vec3 &color);
+    void SetSpecularColor(Shader *shader, const glm::vec3 &color);
+    void SetShininess(Shader *shader, float shininess);
 
-    void Init(Shader* shader);
-    void Apply(Shader* shader);
+    void Init(Shader *shader);
+    void Apply(Shader *shader);
 
     GLuint AmbientColor;  // 环境
     GLuint DiffuseColor;  // 漫反射
@@ -53,15 +53,11 @@ class TechniqueLight : public Technique
 public:
     TechniqueLight(string name, string vertexShader, string fragmentShader);
     ~TechniqueLight();
-    virtual void SetLights(const vector<Light *>& lights);
-
+    virtual void SetLights(const vector<Light *> &lights);
     void SetDirectionLight(DirectionLight *light);
-
     void InitPointLightUniform(int num);
-    void SetPointLights(vector<PointLight*> lights);
-
+    void SetPointLights(vector<PointLight *> lights);
     void SetPointLight(int index, PointLight *light);
-
     virtual void SetMaterial(const Material *material);
 
 private:
