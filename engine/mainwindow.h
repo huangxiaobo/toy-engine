@@ -22,8 +22,7 @@ class QtVariantEditorFactory;
 class QtProperty;
 class QVariant;
 
-enum PropertyType
-{
+enum PropertyType {
     BOOL_TYPE,
     STRING_TYPE,
     INT_TYPE,
@@ -31,8 +30,7 @@ enum PropertyType
     ENUM_TYPE
 };
 
-enum PropertyLabel
-{
+enum PropertyLabel {
     PROPERTY_LABEL_NONE,
     PROPERTY_LABEL_MODEL_POSITION_X,
     PROPERTY_LABEL_MODEL_POSITION_Y,
@@ -47,18 +45,21 @@ enum PropertyLabel
     PROPERTY_LABEL_LIGHT_DIFFUSE,
 };
 
-class ToyEngineMainWindow : public QMainWindow
-{
+class ToyEngineMainWindow : public QMainWindow {
     Q_OBJECT
+
 public:
     ToyEngineMainWindow(QWidget *parent = nullptr);
+
     ~ToyEngineMainWindow();
 
     void closeEvent(QCloseEvent *event) override;
 
 public slots:
     void onUpdateTreeListView();
+
     void onTreeListMenuItemClicked();
+
     void onUpdatePropertyView(QString name);
 
     void AddProperty(PropertyType type, QString propertyName, bool bEditFlag, QString params);
@@ -66,11 +67,14 @@ public slots:
     void onPropertyChanged(QtProperty *property, const QVariant &value);
 
     void onMenuOpen();
+
     void onMenuSave();
+
     void onMenuAbout();
 
 private:
     void InitPropertyViewOfLight(string uuid);
+
     void InitPropertyViewOfModel(string uuid);
 
 private:

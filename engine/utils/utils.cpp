@@ -5,21 +5,18 @@
 #include <sstream>
 #include <iomanip>
 
-void Utils::DebugMatrix(const glm::mat4 &mat)
-{
+void Utils::DebugMatrix(const glm::mat4 &mat) {
     std::cout << "[" << std::endl;
 
-    for (int i = 0; i < 4; i++)
-    {
-        std::cout << "  [ " << mat[i][0] << "," << mat[i][1] << "," << mat[i][2] << "," << mat[i][3] << " ]" << std::endl;
+    for (int i = 0; i < 4; i++) {
+        std::cout << "  [ " << mat[i][0] << "," << mat[i][1] << "," << mat[i][2] << "," << mat[i][3] << " ]" <<
+                std::endl;
     }
     std::cout << "]" << std::endl;
 }
 
-glm::vec3 Utils::GetXYZ(tinyxml2::XMLElement *element)
-{
-    if (element != nullptr)
-    {
+glm::vec3 Utils::GetXYZ(tinyxml2::XMLElement *element) {
+    if (element != nullptr) {
         auto x = element->FirstChildElement("x")->FloatText();
         auto y = element->FirstChildElement("y")->FloatText();
         auto z = element->FirstChildElement("z")->FloatText();
@@ -28,21 +25,16 @@ glm::vec3 Utils::GetXYZ(tinyxml2::XMLElement *element)
     return glm::vec3(0.0f);
 }
 
-std::string Utils::GetString(const glm::vec3 vec)
-{
+std::string Utils::GetString(const glm::vec3 vec) {
     return "(" + std::to_string(vec.x) + "," + std::to_string(vec.y) + "," + std::to_string(vec.z) + ")";
 }
 
-std::string Utils::GetString(const glm::vec2 vec)
-{
+std::string Utils::GetString(const glm::vec2 vec) {
     return "(" + std::to_string(vec.x) + "," + std::to_string(vec.y) + ")";
 }
 
-glm::vec3 Utils::GetRGB(tinyxml2::XMLElement *element)
-{
-
-    if (element != nullptr)
-    {
+glm::vec3 Utils::GetRGB(tinyxml2::XMLElement *element) {
+    if (element != nullptr) {
         auto r = element->FirstChildElement("r")->FloatText();
         auto g = element->FirstChildElement("g")->FloatText();
         auto b = element->FirstChildElement("b")->FloatText();
@@ -51,8 +43,7 @@ glm::vec3 Utils::GetRGB(tinyxml2::XMLElement *element)
     return glm::vec3(0.0f);
 }
 
-std::string Utils::GenerateUUID()
-{
+std::string Utils::GenerateUUID() {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 15);

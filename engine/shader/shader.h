@@ -30,6 +30,7 @@ public:
     void SetUniformValue(const char *name, bool value);
     void SetUniformValue(const char *name, const glm::vec2 &value);
     void SetUniformValue(const char *name, const glm::vec3 &value);
+    void SetUniformValue(const char *name, const glm::vec4 &value);
     void SetUniformValue(const char *name, const glm::mat4 &value);
 
     void SetUniformValue(unsigned int uniform_location, float value);

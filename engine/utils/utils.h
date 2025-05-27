@@ -5,12 +5,12 @@
 #include <glm/glm.hpp>
 #include <tinyxml2/tinyxml2.h>
 
-class Utils
-{
+class Utils {
 public:
     static void DebugMatrix(const glm::mat4 &mat);
 
     static std::string GetString(const glm::vec3 vec);
+
     static std::string GetString(const glm::vec2 vec);
 
     static glm::vec3 GetXYZ(tinyxml2::XMLElement *element);

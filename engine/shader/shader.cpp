@@ -142,10 +142,12 @@ bool Shader::UnUse()
 
 void Shader::SetUniformValue(const char *name, float value)
 {
+    glUniform1f(glGetUniformLocation(m_program, name), value);
 }
 
 void Shader::SetUniformValue(const char *name, int value)
 {
+    glUniform1i(glGetUniformLocation(m_program, name), value);
 }
 
 void Shader::SetUniformValue(const char *name, bool value)
@@ -154,6 +156,18 @@ void Shader::SetUniformValue(const char *name, bool value)
 
 void Shader::SetUniformValue(const char *name, const glm::vec2 &value)
 {
+    glUniform2fv(glGetUniformLocation(m_program, name), 1,  glm::value_ptr(value));
+}
+
+void Shader::SetUniformValue(const char *name, const glm::vec3 &value)
+{
+    auto location = glGetUniformLocation(m_program, name);
+    SetUniformValue(location, value);
+}
+
+void Shader::SetUniformValue(const char *name, const glm::vec4 &value)
+{
+    glUniform4fv(glGetUniformLocation(m_program, name), 1,  glm::value_ptr(value));
 }
 
 void Shader::SetUniformValue(const char *name, const glm::mat4 &value)

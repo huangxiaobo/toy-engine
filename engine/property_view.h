@@ -4,10 +4,10 @@
 #include <QWidget>
 #include <string>
 
-class PropertyView
-{
+class PropertyView {
 public:
     PropertyView();
+
     ~PropertyView();
 };
 #endif // _PROPERTY_VIEW_H_

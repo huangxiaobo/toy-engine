@@ -65,9 +65,15 @@ public:
     static vector<Mesh *> CreateAxisMesh();
 
     Mesh *Clone();
+    void UpdateVertexBuffer();
 
 private:
     void SetUpMesh();
+
+
+
+public:
+    vector<Vertex>& GetVertices();
 
 public:
     string name;

@@ -4,19 +4,15 @@
 
 #include <iostream>
 #include <vector>
-Config::Config()
-{
+
+Config::Config() {
 }
 
-Config::~Config()
-{
+Config::~Config() {
 }
 
-glm::vec3 GetRGB(tinyxml2::XMLElement *element)
-{
-
-    if (element != nullptr)
-    {
+glm::vec3 GetRGB(tinyxml2::XMLElement *element) {
+    if (element != nullptr) {
         auto r = element->FirstChildElement("r")->FloatText();
         auto g = element->FirstChildElement("g")->FloatText();
         auto b = element->FirstChildElement("b")->FloatText();
@@ -25,10 +21,8 @@ glm::vec3 GetRGB(tinyxml2::XMLElement *element)
     return glm::vec3(0.0f);
 }
 
-glm::vec3 GetXYZ(tinyxml2::XMLElement *element)
-{
-    if (element != nullptr)
-    {
+glm::vec3 GetXYZ(tinyxml2::XMLElement *element) {
+    if (element != nullptr) {
         auto x = element->FirstChildElement("x")->FloatText();
         auto y = element->FirstChildElement("y")->FloatText();
         auto z = element->FirstChildElement("z")->FloatText();
@@ -37,15 +31,12 @@ glm::vec3 GetXYZ(tinyxml2::XMLElement *element)
     return glm::vec3(0.0f);
 }
 
-Config *Config::LoadFromXml(std::string xml_file)
-{
-
-    Config *config = new Config();
+Config *Config::LoadFromXml(const std::string &xml_file) {
+    auto *config = new Config();
 
     tinyxml2::XMLDocument doc;
     auto err = doc.LoadFile(xml_file.c_str());
-    if (err != tinyxml2::XML_SUCCESS)
-    {
+    if (err != tinyxml2::XML_SUCCESS) {
         std::cout << "Load failed" << std::endl;
         exit(-1);
     }
@@ -69,24 +60,25 @@ Config *Config::LoadFromXml(std::string xml_file)
     config->Camera.Up = GetXYZ(xml_camera->FirstChildElement("up"));
 
     auto xml_lights = doc.FirstChildElement("world")->FirstChildElement("lights");
-    for (auto xml_light = xml_lights->FirstChildElement("light"); xml_light != nullptr; xml_light = xml_light->NextSiblingElement("light"))
-    {
+    for (auto xml_light = xml_lights->FirstChildElement("light"); xml_light != nullptr;
+         xml_light = xml_light->NextSiblingElement("light")) {
         PointLightConfig light;
         light.Color = GetRGB(xml_light->FirstChildElement("color"));
         light.Position = GetXYZ(xml_light->FirstChildElement("position"));
         light.AmbientColor = GetRGB(xml_light->FirstChildElement("ambient")->FirstChildElement("color"));
         light.DiffuseColor = GetRGB(xml_light->FirstChildElement("diffuse")->FirstChildElement("color"));
         light.SpecularColor = GetRGB(xml_light->FirstChildElement("specular")->FirstChildElement("color"));
-        light.Attenuation.Constant = xml_light->FirstChildElement("attenuation")->FirstChildElement("constant")->FloatText();
-        light.Attenuation.Linear = xml_light->FirstChildElement("attenuation")->FirstChildElement("linear")->FloatText();
+        light.Attenuation.Constant = xml_light->FirstChildElement("attenuation")->FirstChildElement("constant")->
+                FloatText();
+        light.Attenuation.Linear = xml_light->FirstChildElement("attenuation")->FirstChildElement("linear")->
+                FloatText();
         light.Attenuation.Exp = xml_light->FirstChildElement("attenuation")->FirstChildElement("exp")->FloatText();
 
         config->PointLights.push_back(light);
     }
 
     auto models = doc.FirstChildElement("world")->FirstChildElement("models");
-    for (auto model = models->FirstChildElement("model"); model != nullptr; model = model->NextSiblingElement())
-    {
+    for (auto model = models->FirstChildElement("model"); model != nullptr; model = model->NextSiblingElement()) {
         ModelCoinfig modelConfig;
         modelConfig.Name = model->FirstChildElement("name")->GetText();
 
