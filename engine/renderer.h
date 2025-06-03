@@ -4,12 +4,15 @@
 #include <map>
 #include <vector>
 #include <glm/glm.hpp>
+#include <yaml-cpp/yaml.h>
 
 using namespace std;
 
 class Model;
 class Axis;
 class Light;
+class Material;
+class Technique;
 class Camera;
 class FPSCounter;
 
@@ -29,6 +32,18 @@ public:
     void update(long long elapsed);
 
 public:
+    void LoadWorldFromFile(const string &filename);
+
+    static Camera *LoadCameraFromYaml(const YAML::Node &light_node);
+
+    static Light *LoadLightFromYaml(const YAML::Node &light_node, size_t index);
+
+    static Model *LoadModelFromYaml(const YAML::Node &model_node, size_t index);
+
+    static Material *LoadMaterialFromYaml(const YAML::Node &node, size_t index);
+
+    static Technique *LoadTechniqueFromYaml(const YAML::Node &node, size_t index);
+
     // 获取模型数量
     long long GetModelCount() const { return m_models.size(); }
     // 获取全部模型
@@ -71,7 +86,7 @@ private:
     Camera *m_camera;
     Model *m_ground;
     vector<Model *> m_models;
-    map<string, Model*> m_light_models;
+    map<string, Model *> m_light_models;
     vector<Light *> m_lights;
 };
 

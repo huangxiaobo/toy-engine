@@ -26,13 +26,17 @@ set(SOURCE_FILES
 
 # 添加glad
 add_subdirectory(3rdparty/glad)
-add_subdirectory(3rdparty/tinyxml2)
+add_subdirectory(3rdparty/yaml-cpp)
 add_subdirectory(3rdparty/qtpropertybrowser)
 
 # 添加头文件
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/engine)
 # # 添加glfw头文件
 # include_directories(/opt/homebrew/Cellar/glfw/3.4/include)
+# 包含 yaml-cpp 头文件
+include_directories(${PROJECT_SOURCE_DIR}/3rdparty/yaml-cpp/include)
+# 添加yaml-cpp头文件
+include_directories()
 # # glfw 库文件也加进来
 # link_directories(/opt/homebrew/Cellar/glfw/3.4/lib)
 
@@ -57,7 +61,7 @@ target_link_libraries(toy-engine PRIVATE
     glm::glm
     glad
     # glfw
-    tinyxml2
+    yaml-cpp::yaml-cpp
     qtpropertybrowser
     assimp::assimp
 )

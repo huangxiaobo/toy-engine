@@ -30,7 +30,8 @@ const std::string TreeItemModel = "Model";
 const std::string TreeItemLight = "Light";
 
 ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent) {
-    gConfig = Config::LoadFromXml("./resource/world.xml");
+    // gConfig = Config::LoadFromXml("./resource/world.xml");
+    gConfig = Config::LoadFromYaml("./resource/world.yaml");
 
     // 菜单
     // 创建菜单栏
@@ -78,9 +79,7 @@ ToyEngineMainWindow::ToyEngineMainWindow(QWidget *parent) : QMainWindow(parent) 
     timer->start(33);
     m_status_bar = new QStatusBar(this);
     this->setStatusBar(m_status_bar);
-    // m_status_bar->showMessage("hello world");
-    QLabel *label = new QLabel("hello world", this);
-    m_status_bar->addWidget(label);
+
     QLabel *fpsLabel = new QLabel("FPS: 0", this);
     m_status_bar->addWidget(fpsLabel);
 
@@ -166,6 +165,9 @@ void ToyEngineMainWindow::onTreeListMenuItemClicked() {
     qDebug() << "菜单项被点击" << m_tree_view->currentIndex().data().toString();
     qDebug() << m_tree_view->currentIndex().data(Qt::UserRole);
     emit onUpdatePropertyView(m_tree_view->currentIndex().data().toString());
+    if (m_tree_view->currentIndex().data().toString() == "场景") {
+        gRenderer->LoadWorldFromFile("./resource/world.yaml");
+    }
 }
 
 void ToyEngineMainWindow::onUpdatePropertyView(QString name) {
@@ -203,7 +205,7 @@ void ToyEngineMainWindow::onPropertyChanged(QtProperty *property, const QVariant
         return;
 
     PropertyLabel label = PROPERTY_LABEL_NONE;
-    for (auto & it : m_property_label_map) {
+    for (auto &it: m_property_label_map) {
         if (it.first == property) {
             label = it.second;
             break;

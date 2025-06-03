@@ -85,7 +85,7 @@ public:
 
     ~Config();
 
-    static Config *LoadFromXml(const std::string &xml_file);
+    static Config *LoadFromYaml(const std::string &filename);
 
     WindowConfig Window;
     glm::vec4 ClearColor;

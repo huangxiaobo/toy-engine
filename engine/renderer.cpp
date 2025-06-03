@@ -22,8 +22,6 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/transform.hpp>
 
-#include <tinyxml2/tinyxml2.h>
-
 Renderer::Renderer() {
 }
 
@@ -226,6 +224,9 @@ void Renderer::draw(long long elapsed) {
     for (auto light: m_lights) {
         if (light->GetLightType() == LightTypePoint) {
             auto point_light = (PointLight *) light;
+            if (m_light_models.contains(point_light->GetUUID()) == 0) {
+                continue;
+            }
             auto model = m_light_models.at(point_light->GetUUID());
             if (model != nullptr) {
                 model->SetTranslate(point_light->Position);
@@ -271,6 +272,112 @@ void Renderer::update(long long elapsed) {
     }
 }
 
+void Renderer::LoadWorldFromFile(const string &filename) {
+    try {
+        YAML::Node yaml_config = YAML::LoadFile(filename);
+
+        const YAML::Node &world_config = yaml_config["world"];
+        // windows
+        const YAML::Node &window = world_config["window"];
+        gConfig->Window.WindowWidth = window["width"].as<int>();
+        gConfig->Window.WindowHeight = window["height"].as<int>();
+
+        // clip
+        const YAML::Node &clip = world_config["clip"];
+        gConfig->Clip.ClipNear = clip["near"].as<float>();
+        gConfig->Clip.ClipFar = clip["far"].as<float>();
+        gConfig->Clip.ClipFov = clip["fov"].as<float>();
+        gConfig->Clip.ClipAspect = clip["aspect"].as<float>();
+        std::cout << 1111 << std::endl;
+        // camera
+        if (m_camera != nullptr) {
+            delete m_camera;
+        }
+        m_camera = LoadCameraFromYaml(world_config["camera"]);
+
+
+        // lights
+        for (auto &m_light: m_lights) {
+            delete m_light;
+        }
+        m_lights.clear();
+        for (auto &m: m_light_models) {
+            delete m.second;
+        }
+        m_light_models.clear();
+
+        const YAML::Node &light_nodes = world_config["lights"];
+        size_t index = 0;
+        for (auto &i: light_nodes) {
+            const YAML::Node &light_node = i;
+            auto light = LoadLightFromYaml(light_node, ++index);
+            auto pointLight = (PointLight *) light;
+            m_lights.push_back(light);
+
+            // 创建光源模型
+            auto model = new Model(std::format("light-{}", index));
+            // auto mesh = Mesh::CreatePointMesh(light->Position, light->Color);
+            auto mesh = Mesh::CreateIcosphereMesh(5, pointLight->Position, pointLight->Color);
+            model->SetMesh(mesh);
+            model->SetScale(glm::vec3(0.5f));
+
+            Technique *effect = new Technique(
+                "onlycolor",
+                "./resource/shader/onlycolor.vert",
+                "./resource/shader/onlycolor.frag"
+            );
+
+            for (auto m: mesh) {
+                m->SetEffect(effect);
+            }
+
+            m_light_models[light->GetUUID()] = model;
+            std::cout << "Setup light finish" << std::endl;
+        }
+
+        // models
+        for (auto &m: m_models) {
+            delete m;
+        }
+        m_models.clear();
+        const YAML::Node &model_nodes = world_config["models"];
+        for (const auto &i: model_nodes) {
+            const YAML::Node &model_node = i;
+            m_models.push_back(LoadModelFromYaml(model_node, ++index));
+        }
+    } catch (const YAML::BadFile &e) {
+        Utils::PrintStackTrace();
+        std::cerr << "Error loading world from yaml file: " << e.what() << std::endl;
+    } catch (const std::exception &e) {
+        Utils::PrintStackTrace();
+    }
+    std::cout << "load world from yaml file done" << std::endl;
+}
+
+Camera *Renderer::LoadCameraFromYaml(const YAML::Node &camera_node) {
+    auto cameraPosition = glm::vec3(
+        camera_node["position"]["x"].as<float>(),
+        camera_node["position"]["y"].as<float>(),
+        camera_node["position"]["z"].as<float>()
+    );
+    auto cameraTarget = glm::vec3(
+        camera_node["target"]["x"].as<float>(),
+        camera_node["target"]["y"].as<float>(),
+        camera_node["target"]["z"].as<float>()
+    );
+
+    auto cameraUp = glm::vec3(
+        camera_node["up"]["x"].as<float>(),
+        camera_node["up"]["y"].as<float>(),
+        camera_node["up"]["z"].as<float>()
+    );
+    return new Camera(
+        cameraPosition,
+        cameraTarget,
+        cameraUp
+    );
+}
+
 Model *Renderer::GetModel(string name) {
     for (auto model: m_models) {
         if (model->GetName() == name) {
@@ -308,4 +415,132 @@ void Renderer::calculateProjectMatrix(int w, int h) {
     float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
     float farPlane = gConfig->Clip.ClipFar; // 远平面距离
     m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
+}
+
+
+Light *Renderer::LoadLightFromYaml(const YAML::Node &light_node, size_t index) {
+    auto lightColor = glm::vec3(
+        light_node["color"]["r"].as<float>(),
+        light_node["color"]["g"].as<float>(),
+        light_node["color"]["b"].as<float>()
+    );
+    auto lightPosition = glm::vec3(
+        light_node["position"]["x"].as<float>(),
+        light_node["position"]["y"].as<float>(),
+        light_node["position"]["z"].as<float>()
+    );
+    auto lightAmbientColor = glm::vec3(
+        light_node["ambient"]["color"]["r"].as<float>(),
+        light_node["ambient"]["color"]["g"].as<float>(),
+        light_node["ambient"]["color"]["b"].as<float>()
+    );
+    auto lightDiffuseColor = glm::vec3(
+        light_node["diffuse"]["color"]["r"].as<float>(),
+        light_node["diffuse"]["color"]["g"].as<float>(),
+        light_node["diffuse"]["color"]["b"].as<float>()
+    );
+    auto lightSpecularColor = glm::vec3(
+        light_node["specular"]["color"]["r"].as<float>(),
+        light_node["specular"]["color"]["g"].as<float>(),
+        light_node["specular"]["color"]["b"].as<float>()
+    );
+
+    auto lightAttenuationConstant = light_node["attenuation"]["constant"].as<float>();
+    auto lightAttenuationLinear = light_node["attenuation"]["linear"].as<float>();
+    auto lightAttenuationExp = light_node["attenuation"]["exp"].as<float>();
+
+    auto light = new PointLight(std::format("light-{}", index));
+    light->Color = lightColor;
+    light->Position = lightPosition;
+    light->AmbientColor = lightAmbientColor;
+    light->DiffuseColor = lightDiffuseColor;
+    light->SpecularColor = lightSpecularColor;
+    light->Attenuation.Constant = lightAttenuationConstant;
+    light->Attenuation.Linear = lightAttenuationLinear;
+    light->Attenuation.Exp = lightAttenuationExp;
+    return light;
+}
+
+Model *Renderer::LoadModelFromYaml(const YAML::Node &model_node, size_t index) {
+    auto modelName = model_node["name"].as<std::string>();
+
+    auto modelMeshName = model_node["mesh"]["name"].as<std::string>();
+    auto modelMeshFile = model_node["mesh"]["file"].as<std::string>();
+
+
+    auto modelShaderVertFile = model_node["shader"]["vert"].as<std::string>();
+    auto modelShaderFragFile = model_node["shader"]["frag"].as<std::string>();
+
+    auto modelEffect = "light";
+
+    auto modelPosition = glm::vec3(
+        model_node["position"]["x"].as<float>(),
+        model_node["position"]["y"].as<float>(),
+        model_node["position"]["z"].as<float>()
+    );
+    auto modelRotation = model_node["rotation"].as<float>();
+    auto modelScale = glm::vec3(
+        model_node["scale"]["x"].as<float>(),
+        model_node["scale"]["y"].as<float>(),
+        model_node["scale"]["z"].as<float>()
+    );
+
+    std::cout << "model name : " << modelName << std::endl;
+    std::cout << "mesh name  : " << modelMeshName << std::endl;
+    std::cout << "mesh file  : " << modelMeshFile << std::endl;
+    if (modelMeshFile.empty()) {
+        return nullptr;
+    }
+    auto model_obj = new Model(modelName);
+    model_obj->LoadModel(modelMeshFile);
+
+
+    auto *effect = new TechniqueLight(
+        "default",
+        modelShaderVertFile,
+        modelShaderFragFile
+    );
+    auto material = LoadMaterialFromYaml(model_node["material"], 0);
+    effect->SetMaterial(material);
+
+    // effect->SetLights(m_lights);
+    for (auto m: model_obj->GetMeshes()) {
+        m->SetEffect(effect);
+    }
+
+    model_obj->SetScale(modelScale);
+    model_obj->SetTranslate(modelPosition);
+    model_obj->SetRotate(modelRotation);
+
+    return model_obj;
+}
+
+Material *Renderer::LoadMaterialFromYaml(const YAML::Node &node, size_t index) {
+    auto modelMaterialAmbientColor = glm::vec3(
+        node["ambient"]["r"].as<float>(),
+        node["ambient"]["g"].as<float>(),
+        node["ambient"]["b"].as<float>()
+    );
+    auto modelMaterialDiffuseColor = glm::vec3(
+        node["diffuse"]["r"].as<float>(),
+        node["diffuse"]["g"].as<float>(),
+        node["diffuse"]["b"].as<float>()
+    );
+    auto modelMaterialSpecularColor = glm::vec3(
+        node["specular"]["r"].as<float>(),
+        node["specular"]["g"].as<float>(),
+        node["specular"]["b"].as<float>()
+    );
+    auto modelMaterialShininess = node["shininess"].as<float>();
+
+
+    Material *material = new Material();
+    material->AmbientColor = modelMaterialAmbientColor;
+    material->DiffuseColor = modelMaterialDiffuseColor;
+    material->SpecularColor = modelMaterialSpecularColor;
+    material->Shininess = modelMaterialShininess;
+    return material;
+}
+
+Technique *Renderer::LoadTechniqueFromYaml(const YAML::Node &node, size_t index) {
 }
