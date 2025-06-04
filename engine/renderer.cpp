@@ -288,7 +288,7 @@ void Renderer::LoadWorldFromFile(const string &filename) {
         gConfig->Clip.ClipFar = clip["far"].as<float>();
         gConfig->Clip.ClipFov = clip["fov"].as<float>();
         gConfig->Clip.ClipAspect = clip["aspect"].as<float>();
-        std::cout << 1111 << std::endl;
+
         // camera
         if (m_camera != nullptr) {
             delete m_camera;
@@ -396,8 +396,8 @@ Model *Renderer::GetModelByUUID(string uuid) {
     return nullptr;
 }
 
-Light *Renderer::GetLightByUUID(std::string uuid) {
-    for (auto light: m_lights) {
+Light *Renderer::GetLightByUUID(const std::string &uuid) const {
+    for (auto const light: m_lights) {
         if (light->GetUUID() == uuid) {
             return light;
         }
@@ -405,7 +405,7 @@ Light *Renderer::GetLightByUUID(std::string uuid) {
     return nullptr;
 }
 
-float Renderer::GetFPS() {
+float Renderer::GetFPS() const {
     return m_fps_counter->GetFPS();
 }
 

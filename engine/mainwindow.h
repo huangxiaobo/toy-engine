@@ -1,4 +1,3 @@
-
 #ifndef __MAIN_WINDOW_H__
 #define __MAIN_WINDOW_H__
 
@@ -62,25 +61,26 @@ public slots:
 
     void onUpdatePropertyView(QString name);
 
-    void AddProperty(PropertyType type, QString propertyName, bool bEditFlag, QString params);
-
-    void onPropertyChanged(QtProperty *property, const QVariant &value);
-
-    void onMenuOpen();
-
-    void onMenuSave();
-
     void onMenuAbout();
 
 private:
-    void InitPropertyViewOfLight(string uuid);
+    void InitMenuBar();
+
+    void InitStatusBar();
+
+    void InitPropertyViewOfLight(const string &uuid);
+
+    void onLightPropertyChanged(const string &uuid, QtProperty *property, const QVariant &value);
 
     void InitPropertyViewOfModel(string uuid);
 
+    void onModelPropertyChanged(const string &uuid, QtProperty *property, const QVariant &value);
+
 private:
-    RendererWidget *renderer_widget;
+    RendererWidget *m_renderer_widget;
 
     QTimer *timer;
+    QMenuBar *m_menu_bar;
     QStatusBar *m_status_bar;
 
     // 左侧树形组件
@@ -89,7 +89,7 @@ private:
     // 右侧属性组件
     class QtDoublePropertyManager *doubleManager;
 
-    QTreeView *m_property_view;
+    // QTreeView *m_property_view;
     QtTreePropertyBrowser *m_property_browser;
     ;
     QtVariantPropertyManager *m_pVarMgrEdit;

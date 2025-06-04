@@ -45,7 +45,7 @@ public:
     static Technique *LoadTechniqueFromYaml(const YAML::Node &node, size_t index);
 
     // 获取模型数量
-    long long GetModelCount() const { return m_models.size(); }
+    int GetModelCount() const { return m_models.size(); }
     // 获取全部模型
     std::vector<Model *> GetModels() { return m_models; }
 
@@ -59,10 +59,10 @@ public:
     std::vector<Light *> GetLights() { return m_lights; }
 
     // 通过uuid获取灯光
-    Light *GetLightByUUID(std::string uuid);
+    Light *GetLightByUUID(const std::string &uuid) const;
 
     // 获取帧率
-    float GetFPS();
+    float GetFPS() const;
 
     // 获取相机
     Camera *GetCamera() const { return m_camera; }

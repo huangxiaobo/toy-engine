@@ -54,10 +54,12 @@ RendererWidget::~RendererWidget() {
 }
 
 void RendererWidget::updateStatusBar(QStatusBar *status_bar) {
+    if (status_bar == nullptr) {
+        return;
+    }
     QList<QLabel *> labels = status_bar->findChildren<QLabel *>();
-    if (labels.size() >= 2) {
-        labels[0]->setText(QString("帧率: %1").arg(gRenderer->GetFPS()));
-        labels[1]->setText(QString("模型数量: %1").arg(gRenderer->GetModelCount()));
+    if (!labels.empty()) {
+        labels[0]->setText(QString("帧率: %1 \t\t模型数量: %2").arg(gRenderer->GetFPS()).arg(gRenderer->GetModelCount()));
     }
 }
 
