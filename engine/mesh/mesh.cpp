@@ -122,7 +122,7 @@ void Mesh::UpdateVertexBuffer() {
     glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
 }
 
-vector<Vertex> & Mesh::GetVertices() {
+vector<Vertex> &Mesh::GetVertices() {
     return this->vertices;
 }
 
@@ -311,8 +311,10 @@ vector<glm::vec3> drawConeArrow(float length, float arrowLength, float arrowRadi
     return points;
 }
 
-vector<glm::vec3> createCirclePoints(float radius, int segments = 20, glm::vec3 center = glm::vec3(0.0f),
-                                     glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f)) {
+vector<glm::vec3> createCirclePoints(const float radius,
+                                     const int segments = 20,
+                                     const glm::vec3 center = glm::vec3(0.0f),
+                                     const glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f)) {
     // 圆锥底部的圆
     std::vector<glm::vec3> circleVertices;
     for (int i = 0; i <= segments; ++i) {
@@ -531,6 +533,47 @@ vector<Mesh *> Mesh::CreateAxisMesh() {
     meshes.push_back(m_z_arrow);
 
     for (auto mesh: meshes) {
+        mesh->SetUpMesh();
+    }
+
+    return meshes;
+}
+
+vector<Mesh *> Mesh::CreatePointLightMeshes(int radius) {
+    vector<Mesh *> meshes;
+
+    vector ups = {
+        glm::vec3(1.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f),
+    };
+    for (auto up: ups) {
+        Mesh *m1 = new Mesh();
+        m1->DrawMode = GL_LINE_LOOP;
+
+
+        auto points = createCirclePoints(
+            radius,
+            40,
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            up
+        );
+        for (size_t i = 0; i < points.size(); i += 1) {
+            std::cout << "point: " << Utils::GetString(points[i]) << std::endl;
+            m1->vertices.push_back({
+                points[i],
+                glm::vec3(1.0f),
+                glm::vec3(1.0f),
+                glm::vec2(0.0f),
+                glm::vec3(1.0f),
+                glm::vec3(1.0f)
+            });
+            m1->indices.push_back(i);
+        }
+        meshes.push_back(m1);
+    }
+
+    for (const auto mesh: meshes) {
         mesh->SetUpMesh();
     }
 

@@ -53,6 +53,7 @@ PointLight::~PointLight() {
 }
 
 
+
 void PointLight::SetColor(glm::vec3 color) {
     Color = color;
 }
@@ -63,6 +64,9 @@ void PointLight::SetAttenuation(glm::vec3 attenuation) {
 
 void PointLight::SetPosition(glm::vec3 position) {
     Position = position;
+    if (m_model != nullptr) {
+        m_model->SetPosition(position);
+    }
 }
 
 void PointLight::SetAmbientColor(glm::vec3 direction) {

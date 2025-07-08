@@ -19,6 +19,7 @@ const std::string LightTypeNamePoint = "点光源";
 const std::string LightTypeNameDirection = "方向光源";
 const std::string LightTypeNameSpot = "聚光灯";
 
+
 class Light {
 public:
     Light();
@@ -33,12 +34,18 @@ public:
 
     std::string GetUUID() const;
 
+    void SetModel(Model *model) { m_model = model; };
+    Model *GetModel() const { return m_model; }
+
     virtual ~Light();
 
 private:
     LightType m_light_type;
     std::string m_name;
     std::string m_uuid;
+
+protected:
+    Model *m_model;
 };
 
 class DirectionLight : public Light {
@@ -85,10 +92,15 @@ public:
     ~PointLight() override;
 
     void SetColor(glm::vec3 color);
+
     void SetAttenuation(glm::vec3 attenuation);
+
     void SetPosition(glm::vec3 position);
+
     void SetAmbientColor(glm::vec3 direction);
+
     void SetDiffuseColor(glm::vec3 color);
+
     void SetSpecularColor(glm::vec3 color);
 };
 

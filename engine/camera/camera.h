@@ -41,7 +41,7 @@ public:
         float yoffset,
         bool constrainPitch = true
     );
-    void ProcessMouseScroll(float yoffse);
+    void ProcessMouseScroll(float yoffset);
 private:
     void updateCameraVectors();
 

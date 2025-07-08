@@ -4,7 +4,10 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <string>
-#include <glad/gl.h>
+// OpenGL类型前向声明
+typedef unsigned int GLenum;
+typedef unsigned int GLuint;
+typedef int GLint;
 #include <iostream>
 
 using namespace std;
@@ -63,6 +66,7 @@ public:
     static vector<Mesh *> CreateIcosphereMesh(int subdivisions = 0);
     static vector<Mesh *> CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color);
     static vector<Mesh *> CreateAxisMesh();
+    static vector<Mesh*> CreatePointLightMeshes(int radius);
 
     Mesh *Clone();
     void UpdateVertexBuffer();
