@@ -16,6 +16,11 @@ class Technique;
 class Camera;
 class FPSCounter;
 
+enum class ProjectionType {
+    Perspective,
+    Orthographic
+};
+
 class Renderer {
 public:
     explicit Renderer();
@@ -50,10 +55,10 @@ public:
     std::vector<Model *> GetModels() { return m_models; }
 
     // 通过名字获取模型
-    Model *GetModel(string name);
+    Model *GetModel(const string& name);
 
     // 通过uuid获取模型
-    Model *GetModelByUUID(string uuid);
+    Model *GetModelByUUID(const string& uuid);
 
     // 获取全部灯光
     std::vector<Light *> GetLights() { return m_lights; }
@@ -66,6 +71,11 @@ public:
 
     // 获取相机
     Camera *GetCamera() const { return m_camera; }
+
+    // 切换视角
+    void SerProjectionType(ProjectionType type);
+
+    const ProjectionType GetProjectionType() const;
 
 private:
     void calculateProjectMatrix(int w, int h);
@@ -81,12 +91,16 @@ private:
     glm::mat4 m_mvp_matrix;
     glm::vec3 m_eye_pos;
 
+    ProjectionType m_projectionType = ProjectionType::Perspective;
+
+
     FPSCounter *m_fps_counter;
     Axis *m_axis;
     Camera *m_camera;
     Model *m_ground;
     vector<Model *> m_models;
     map<string, Model *> m_light_models;
+    vector<Model *> m_light_modes_ext;
     vector<Light *> m_lights;
 };
 

@@ -24,7 +24,7 @@ glm::mat4 Camera::GetViewMatrix()
 }
 void Camera::ProcessKeyboard(CameraMoveType direction, float deltaTime)
 {
-    float velocity = m_move_speed * deltaTime;
+    const float velocity = m_move_speed * deltaTime;
     switch (direction)
     {
     case FORWARD:

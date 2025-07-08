@@ -9,6 +9,9 @@
 #include <QStatusBar>
 #include <QTreeView>
 #include <QString>
+//#include <QtVariantEditorFactory>
+#include <QUuid>
+#include <QHash>
 
 using namespace std;
 
@@ -72,9 +75,10 @@ private:
 
     void onLightPropertyChanged(const string &uuid, QtProperty *property, const QVariant &value);
 
-    void InitPropertyViewOfModel(string uuid);
+    void InitPropertyViewOfModel(const string& uuid);
 
-    void onModelPropertyChanged(const string &uuid, QtProperty *property, const QVariant &value);
+    void onModelPropertyChanged(const string& modelUUID, QtProperty *property, const QVariant &value);
+
 
 private:
     RendererWidget *m_renderer_widget;
@@ -86,15 +90,14 @@ private:
     // 左侧树形组件
     QTreeView *m_tree_view;
     QStandardItemModel *m_tree_model;
-    // 右侧属性组件
-    class QtDoublePropertyManager *doubleManager;
 
     // QTreeView *m_property_view;
     QtTreePropertyBrowser *m_property_browser;
     ;
-    QtVariantPropertyManager *m_pVarMgrEdit;
-    QtVariantPropertyManager *m_pVarMgrOnlyRead;
-    QtVariantEditorFactory *m_pVarFactory;
+    QtVariantPropertyManager *m_var_prop_mgr_edit;
+    QHash<QUuid, QMetaObject::Connection> m_connections{};
+    QtVariantPropertyManager *m_var_prop_mgr_onlyread;
+    QtVariantEditorFactory *m_var_edit_factory;
     std::map<QtProperty *, PropertyLabel> m_property_label_map;
 };
 

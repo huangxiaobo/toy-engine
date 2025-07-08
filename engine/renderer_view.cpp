@@ -84,6 +84,18 @@ void RendererWidget::resizeGL(int w, int h) {
     gRenderer->resize(w, h);
 }
 
+void RendererWidget::SetProjectionType(ProjectionType type) {
+    gRenderer->SerProjectionType(type);
+    resizeGL(width(), height());
+    update();
+
+}
+
+const ProjectionType RendererWidget::GetProjectionType() {
+    return gRenderer->GetProjectionType();
+}
+
+
 void RendererWidget::keyPressEvent(QKeyEvent *e) {
     std::cout << "keyPressEvent" << std::endl;
     switch (e->key()) {

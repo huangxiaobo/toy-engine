@@ -44,7 +44,8 @@ public:
 
     vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName);
 
-    void SetMesh(vector<Mesh *> model);
+    void SetMeshes(vector<Mesh *> model);
+    void SetMesh(Mesh* model);
 
     void SetScale(glm::vec3 scale);
 
@@ -69,6 +70,11 @@ public:
 
     virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
                       const glm::vec3 &camera, const std::vector<Light *> &lights);
+
+
+public:
+    static Model* CreatePointLightModelV1();
+    static Model* CreatePointLightModelV2();
 };
 
 #endif

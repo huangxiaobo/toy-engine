@@ -1,6 +1,7 @@
 #include "model.h"
 
 #include <iostream>
+#include <format>
 
 #include "../technique/technique.h"
 #include "../technique/technique_light.h"
@@ -193,7 +194,11 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
     return textures;
 }
 
-void Model::SetMesh(vector<Mesh *> meshes) {
+void Model::SetMesh(Mesh *mesh) {
+    this->m_meshes.push_back(mesh);
+}
+
+void Model::SetMeshes(vector<Mesh *> meshes) {
     for (auto m: meshes) {
         this->m_meshes.push_back(m);
     }
@@ -293,4 +298,46 @@ void Model::Draw(long long elapsed,
     for (int i = 0; i < this->m_meshes.size(); i++) {
         this->m_meshes[i]->Draw(elapsed, projection, view, model_local, camera, lights);
     }
+}
+
+Model *Model::CreatePointLightModelV1() {
+    // 创建光源模型
+    auto model = new Model(std::format("light-{}", 1));
+    auto meshes = Mesh::CreatePointLightMeshes(5);
+    model->SetMeshes(meshes);
+    model->SetPosition(glm::vec3{0.0f, 0.0f, 0.0f});
+
+    Technique *effect = new Technique(
+        "only_vertex_color",
+        "./resource/shader/only_vertex_color.vert",
+        "./resource/shader/only_vertex_color.frag"
+    );
+
+    for (auto m: meshes) {
+        m->SetEffect(effect);
+    }
+    return model;
+}
+
+Model *Model::CreatePointLightModelV2() {
+    // 创建光源模型
+    auto model = new Model(std::format("light-{}", 1));
+
+    Technique *effect = new Technique(
+        "only_vertex_color",
+        "./resource/shader/only_vertex_color.vert",
+        "./resource/shader/only_vertex_color.frag"
+    );
+
+    for (auto m: Mesh::CreateIcosphereMesh(5, glm::vec3{0.0f}, glm::vec3{1.0f})) {
+        model->SetMesh(m);
+        m->SetEffect(effect);
+    }
+
+    for (auto m: Mesh::CreatePointLightMeshes(5)) {
+        model->SetMesh(m);
+        m->SetEffect(effect);
+    }
+    model->SetScale(glm::vec3{0.5f});
+    return model;
 }
