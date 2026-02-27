@@ -70,6 +70,27 @@ bool ToyEngineMainWindow::Initialize() {
     // 注释掉停靠功能，因为可能不支持
     // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+    // 加载中文字体
+    std::cout << "正在加载中文字体..." << std::endl;
+    
+    // 检查字体文件是否存在
+    FILE* fontFile = fopen("./resource/font/微软雅黑.ttf", "rb");
+    if (fontFile) {
+        fclose(fontFile);
+        std::cout << "找到字体文件" << std::endl;
+        
+        ImFont* chineseFont = io.Fonts->AddFontFromFileTTF("./resource/font/微软雅黑.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+        if (chineseFont) {
+            std::cout << "✅ 成功加载中文字体" << std::endl;
+            // 设置为默认字体
+            io.FontDefault = chineseFont;
+        } else {
+            std::cerr << "❌ 加载中文字体失败" << std::endl;
+        }
+    } else {
+        std::cerr << "❌ 找不到字体文件: ./resource/font/微软雅黑.ttf" << std::endl;
+    }
+
     ImGui::StyleColorsDark();
 
     // 初始化ImGui后端
