@@ -4,7 +4,10 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <string>
-#include <glad/gl.h>
+// OpenGL类型前向声明
+typedef unsigned int GLenum;
+typedef unsigned int GLuint;
+typedef int GLint;
 #include <iostream>
 
 using namespace std;

@@ -1,7 +1,6 @@
 ### Qt安装 
 #### Mac安装
 ```
-brew install qt
 brew install cmake
 brew install glfw
 brew install glm
