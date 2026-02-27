@@ -15,6 +15,12 @@ public:
     static std::string GenerateUUID();
 
     static void PrintStackTrace();
+
+    // 从文件加载纹理并返回OpenGL纹理ID
+    static unsigned int LoadTextureFromFile(const std::string &path);
+    
+    // 创建棋盘格纹理
+    static unsigned int CreateCheckerboardTexture(int width, int height, int checkSize);
 };
 
 #endif

@@ -57,11 +57,15 @@ public:
 
     void SetEffect(Technique *effect);
     Technique* GetEffect() const;
+    
+    void SetTexture(unsigned int textureID) { m_textureID = textureID; }
+    unsigned int GetTexture() const { return m_textureID; }
 
     virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *> &lights);
 
     static vector<Mesh *> CreatePlaneMesh();
     static vector<Mesh *> CreateGroundMesh();
+    static vector<Mesh *> CreateTexturedGroundMesh(float size, int repeatCount);
     static vector<Mesh *> CreatePointMesh(glm::vec3 pos, glm::vec3 color);
     static vector<Mesh *> CreateIcosphereMesh(int subdivisions = 0);
     static vector<Mesh *> CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color);
@@ -91,6 +95,8 @@ public:
     GLuint DrawMode; // 绘制模式
 
     Technique *m_effect;
+    
+    unsigned int m_textureID; // 纹理ID
 };
 
 #endif

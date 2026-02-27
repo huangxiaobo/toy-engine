@@ -12,6 +12,12 @@
 #include <cxxabi.h>
 #include <cstdlib>
 
+// 定义STB_IMAGE_IMPLEMENTATION以确保stb_image的实现被包含
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#include <glad/gl.h>
+
 
 void Utils::DebugMatrix(const glm::mat4 &mat) {
     std::cout << "[" << std::endl;
@@ -93,4 +99,83 @@ void Utils::PrintStackTrace() {
     }
 
     free(symbols);
+}
+
+unsigned int Utils::LoadTextureFromFile(const std::string &path) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    int width, height, nrComponents;
+    // stbi_load 会自动翻转Y轴，使图像原点位于左下角（OpenGL坐标系）
+    unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrComponents, 0);
+    if (data) {
+        GLenum format;
+        if (nrComponents == 1)
+            format = GL_RED;
+        else if (nrComponents == 3)
+            format = GL_RGB;
+        else if (nrComponents == 4)
+            format = GL_RGBA;
+        else
+            format = GL_RGB; // 默认
+
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        // 设置纹理环绕和过滤参数
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        stbi_image_free(data);
+    } else {
+        std::cerr << "Texture failed to load at path: " << path << std::endl;
+        stbi_image_free(data);
+    }
+
+    return textureID;
+}
+
+unsigned int Utils::CreateCheckerboardTexture(int width, int height, int checkSize) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    // 创建棋盘格数据
+    std::vector<unsigned char> data(width * height * 3); // RGB
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int index = (y * width + x) * 3;
+            
+            // 计算棋盘格颜色
+            int xCheck = (x / checkSize) % 2;
+            int yCheck = (y / checkSize) % 2;
+            
+            if (xCheck == yCheck) {
+                // 白色方格
+                data[index] = 255;     // R
+                data[index + 1] = 255; // G
+                data[index + 2] = 255; // B
+            } else {
+                // 黑色方格
+                data[index] = 0;       // R
+                data[index + 1] = 0;   // G
+                data[index + 2] = 0;   // B
+            }
+        }
+    }
+
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // 设置纹理环绕和过滤参数
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    return textureID;
 }

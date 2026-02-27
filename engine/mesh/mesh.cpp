@@ -15,6 +15,7 @@ Mesh::Mesh() : DrawMode(GL_TRIANGLES) {
     VAO = 0;
     VBO = 0;
     EBO = 0;
+    m_textureID = 0;
 }
 
 Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices) {
@@ -149,6 +150,12 @@ void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
     this->m_effect->SetCamera(camera);
 
     this->m_effect->SetLights(lights);
+    
+    // 如果网格有纹理，则绑定纹理
+    if (m_textureID != 0) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_textureID);
+    }
 
     /* 重新绑定 VAO */
     glBindVertexArray(VAO);
@@ -266,6 +273,53 @@ vector<Mesh *> Mesh::CreateGroundMesh() {
     for (auto mesh: meshes) {
         mesh->SetUpMesh();
     }
+    return meshes;
+}
+
+vector<Mesh *> Mesh::CreateTexturedGroundMesh(float size, int repeatCount) {
+    vector<Mesh *> meshes;
+
+    // 创建一个带有纹理坐标的平面作为地面
+    vector<Vertex> vertices = {
+        {
+            // top right
+            glm::vec3(size / 2.0f, 0.0f, size / 2.0f),   // Position
+            glm::vec3(1.0f, 1.0f, 1.0f),                  // Color (白色，让纹理显示原色)
+            glm::vec3(0.0f, 1.0f, 0.0f),                  // Normal (朝上)
+            glm::vec2(repeatCount, repeatCount),          // TexCoords
+        },
+        {
+            // bottom right
+            glm::vec3(size / 2.0f, 0.0f, -size / 2.0f),  // Position
+            glm::vec3(1.0f, 1.0f, 1.0f),                  // Color
+            glm::vec3(0.0f, 1.0f, 0.0f),                  // Normal
+            glm::vec2(repeatCount, 0.0f),                 // TexCoords
+        },
+        {
+            // bottom left
+            glm::vec3(-size / 2.0f, 0.0f, -size / 2.0f), // Position
+            glm::vec3(1.0f, 1.0f, 1.0f),                  // Color
+            glm::vec3(0.0f, 1.0f, 0.0f),                  // Normal
+            glm::vec2(0.0f, 0.0f),                        // TexCoords
+        },
+        {
+            // top left
+            glm::vec3(-size / 2.0f, 0.0f, size / 2.0f),  // Position
+            glm::vec3(1.0f, 1.0f, 1.0f),                  // Color
+            glm::vec3(0.0f, 1.0f, 0.0f),                  // Normal
+            glm::vec2(0.0f, repeatCount),                 // TexCoords
+        },
+    };
+    
+    vector<unsigned int> indices = {
+        0, 1, 3, // first triangle
+        1, 2, 3  // second triangle
+    };
+
+    Mesh *mesh = new Mesh(vertices, indices);
+    mesh->SetDrawMode(GL_TRIANGLES);
+
+    meshes.push_back(mesh);
     return meshes;
 }
 

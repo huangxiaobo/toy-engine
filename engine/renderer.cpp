@@ -116,18 +116,27 @@ void Renderer::init(int w, int h) {
 
     m_models.push_back(plane);
 
-    // Create Ground
-    vector<Mesh *> ground_mesh = Mesh::CreateGroundMesh();
+    // Create Ground with texture
+    vector<Mesh *> ground_mesh = Mesh::CreateTexturedGroundMesh(10.0f, 5); // 10x10大小，纹理重复5次
     Technique *ground_effect = new Technique("ground",
-                                             "./resource/shader/light.vert",
-                                             "./resource/shader/light.frag");
+                                             "./resource/shader/ground.vert",
+                                             "./resource/shader/ground.frag");
 
     m_ground = new Model("ground");
     m_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
     m_ground->SetMeshes(ground_mesh);
+    
+    // 创建棋盘格纹理 (512x512, 每个格子64像素)
+    unsigned int groundTextureID = Utils::CreateCheckerboardTexture(512, 512, 64);
+    
     for (auto m: ground_mesh) {
         m->SetEffect(ground_effect);
+        m->SetTexture(groundTextureID); // 设置纹理ID
     }
+    
+    // 设置纹理uniform
+    ground_effect->Enable();
+    ground_effect->SetUniform("groundTexture", 0); // 使用纹理单元0
 
     m_camera = new Camera(
         gConfig->Camera.Position,
