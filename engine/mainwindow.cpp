@@ -59,6 +59,9 @@ bool ToyEngineMainWindow::Initialize() {
 
     glfwMakeContextCurrent(m_window);
     glfwSwapInterval(1); // 启用垂直同步
+    
+    // 注册鼠标滚轮回调
+    glfwSetScrollCallback(m_window, ScrollCallback);
 
     // OpenGL上下文由renderer初始化
 
@@ -125,6 +128,60 @@ void ToyEngineMainWindow::ProcessInput() {
     if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(m_window, true);
     }
+    
+    // 获取鼠标位置
+    glfwGetCursorPos(m_window, &m_currentMouseX, &m_currentMouseY);
+    
+    // 处理鼠标按键
+    int leftMouseButton = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT);
+    int rightMouseButton = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT);
+    
+    bool leftPressed = (leftMouseButton == GLFW_PRESS);
+    bool rightPressed = (rightMouseButton == GLFW_PRESS);
+    
+    // 鼠标左键按下/释放检测
+    if (leftPressed && !m_mouseLeftPressed) {
+        // 左键刚按下
+        OnMouseLeftButtonDown();
+    } else if (!leftPressed && m_mouseLeftPressed) {
+        // 左键刚释放
+        OnMouseLeftButtonUp();
+    }
+    
+    // 鼠标右键按下/释放检测
+    if (rightPressed && !m_mouseRightPressed) {
+        // 右键刚按下
+        OnMouseRightButtonDown();
+    } else if (!rightPressed && m_mouseRightPressed) {
+        // 右键刚释放
+        OnMouseRightButtonUp();
+    }
+    
+    // 更新鼠标按键状态
+    m_mouseLeftPressed = leftPressed;
+    m_mouseRightPressed = rightPressed;
+    
+    // 处理鼠标移动
+    if (m_mouseLeftPressed || m_mouseRightPressed) {
+        double deltaX = m_currentMouseX - m_lastMouseX;
+        double deltaY = m_currentMouseY - m_lastMouseY;
+        
+        if (deltaX != 0.0 || deltaY != 0.0) {
+            OnMouseMove(deltaX, deltaY);
+        }
+    }
+    
+    // 处理鼠标滚轮
+    // 注意：GLFW使用回调处理滚轮事件，这里暂时注释掉
+    // double scrollX, scrollY;
+    // glfwGetScrollOffset(m_window, &scrollX, &scrollY);
+    // if (scrollY != 0.0) {
+    //     OnMouseWheel(scrollY);
+    // }
+    
+    // 更新鼠标位置
+    m_lastMouseX = m_currentMouseX;
+    m_lastMouseY = m_currentMouseY;
 }
 
 void ToyEngineMainWindow::RenderFrame() {
@@ -337,7 +394,7 @@ void ToyEngineMainWindow::UpdateSelectedObjectProperties() {
         }
         
     } else if (m_selectedObjectType == "Light") {
-        PointLight* light = static_cast<PointLight*>(m_selectedObject);
+        auto light = static_cast<PointLight*>(m_selectedObject);
         ImGui::Text("光源名称: %s", light->GetName().c_str());
         
         // 光源颜色 - 使用ColorEdit3替代
@@ -362,6 +419,83 @@ void ToyEngineMainWindow::UpdateSelectedObjectProperties() {
             // 更新相机位置
         }
     }
+}
+
+void ToyEngineMainWindow::OnMouseLeftButtonDown() {
+    // 检查是否在ImGui区域内点击
+    if (ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
+        return; // ImGui正在处理点击，不传递给3D场景
+    }
+    
+    std::cout << "鼠标左键按下 - 位置: (" << m_currentMouseX << ", " << m_currentMouseY << ")" << std::endl;
+    // 这里可以添加3D场景中的对象拾取逻辑
+}
+
+void ToyEngineMainWindow::OnMouseLeftButtonUp() {
+    std::cout << "鼠标左键释放" << std::endl;
+}
+
+void ToyEngineMainWindow::OnMouseRightButtonDown() {
+    if (ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
+        return;
+    }
+    
+    m_cameraRotating = true;
+    std::cout << "开始相机旋转" << std::endl;
+}
+
+void ToyEngineMainWindow::OnMouseRightButtonUp() {
+    m_cameraRotating = false;
+    std::cout << "结束相机旋转" << std::endl;
+}
+
+void ToyEngineMainWindow::OnMouseMove(double deltaX, double deltaY) {
+    // 相机旋转控制
+    if (m_cameraRotating && m_renderer) {
+        auto camera = m_renderer->GetCamera();
+        if (camera) {
+            // 根据鼠标移动调整相机角度
+            float sensitivity = 0.1f;
+            camera->RotateHorizontal(static_cast<float>(-deltaX * sensitivity));
+            camera->RotateVertical(static_cast<float>(-deltaY * sensitivity));
+            std::cout << "相机旋转 - deltaX: " << deltaX << ", deltaY: " << deltaY << std::endl;
+        }
+    }
+    
+    // 相机平移控制（按住Shift键时）
+    if (m_mouseLeftPressed && glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        m_cameraPanning = true;
+        if (m_renderer) {
+            auto camera = m_renderer->GetCamera();
+            if (camera) {
+                float panSpeed = 0.01f;
+                camera->Pan(static_cast<float>(deltaX * panSpeed), static_cast<float>(-deltaY * panSpeed));
+                std::cout << "相机平移 - deltaX: " << deltaX << ", deltaY: " << deltaY << std::endl;
+            }
+        }
+    } else {
+        m_cameraPanning = false;
+    }
+}
+
+void ToyEngineMainWindow::OnMouseWheel(double delta) {
+    if (m_renderer) {
+        auto camera = m_renderer->GetCamera();
+        if (camera) {
+            // 相机缩放
+            float zoomSpeed = 0.1f;
+            camera->Zoom(static_cast<float>(delta * zoomSpeed));
+            std::cout << "相机缩放 - delta: " << delta << std::endl;
+        }
+    }
+}
+
+// 静态回调函数实现
+void ToyEngineMainWindow::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    // 注意：由于这是静态函数，我们需要某种方式获取MainWindow实例
+    // 这里简化处理，实际项目中可能需要使用glfwSetWindowUserPointer
+    std::cout << "鼠标滚轮 - xoffset: " << xoffset << ", yoffset: " << yoffset << std::endl;
+    // 在实际应用中，这里应该调用对应的MainWindow实例的方法
 }
 
 void ToyEngineMainWindow::Cleanup() {

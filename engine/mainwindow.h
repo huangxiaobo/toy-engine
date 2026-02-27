@@ -60,6 +60,17 @@ private:
     
     // 更新选中对象的属性
     void UpdateSelectedObjectProperties();
+    
+    // 鼠标事件处理
+    void OnMouseLeftButtonDown();
+    void OnMouseLeftButtonUp();
+    void OnMouseRightButtonDown();
+    void OnMouseRightButtonUp();
+    void OnMouseMove(double deltaX, double deltaY);
+    void OnMouseWheel(double delta);
+    
+    // GLFW回调函数
+    static void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
 private:
     GLFWwindow* m_window = nullptr;
@@ -78,6 +89,18 @@ private:
     // 选中的对象
     void* m_selectedObject = nullptr;
     std::string m_selectedObjectType;
+    
+    // 鼠标状态
+    bool m_mouseLeftPressed = false;
+    bool m_mouseRightPressed = false;
+    double m_lastMouseX = 0.0;
+    double m_lastMouseY = 0.0;
+    double m_currentMouseX = 0.0;
+    double m_currentMouseY = 0.0;
+    
+    // 相机控制状态
+    bool m_cameraRotating = false;
+    bool m_cameraPanning = false;
     
     // 时间相关
     float m_lastTime = 0.0f;

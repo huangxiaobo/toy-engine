@@ -69,8 +69,50 @@ void Camera::Roll(float angle)
 {
     // 创建一个绕相机前向向量旋转的旋转矩阵
     glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians(angle), m_front);
-
+    
     // 使用旋转矩阵更新相机的上向量和右向量
     m_up = glm::vec3(rotation * glm::vec4(m_up, 0.0f));
     m_right = glm::vec3(rotation * glm::vec4(m_right, 0.0f));
+}
+
+void Camera::RotateHorizontal(float angle)
+{
+    // 绕世界Y轴旋转（水平旋转）
+    glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians(angle), m_world_up);
+    
+    // 更新相机的前向向量和右向量
+    m_front = glm::vec3(rotation * glm::vec4(m_front, 0.0f));
+    m_right = glm::vec3(rotation * glm::vec4(m_right, 0.0f));
+    
+    // 更新目标点
+    m_target = m_position + m_front * 10.0f;
+}
+
+void Camera::RotateVertical(float angle)
+{
+    // 绕相机右向量旋转（垂直旋转）
+    glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians(angle), m_right);
+    
+    // 更新相机的前向向量和上向量
+    m_front = glm::vec3(rotation * glm::vec4(m_front, 0.0f));
+    m_up = glm::vec3(rotation * glm::vec4(m_up, 0.0f));
+    
+    // 更新目标点
+    m_target = m_position + m_front * 10.0f;
+}
+
+void Camera::Pan(float dx, float dy)
+{
+    // 平移相机
+    m_position += m_right * dx + m_up * dy;
+    m_target += m_right * dx + m_up * dy;
+}
+
+void Camera::Zoom(float amount)
+{
+    // 调整缩放
+    m_zoom -= amount;
+    if (m_zoom < 1.0f) m_zoom = 1.0f;
+    if (m_zoom > 45.0f) m_zoom = 45.0f;
+    updateCameraVectors();
 }

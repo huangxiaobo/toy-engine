@@ -42,6 +42,16 @@ public:
         bool constrainPitch = true
     );
     void ProcessMouseScroll(float yoffset);
+    
+    // 新增的相机控制方法
+    void RotateHorizontal(float angle);
+    void RotateVertical(float angle);
+    void Pan(float dx, float dy);
+    void Zoom(float amount);
+    
+    glm::vec3 GetPosition() const { return m_position; }
+    void SetPosition(const glm::vec3& position) { m_position = position; updateCameraVectors(); }
+    
 private:
     void updateCameraVectors();
 
