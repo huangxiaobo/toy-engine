@@ -10,35 +10,28 @@
 
 using namespace std;
 
-Shader::Shader()
-{
+Shader::Shader() {
     m_program = glCreateProgram();
 }
 
-Shader::~Shader()
-{
+Shader::~Shader() {
 }
 
-Shader::Shader(const char *vertexShaderPath, const char *fragmentShaderPath)
-{
+Shader::Shader(const char *vertexShaderPath, const char *fragmentShaderPath) {
     m_program = glCreateProgram();
     addShaderFromSourceFile(VERTEX_SHADER, vertexShaderPath);
     addShaderFromSourceFile(FRAGMENT_SHADER, fragmentShaderPath);
 }
 
 
-void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath)
-{
+void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath) {
     std::cout << "add shader from source file: " << shaderType << std::endl;
     std::ifstream file(filePath);
     std::stringstream buffer;
-    if (file.is_open())
-    {
+    if (file.is_open()) {
         buffer << file.rdbuf();
         file.close();
-    }
-    else
-    {
+    } else {
         std::cerr << "无法打开文件进行读取: " << filePath << std::endl;
         return;
     }
@@ -46,12 +39,9 @@ void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath
     const GLchar *vertexShaderSource = shader_source.c_str();
 
     int glShaderType = 0;
-    if (shaderType == VERTEX_SHADER)
-    {
+    if (shaderType == VERTEX_SHADER) {
         glShaderType = GL_VERTEX_SHADER;
-    }
-    else
-    {
+    } else {
         glShaderType = GL_FRAGMENT_SHADER;
     }
 
@@ -62,46 +52,40 @@ void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath
     int success;
     char infoLog[512];
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
+    if (!success) {
         glGetShaderInfoLog(vertexShader, 512, 0, infoLog);
         std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
+                << infoLog << std::endl;
     }
 
     glAttachShader(m_program, vertexShader);
     glDeleteShader(vertexShader);
 }
 
-bool Shader::Link()
-{
+bool Shader::Link() {
     int success;
 
     glLinkProgram(m_program);
 
     // check for linking errors
     glGetProgramiv(m_program, GL_LINK_STATUS, &success);
-    if (!success)
-    {
+    if (!success) {
         PrintProgramLog(m_program);
     }
     return success == 1;
 }
 
-void Shader::BindFragDataLocation()
-{
+void Shader::BindFragDataLocation() {
     glBindFragDataLocation(m_program, 0, "color\x00");
 }
 
 // 捕获链接着色器时的错误的函数
-void Shader::PrintProgramLog(unsigned int id)
-{
+void Shader::PrintProgramLog(unsigned int id) {
     int len = 0;
     char *log;
     glGetProgramiv(id, GL_INFO_LOG_LENGTH, &len);
-    if (len > 0)
-    {
-        log = (char *)malloc(len);
+    if (len > 0) {
+        log = (char *) malloc(len);
         glGetProgramInfoLog(id, len, 0, log);
         std::cout << "Program Inof Log:" << log << std::endl;
         free(log);
@@ -109,83 +93,77 @@ void Shader::PrintProgramLog(unsigned int id)
 }
 
 
-unsigned int Shader::GetAttributeLocation(const char *name)
-{
-
-    if (m_program != 0)
-    {
+unsigned int Shader::GetAttributeLocation(const char *name) {
+    if (m_program != 0) {
         return glGetAttribLocation(m_program, name);
     }
     return 0;
 }
 
-unsigned int Shader::GetUniformLocation(const char *name)
-{
-    if (m_program != 0)
-    {
+unsigned int Shader::GetUniformLocation(const char *name) {
+    if (m_program != 0) {
         return glGetUniformLocation(m_program, name);
     }
     return 0;
 }
 
-void Shader::Use()
-{
+void Shader::Use() {
     glUseProgram(m_program);
 }
 
-bool Shader::UnUse()
-{
+bool Shader::UnUse() {
     glUseProgram(0);
     return true;
 }
 
 
-void Shader::SetUniformValue(const char *name, float value)
-{
+void Shader::SetUniformValue(const char *name, float value) {
+    glUniform1f(glGetUniformLocation(m_program, name), value);
 }
 
-void Shader::SetUniformValue(const char *name, int value)
-{
+void Shader::SetUniformValue(const char *name, int value) {
+    glUniform1i(glGetUniformLocation(m_program, name), value);
 }
 
-void Shader::SetUniformValue(const char *name, bool value)
-{
+void Shader::SetUniformValue(const char *name, bool value) {
 }
 
-void Shader::SetUniformValue(const char *name, const glm::vec2 &value)
-{
+void Shader::SetUniformValue(const char *name, const glm::vec2 &value) {
+    glUniform2fv(glGetUniformLocation(m_program, name), 1, glm::value_ptr(value));
 }
 
-void Shader::SetUniformValue(const char *name, const glm::mat4 &value)
-{
+void Shader::SetUniformValue(const char *name, const glm::vec3 &value) {
+    auto location = glGetUniformLocation(m_program, name);
+    SetUniformValue(location, value);
+}
+
+void Shader::SetUniformValue(const char *name, const glm::vec4 &value) {
+    glUniform4fv(glGetUniformLocation(m_program, name), 1, glm::value_ptr(value));
+}
+
+void Shader::SetUniformValue(const char *name, const glm::mat4 &value) {
     glUniformMatrix4fv(glGetUniformLocation(m_program, name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
-void Shader::SetUniformValue(unsigned int uniform_location, float value)
-{
+void Shader::SetUniformValue(unsigned int uniform_location, float value) {
     glUniform1f(uniform_location, value);
 }
 
-void Shader::SetUniformValue(unsigned int uniform_location, int value)
-{
+void Shader::SetUniformValue(unsigned int uniform_location, int value) {
     glUniform1i(uniform_location, value);
 }
 
-void Shader::SetUniformValue(unsigned int uniform_location, bool value)
-{
+void Shader::SetUniformValue(unsigned int uniform_location, bool value) {
 }
 
-void Shader::SetUniformValue(unsigned int uniform_location, const glm::vec2 &value)
-{
+void Shader::SetUniformValue(unsigned int uniform_location, const glm::vec2 &value) {
     glUniform2fv(uniform_location, 1, glm::value_ptr(value));
 }
 
-void Shader::SetUniformValue(unsigned int uniform_location, const glm::vec3 &value)
-{
+void Shader::SetUniformValue(unsigned int uniform_location, const glm::vec3 &value) {
     glUniform3fv(uniform_location, 1, glm::value_ptr(value));
 }
 
-void Shader::SetUniformValue(unsigned int uniform_location, const glm::mat4 &value)
-{
+void Shader::SetUniformValue(unsigned int uniform_location, const glm::mat4 &value) {
     glUniformMatrix4fv(uniform_location, 1, GL_FALSE, glm::value_ptr(value));
 }

@@ -8,15 +8,13 @@
 #include <string>
 #include <vector>
 
-class WindowConfig
-{
+class WindowConfig {
 public:
     int WindowWidth;
     int WindowHeight;
 };
 
-class ClipConfig
-{
+class ClipConfig {
 public:
     float ClipNear;
     float ClipFar;
@@ -24,16 +22,14 @@ public:
     float ClipAspect;
 };
 
-class CameraConfig
-{
+class CameraConfig {
 public:
     glm::vec3 Position;
     glm::vec3 Target;
     glm::vec3 Up;
 };
 
-class PointLightConfig
-{
+class PointLightConfig {
 public:
     glm::vec3 Position;
     glm::vec3 Color;
@@ -46,16 +42,14 @@ public:
     float DiffuseIntensity;
     float SpecularIntensity;
 
-    struct
-    {
+    struct {
         float Constant;
         float Linear;
         float Exp;
     } Attenuation;
 };
 
-class MaterialConfig
-{
+class MaterialConfig {
 public:
     glm::vec3 AmbientColor;
     glm::vec3 DiffuseColor;
@@ -63,14 +57,13 @@ public:
     float Shininess;
 };
 
-class MeshConfig
-{
+class MeshConfig {
 public:
     std::string Name;
     std::string File;
 };
-class ModelCoinfig
-{
+
+class ModelCoinfig {
 public:
     std::string Name;
     std::string Effect;
@@ -86,17 +79,14 @@ public:
     MaterialConfig Material;
 };
 
-class Config
-{
-
+class Config {
 public:
     Config();
+
     ~Config();
 
-public:
-    static Config *LoadFromXml(std::string xml_file);
+    static Config *LoadFromYaml(const std::string &filename);
 
-public:
     WindowConfig Window;
     glm::vec4 ClearColor;
     ClipConfig Clip;

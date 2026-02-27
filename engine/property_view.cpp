@@ -6,10 +6,8 @@
 
 #include <QVBoxLayout>
 
-PropertyView::PropertyView()
-{
+PropertyView::PropertyView() {
 }
 
-PropertyView::~PropertyView()
-{
+PropertyView::~PropertyView() {
 }

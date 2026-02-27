@@ -11,36 +11,34 @@
 #include "../utils/utils.h"
 #include "../technique/technique.h"
 
-Mesh::Mesh() : DrawMode(GL_TRIANGLES)
-{
+Mesh::Mesh() : DrawMode(GL_TRIANGLES) {
+    VAO = 0;
+    VBO = 0;
+    EBO = 0;
 }
 
-Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices)
-{
+Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices) {
     DrawMode = GL_TRIANGLES;
     this->vertices.insert(this->vertices.end(), vertices.begin(), vertices.end());
     this->indices.insert(this->indices.end(), indices.begin(), indices.end());
     this->SetUpMesh();
 }
 
-Mesh::~Mesh()
-{
-    if (m_effect)
-    {
+Mesh::~Mesh() {
+    if (m_effect) {
         delete m_effect;
         m_effect = nullptr;
     }
 }
 
-void Mesh::SetUpMesh()
-{
+void Mesh::SetUpMesh() {
     // ===================== VAO | VBO =====================
-    // VAO 和 VBO 对象赋予 ID
+    // 创建并绑定VAO，VAO是一种容器对象，它存储了多个VBO以及与这些VBO相关的顶点属性指针设置（即glVertexAttribPointer的调用）
     glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-
-    // 绑定 VAO、VBO 对象
     glBindVertexArray(VAO);
+
+    // 创建并绑定VBO，VBO是一个GPU上的内存缓冲区，用来存储顶点属性的数据，如位置、颜色、纹理坐标、法线等信息
+    glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
     /* 为当前绑定到 target 的缓冲区对象创建一个新的数据存储（在 GPU 上创建对应的存储区域，并将内存中的数据发送过去）
@@ -66,29 +64,34 @@ void Mesh::SetUpMesh()
 
     // Vertex Positions
     // 开始 VAO 管理的第一个属性值
-    glVertexAttribPointer(Vertex::PositionLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0); // 手动传入第几个属性
+    glVertexAttribPointer(Vertex::PositionLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *) 0); // 手动传入第几个属性
     glEnableVertexAttribArray(Vertex::PositionLocation);
 
     // Vertex Color
     // 开始 VAO 管理的第二个属性值
-    glVertexAttribPointer(Vertex::ColorLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Color)); // 手动传入第几个属性
+    glVertexAttribPointer(Vertex::ColorLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void *) offsetof(Vertex, Color)); // 手动传入第几个属性
     glEnableVertexAttribArray(Vertex::ColorLocation);
 
     // Vertex Normal
-    glEnableVertexAttribArray(Vertex::NormalLocation);                                                                      // 开始 VAO 管理的第二个属性值
-    glVertexAttribPointer(Vertex::NormalLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Normal)); // 手动传入第几个属性
+    glEnableVertexAttribArray(Vertex::NormalLocation); // 开始 VAO 管理的第二个属性值
+    glVertexAttribPointer(Vertex::NormalLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void *) offsetof(Vertex, Normal)); // 手动传入第几个属性
 
     // Vertex TexCoords
-    glEnableVertexAttribArray(Vertex::TexCoordsLocation);                                                                         // 开始 VAO 管理的第三个属性值
-    glVertexAttribPointer(Vertex::TexCoordsLocation, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, TexCoords)); // 手动传入第几个属性
+    glEnableVertexAttribArray(Vertex::TexCoordsLocation); // 开始 VAO 管理的第三个属性值
+    glVertexAttribPointer(Vertex::TexCoordsLocation, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void *) offsetof(Vertex, TexCoords)); // 手动传入第几个属性
 
     // Vertex TexCoords
-    glEnableVertexAttribArray(Vertex::TangentLocation);                                                                       // 开始 VAO 管理的第三个属性值
-    glVertexAttribPointer(Vertex::TangentLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Tangent)); // 手动传入第几个属性
+    glEnableVertexAttribArray(Vertex::TangentLocation); // 开始 VAO 管理的第三个属性值
+    glVertexAttribPointer(Vertex::TangentLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void *) offsetof(Vertex, Tangent)); // 手动传入第几个属性
 
     // Vertex TexCoords
-    glEnableVertexAttribArray(Vertex::BitangentLocation);                                                                         // 开始 VAO 管理的第三个属性值
-    glVertexAttribPointer(Vertex::BitangentLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Bitangent)); // 手动传入第几个属性
+    glEnableVertexAttribArray(Vertex::BitangentLocation); // 开始 VAO 管理的第三个属性值
+    glVertexAttribPointer(Vertex::BitangentLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          (void *) offsetof(Vertex, Bitangent)); // 手动传入第几个属性
 
 #endif
 
@@ -105,7 +108,8 @@ void Mesh::SetUpMesh()
     // ===================== EBO =====================
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW); // EBO/IBO 是储存顶点【索引】的
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+    // EBO/IBO 是储存顶点【索引】的
 
     // 解绑 VAO 和 VBO，注意先解绑 VAO再解绑EBO
     glBindVertexArray(0);
@@ -113,23 +117,30 @@ void Mesh::SetUpMesh()
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void Mesh::SetDrawMode(GLuint mode)
-{
+void Mesh::UpdateVertexBuffer() {
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
+}
+
+vector<Vertex> &Mesh::GetVertices() {
+    return this->vertices;
+}
+
+
+void Mesh::SetDrawMode(GLuint mode) {
     DrawMode = mode;
 }
 
-void Mesh::SetEffect(Technique *effect)
-{
+void Mesh::SetEffect(Technique *effect) {
     m_effect = effect;
 }
 
-Technique *Mesh::GetEffect() const
-{
+Technique *Mesh::GetEffect() const {
     return m_effect;
 }
 
-void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *> &lights)
-{
+void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
+                const glm::vec3 &camera, const std::vector<Light *> &lights) {
     this->m_effect->Enable();
     this->m_effect->SetProjectionMatrix(projection);
     this->m_effect->SetViewMatrix(view);
@@ -139,16 +150,14 @@ void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
 
     this->m_effect->SetLights(lights);
 
-    // glLineWidth(5.0f);
     /* 重新绑定 VAO */
     glBindVertexArray(VAO);
     // 绘制模式(DrawMode): GL_TRIANGLES, GL_LINES, GL_POINTS
-    glDrawElements(DrawMode, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, (void *)0);
+    glDrawElements(DrawMode, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, (void *) 0);
     glBindVertexArray(0);
 }
 
-vector<Mesh *> Mesh::CreatePlaneMesh()
-{
+vector<Mesh *> Mesh::CreatePlaneMesh() {
     vector<Mesh *> meshes;
 
     vector<Vertex> vertices = {
@@ -157,34 +166,34 @@ vector<Mesh *> Mesh::CreatePlaneMesh()
             glm::vec3(0.5f, 0.5f, 0.0f), // Position
             glm::vec3(1.0f, 0.0f, 0.0f), // Color
             glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f, 1.0f),       // texture coords
+            glm::vec2(1.0f, 1.0f), // texture coords
 
         },
         {
             // bottom right
             glm::vec3(0.5f, -0.5f, 0.0f), // Position
-            glm::vec3(0.0f, 1.0f, 0.0f),  // Color
-            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
-            glm::vec2(1.0f, 1.0f),        // texture coords
+            glm::vec3(0.0f, 1.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f, 1.0f), // texture coords
         },
         {
             // bottom left
             glm::vec3(-0.5f, -0.5f, 0.0f), // Position
-            glm::vec3(0.0f, 0.0f, 1.0f),   // Color
-            glm::vec3(0.0f, 0.0f, 0.0f),   // Normal
-            glm::vec2(1.0f, 1.0f),         // texture coords
+            glm::vec3(0.0f, 0.0f, 1.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f, 1.0f), // texture coords
         },
         {
             // top left
             glm::vec3(-0.5f, 0.5f, 0.0f), // Position
-            glm::vec3(0.0f, 0.0f, 0.0f),  // Color
-            glm::vec3(0.0f, 0.0f, 0.0f),  // Normal
-            glm::vec2(1.0f, 1.0f),        // texture coords
+            glm::vec3(0.0f, 0.0f, 0.0f), // Color
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f, 1.0f), // texture coords
         },
     };
     vector<unsigned int> indices = {
         0, 1, 3, // first triangle
-        1, 2, 3  // second triangle
+        1, 2, 3 // second triangle
     };
 
     Mesh *mesh = new Mesh(vertices, indices);
@@ -194,8 +203,7 @@ vector<Mesh *> Mesh::CreatePlaneMesh()
     return meshes;
 }
 
-vector<Mesh *> Mesh::CreateGroundMesh()
-{
+vector<Mesh *> Mesh::CreateGroundMesh() {
     vector<Mesh *> meshes;
 
     Mesh *m1 = new Mesh();
@@ -212,10 +220,8 @@ vector<Mesh *> Mesh::CreateGroundMesh()
     //   v
     //   z
     GLuint i = 0;
-    for (int xi = -gridNum / 2; xi <= gridNum / 2; xi += 1)
-    {
-        for (int zi = -gridNum / 2; zi <= gridNum / 2; zi += 1)
-        {
+    for (int xi = -gridNum / 2; xi <= gridNum / 2; xi += 1) {
+        for (int zi = -gridNum / 2; zi <= gridNum / 2; zi += 1) {
             m1->vertices.push_back(Vertex{
                 glm::vec3{xi + 0, 0.0f, zi + 0},
                 glm::vec3{0.5, 0.5, 0.5},
@@ -257,23 +263,21 @@ vector<Mesh *> Mesh::CreateGroundMesh()
 
     meshes.push_back(m1);
 
-    for (auto mesh : meshes)
-    {
+    for (auto mesh: meshes) {
         mesh->SetUpMesh();
     }
     return meshes;
 }
 
-vector<Mesh *> Mesh::CreatePointMesh(glm::vec3 pos, glm::vec3 color)
-{
+vector<Mesh *> Mesh::CreatePointMesh(glm::vec3 pos, glm::vec3 color) {
     vector<Mesh *> meshes;
 
     vector<Vertex> vertices = {
         {
-            glm::vec3(pos.x, pos.y, pos.z),       // Position
+            glm::vec3(pos.x, pos.y, pos.z), // Position
             glm::vec3(color.x, color.y, color.z), // Color
-            glm::vec3(0.0f, 0.0f, 0.0f),          // Normal
-            glm::vec2(1.0f, 1.0f),                // texture co
+            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
+            glm::vec2(1.0f, 1.0f), // texture co
         },
     };
     vector<unsigned int> indices = {
@@ -288,12 +292,10 @@ vector<Mesh *> Mesh::CreatePointMesh(glm::vec3 pos, glm::vec3 color)
     return meshes;
 }
 
-vector<glm::vec3> drawConeArrow(float length, float arrowLength, float arrowRadius, int segments = 20)
-{
+vector<glm::vec3> drawConeArrow(float length, float arrowLength, float arrowRadius, int segments = 20) {
     // 圆锥底部的圆
     std::vector<float> circleVertices;
-    for (int i = 0; i <= segments; ++i)
-    {
+    for (int i = 0; i <= segments; ++i) {
         float angle = 2.0f * M_PI * i / segments;
         float x = arrowRadius * cos(angle);
         float y = arrowRadius * sin(angle);
@@ -303,34 +305,29 @@ vector<glm::vec3> drawConeArrow(float length, float arrowLength, float arrowRadi
     }
     vector<glm::vec3> points;
     points.push_back(glm::vec3(0.0f, 0.0f, length + arrowLength));
-    for (size_t i = 0; i < circleVertices.size(); i += 3)
-    {
+    for (size_t i = 0; i < circleVertices.size(); i += 3) {
         points.push_back(glm::vec3(circleVertices[i], circleVertices[i + 1], circleVertices[i + 2]));
     };
     return points;
 }
 
-vector<glm::vec3> createCirclePoints(float radius, int segments = 20, glm::vec3 center = glm::vec3(0.0f), glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f))
-{
+vector<glm::vec3> createCirclePoints(const float radius,
+                                     const int segments = 20,
+                                     const glm::vec3 center = glm::vec3(0.0f),
+                                     const glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f)) {
     // 圆锥底部的圆
     std::vector<glm::vec3> circleVertices;
-    for (int i = 0; i <= segments; ++i)
-    {
+    for (int i = 0; i <= segments; ++i) {
         glm::vec3 vertic;
         float angle = 2.0f * M_PI * i / segments;
         float x = radius * cos(angle);
         float y = radius * sin(angle);
 
-        if (up.x != 0.0f)
-        {
+        if (up.x != 0.0f) {
             vertic = glm::vec3(0.0f, x, y);
-        }
-        else if (up.y != 0.0f)
-        {
+        } else if (up.y != 0.0f) {
             vertic = glm::vec3(x, 0.0f, y);
-        }
-        else if (up.z != 0.0f)
-        {
+        } else if (up.z != 0.0f) {
             vertic = glm::vec3(x, y, 0.0f);
         }
 
@@ -339,8 +336,7 @@ vector<glm::vec3> createCirclePoints(float radius, int segments = 20, glm::vec3 
     return circleVertices;
 }
 
-vector<Mesh *> Mesh::CreateAxisMesh()
-{
+vector<Mesh *> Mesh::CreateAxisMesh() {
     vector<Mesh *> meshes;
 
     auto axislength = 10.0f;
@@ -364,19 +360,21 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     axis_cyber_top_circle_points = createCirclePoints(axisRadius, 20, axisEndPoint, axisDirection);
 
     Mesh *m_x = new Mesh();
-    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1)
-    {
-        m_x->vertices.push_back({axis_cyber_btm_circle_points[i],
-                                 axisColor,
-                                 axis_cyber_btm_circle_points[i] - axisStartPoint,
-                                 glm::vec2(0.0f)});
-        m_x->vertices.push_back({axis_cyber_top_circle_points[i],
-                                 axisColor,
-                                 axis_cyber_top_circle_points[i] - axisEndPoint,
-                                 glm::vec2(0.0f)});
+    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1) {
+        m_x->vertices.push_back({
+            axis_cyber_btm_circle_points[i],
+            axisColor,
+            axis_cyber_btm_circle_points[i] - axisStartPoint,
+            glm::vec2(0.0f)
+        });
+        m_x->vertices.push_back({
+            axis_cyber_top_circle_points[i],
+            axisColor,
+            axis_cyber_top_circle_points[i] - axisEndPoint,
+            glm::vec2(0.0f)
+        });
     }
-    for (int i = 0; i < m_x->vertices.size() - 2; i += 2)
-    {
+    for (int i = 0; i < m_x->vertices.size() - 2; i += 2) {
         m_x->indices.push_back(i);
         m_x->indices.push_back(i + 1);
         m_x->indices.push_back(i + 2);
@@ -391,20 +389,22 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     // 圆锥底部的圆
     axis_arrow_btm_circle_points = createCirclePoints(arrowRadius, 20, axisEndPoint, axisDirection);
 
-    m_x_arrow->vertices.push_back({axisEndPoint + axisDirection * arrowLength,
-                                   axisColor,
-                                   glm::vec3(1.0f, 0.0f, 0.0f),
-                                   glm::vec2(0.0f)});
-    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1)
-    {
-        m_x_arrow->vertices.push_back({axis_arrow_btm_circle_points[i],
-                                       axisColor,
-                                       axis_arrow_btm_circle_points[i] - axisEndPoint,
-                                       glm::vec2(0.0f)});
+    m_x_arrow->vertices.push_back({
+        axisEndPoint + axisDirection * arrowLength,
+        axisColor,
+        glm::vec3(1.0f, 0.0f, 0.0f),
+        glm::vec2(0.0f)
+    });
+    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1) {
+        m_x_arrow->vertices.push_back({
+            axis_arrow_btm_circle_points[i],
+            axisColor,
+            axis_arrow_btm_circle_points[i] - axisEndPoint,
+            glm::vec2(0.0f)
+        });
     }
 
-    for (size_t i = 2; i < m_x_arrow->vertices.size(); i += 1)
-    {
+    for (size_t i = 2; i < m_x_arrow->vertices.size(); i += 1) {
         m_x_arrow->indices.push_back(0);
         m_x_arrow->indices.push_back(i - 1);
         m_x_arrow->indices.push_back(i);
@@ -420,19 +420,21 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     axis_cyber_top_circle_points = createCirclePoints(axisRadius, 20, axisEndPoint, axisDirection);
 
     Mesh *m_y = new Mesh();
-    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1)
-    {
-        m_y->vertices.push_back({axis_cyber_btm_circle_points[i],
-                                 axisColor,
-                                 axis_cyber_btm_circle_points[i] - axisStartPoint,
-                                 glm::vec2(0.0f)});
-        m_y->vertices.push_back({axis_cyber_top_circle_points[i],
-                                 axisColor,
-                                 axis_cyber_top_circle_points[i] - axisEndPoint,
-                                 glm::vec2(0.0f)});
+    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1) {
+        m_y->vertices.push_back({
+            axis_cyber_btm_circle_points[i],
+            axisColor,
+            axis_cyber_btm_circle_points[i] - axisStartPoint,
+            glm::vec2(0.0f)
+        });
+        m_y->vertices.push_back({
+            axis_cyber_top_circle_points[i],
+            axisColor,
+            axis_cyber_top_circle_points[i] - axisEndPoint,
+            glm::vec2(0.0f)
+        });
     }
-    for (int i = 0; i < m_y->vertices.size() - 2; i += 2)
-    {
+    for (int i = 0; i < m_y->vertices.size() - 2; i += 2) {
         m_y->indices.push_back(i);
         m_y->indices.push_back(i + 1);
         m_y->indices.push_back(i + 2);
@@ -447,20 +449,22 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     // 圆锥底部的圆
     axis_arrow_btm_circle_points = createCirclePoints(arrowRadius, 20, axisEndPoint, axisDirection);
 
-    m_y_arrow->vertices.push_back({axisEndPoint + axisDirection * arrowLength,
-                                   axisColor,
-                                   glm::vec3(0.0f, 1.0f, 0.0f),
-                                   glm::vec2(0.0f)});
-    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1)
-    {
-        m_y_arrow->vertices.push_back({axis_arrow_btm_circle_points[i],
-                                       axisColor,
-                                       axis_arrow_btm_circle_points[i] - axisEndPoint,
-                                       glm::vec2(0.0f)});
+    m_y_arrow->vertices.push_back({
+        axisEndPoint + axisDirection * arrowLength,
+        axisColor,
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        glm::vec2(0.0f)
+    });
+    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1) {
+        m_y_arrow->vertices.push_back({
+            axis_arrow_btm_circle_points[i],
+            axisColor,
+            axis_arrow_btm_circle_points[i] - axisEndPoint,
+            glm::vec2(0.0f)
+        });
     }
 
-    for (size_t i = 2; i < m_y_arrow->vertices.size(); i += 1)
-    {
+    for (size_t i = 2; i < m_y_arrow->vertices.size(); i += 1) {
         m_y_arrow->indices.push_back(0);
         m_y_arrow->indices.push_back(i - 1);
         m_y_arrow->indices.push_back(i);
@@ -477,19 +481,21 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     axis_cyber_top_circle_points = createCirclePoints(axisRadius, 20, axisEndPoint, axisDirection);
 
     Mesh *m_z = new Mesh();
-    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1)
-    {
-        m_z->vertices.push_back({axis_cyber_btm_circle_points[i],
-                                 axisColor,
-                                 axis_cyber_btm_circle_points[i] - axisStartPoint,
-                                 glm::vec2(0.0f)});
-        m_z->vertices.push_back({axis_cyber_top_circle_points[i],
-                                 axisColor,
-                                 axis_cyber_top_circle_points[i] - axisEndPoint,
-                                 glm::vec2(0.0f)});
+    for (size_t i = 0; i < axis_cyber_btm_circle_points.size(); i += 1) {
+        m_z->vertices.push_back({
+            axis_cyber_btm_circle_points[i],
+            axisColor,
+            axis_cyber_btm_circle_points[i] - axisStartPoint,
+            glm::vec2(0.0f)
+        });
+        m_z->vertices.push_back({
+            axis_cyber_top_circle_points[i],
+            axisColor,
+            axis_cyber_top_circle_points[i] - axisEndPoint,
+            glm::vec2(0.0f)
+        });
     }
-    for (int i = 0; i < m_z->vertices.size() - 2; i += 2)
-    {
+    for (int i = 0; i < m_z->vertices.size() - 2; i += 2) {
         m_z->indices.push_back(i);
         m_z->indices.push_back(i + 1);
         m_z->indices.push_back(i + 2);
@@ -504,37 +510,77 @@ vector<Mesh *> Mesh::CreateAxisMesh()
     // 圆锥底部的圆
     axis_arrow_btm_circle_points = createCirclePoints(arrowRadius, 20, axisEndPoint, axisDirection);
 
-    m_z_arrow->vertices.push_back({axisEndPoint + axisDirection * arrowLength,
-                                   axisColor,
-                                   glm::vec3(0.0f, 0.0f, 1.0f),
-                                   glm::vec2(0.0f)});
-    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1)
-    {
-        m_z_arrow->vertices.push_back({axis_arrow_btm_circle_points[i],
-                                       axisColor,
-                                       axis_arrow_btm_circle_points[i] - axisEndPoint,
-                                       glm::vec2(0.0f)});
+    m_z_arrow->vertices.push_back({
+        axisEndPoint + axisDirection * arrowLength,
+        axisColor,
+        glm::vec3(0.0f, 0.0f, 1.0f),
+        glm::vec2(0.0f)
+    });
+    for (size_t i = 0; i < axis_arrow_btm_circle_points.size(); i += 1) {
+        m_z_arrow->vertices.push_back({
+            axis_arrow_btm_circle_points[i],
+            axisColor,
+            axis_arrow_btm_circle_points[i] - axisEndPoint,
+            glm::vec2(0.0f)
+        });
     }
 
-    for (size_t i = 2; i < m_z_arrow->vertices.size(); i += 1)
-    {
+    for (size_t i = 2; i < m_z_arrow->vertices.size(); i += 1) {
         m_z_arrow->indices.push_back(0);
         m_z_arrow->indices.push_back(i - 1);
         m_z_arrow->indices.push_back(i);
     }
     meshes.push_back(m_z_arrow);
 
-    for (auto mesh : meshes)
-    {
+    for (auto mesh: meshes) {
         mesh->SetUpMesh();
     }
 
     return meshes;
 }
 
-Mesh *Mesh::Clone()
-{
+vector<Mesh *> Mesh::CreatePointLightMeshes(int radius) {
+    vector<Mesh *> meshes;
 
+    vector ups = {
+        glm::vec3(1.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f),
+    };
+    for (auto up: ups) {
+        Mesh *m1 = new Mesh();
+        m1->DrawMode = GL_LINE_LOOP;
+
+
+        auto points = createCirclePoints(
+            radius,
+            40,
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            up
+        );
+        for (size_t i = 0; i < points.size(); i += 1) {
+            std::cout << "point: " << Utils::GetString(points[i]) << std::endl;
+            m1->vertices.push_back({
+                points[i],
+                glm::vec3(1.0f),
+                glm::vec3(1.0f),
+                glm::vec2(0.0f),
+                glm::vec3(1.0f),
+                glm::vec3(1.0f)
+            });
+            m1->indices.push_back(i);
+        }
+        meshes.push_back(m1);
+    }
+
+    for (const auto mesh: meshes) {
+        mesh->SetUpMesh();
+    }
+
+    return meshes;
+}
+
+Mesh *Mesh::Clone() {
     Mesh *m = new Mesh();
     m->vertices = vector<Vertex>(this->vertices);
     m->indices = vector<unsigned int>(this->indices);
@@ -544,18 +590,15 @@ Mesh *Mesh::Clone()
 }
 
 // 辅助函数：归一化向量
-glm::vec3 normalize(const glm::vec3 &v)
-{
+glm::vec3 normalize(const glm::vec3 &v) {
     float length = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
     return glm::vec3(v.x / length, v.y / length, v.z / length);
 }
 
 // 辅助函数：细分三角形
-void subdivide(vector<Vertex> &vertices, vector<unsigned int> &indices)
-{
+void subdivide(vector<Vertex> &vertices, vector<unsigned int> &indices) {
     vector<unsigned int> newIndices;
-    for (size_t i = 0; i < indices.size(); i += 3)
-    {
+    for (size_t i = 0; i < indices.size(); i += 3) {
         int i0 = indices[i];
         int i1 = indices[i + 1];
         int i2 = indices[i + 2];
@@ -594,9 +637,7 @@ void subdivide(vector<Vertex> &vertices, vector<unsigned int> &indices)
     indices = newIndices;
 }
 
-vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color)
-{
-
+vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color) {
     vector<Mesh *> meshes;
 
     // 二十面体的顶点和索引数据
@@ -614,9 +655,9 @@ vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm
         {{t, 0, -1}, glm::vec3(1.0f), glm::vec3(0.0f), glm::vec2(0.0f)},
         {{t, 0, 1}, glm::vec3(1.0f), glm::vec3(0.0f), glm::vec2(0.0f)},
         {{-t, 0, -1}, glm::vec3(1.0f), glm::vec3(0.0f), glm::vec2(0.0f)},
-        {{-t, 0, 1}, glm::vec3(1.0f), glm::vec3(0.0f), glm::vec2(0.0f)}};
-    for (auto &v : vertices)
-    {
+        {{-t, 0, 1}, glm::vec3(1.0f), glm::vec3(0.0f), glm::vec2(0.0f)}
+    };
+    for (auto &v: vertices) {
         v.Position = normalize(v.Position);
     }
 
@@ -640,15 +681,14 @@ vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm
         2, 4, 11,
         6, 2, 10,
         8, 6, 7,
-        9, 8, 1};
+        9, 8, 1
+    };
 
     // 细分三角形
-    for (int i = 0; i < subdivisions; ++i)
-    {
+    for (int i = 0; i < subdivisions; ++i) {
         subdivide(vertices, indices);
     }
-    for (int i = 0; i < vertices.size(); ++i)
-    {
+    for (int i = 0; i < vertices.size(); ++i) {
         vertices[i].Color = color;
         vertices[i].Normal = glm::normalize(vertices[i].Position);
     }
@@ -662,7 +702,6 @@ vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm
     return meshes;
 }
 
-vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions)
-{
+vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions) {
     return CreateIcosphereMesh(subdivisions, glm::vec3(0.0f), glm::vec3(1.0f));
 }

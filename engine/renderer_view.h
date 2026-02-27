@@ -10,22 +10,32 @@
 #include <QLabel>
 
 class Renderer;
+enum class ProjectionType;
+
+
 class RendererWidget : public QOpenGLWidget //, protected QOpenGLFunctions_4_1_Core
 {
-
     Q_OBJECT
 
 public:
     explicit RendererWidget(QWidget *parent = Q_NULLPTR);
+
     virtual ~RendererWidget();
 
     void updateStatusBar(QStatusBar *status_bar);
+
     void updateModelList(QTreeView *tree_view);
+
+    void SetProjectionType(ProjectionType type);
+    const ProjectionType GetProjectionType();
 
 protected:
     void initializeGL();
+
     void paintGL();
+
     void resizeGL(int w, int h);
+
     void keyPressEvent(QKeyEvent *e);
 
 signals:

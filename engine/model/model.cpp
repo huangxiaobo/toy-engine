@@ -1,6 +1,7 @@
 #include "model.h"
 
 #include <iostream>
+#include <format>
 
 #include "../technique/technique.h"
 #include "../technique/technique_light.h"
@@ -19,35 +20,32 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <string>
-Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f)
-{
+
+Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f) {
     m_uuid = Utils::GenerateUUID();
     m_matrix = glm::mat4(1.0f);
 }
 
-Model::~Model()
-{
-    while (!m_meshes.empty())
-    {
+Model::~Model() {
+    while (!m_meshes.empty()) {
         delete m_meshes[0];
         m_meshes.erase(m_meshes.begin());
     }
 }
 
-void Model::Init()
-{
+void Model::Init() {
 }
 
 // 使用assimp加载模型
-void Model::LoadModel(const string &path)
-{
-
+void Model::LoadModel(const string &path) {
     // read file via ASSIMP
     Assimp::Importer importer; // c++接口
     // aiProcess_GenSmoothNormals
     // aiProcess_CalcTangentSpace
     const aiScene *scene = importer.ReadFile(path,
-                                             aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace); // 读取数据并做部分处理，返回根节点
+                                             aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices
+                                             | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+    // 读取数据并做部分处理，返回根节点
     // check for errors
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // 检查读取是否正确
     {
@@ -61,26 +59,22 @@ void Model::LoadModel(const string &path)
     ProcessNode(scene->mRootNode, scene); // 处理结点
 }
 
-void Model::ProcessNode(aiNode *node, const aiScene *scene)
-{
+void Model::ProcessNode(aiNode *node, const aiScene *scene) {
     std::cout << "ProcessNode: " << node->mNumMeshes << std::endl;
     // process each mesh located at the current node处理当前结点的每个网络
-    for (unsigned int i = 0; i < node->mNumMeshes; i++)
-    {
+    for (unsigned int i = 0; i < node->mNumMeshes; i++) {
         // the node object only contains indices to index the actual objects in the scene.
         // the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
         m_meshes.push_back(ProcessMesh(mesh, scene)); // 递归扫描，将模型数据存储在vector<mesh>中
     }
     // after we've processed all of the meshes (if any) we then recursively process each of the children nodes处理当前结点的所有子节点
-    for (unsigned int i = 0; i < node->mNumChildren; i++)
-    {
+    for (unsigned int i = 0; i < node->mNumChildren; i++) {
         ProcessNode(node->mChildren[i], scene);
     }
 }
 
-Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene)
-{
+Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) {
     // data to fill
     vector<Vertex> vertices;
     vector<unsigned int> indices;
@@ -89,7 +83,7 @@ Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene)
     // 遍历网格的每个顶点
     for (unsigned int i = 0; i < ai_mesh->mNumVertices; i++) // mNumVertices存储了顶点数量
     {
-        Vertex vertex;    // Vertex结构体在Mesh.h中有定义
+        Vertex vertex; // Vertex结构体在Mesh.h中有定义
         glm::vec3 vector; // 我们声明了一个占位符向量，因为assimp使用它自己的向量类，它不会直接转换到glm的vec3类，所以我们首先将数据转换到这个占位符glm::vec3。
         // positions
         vector.x = ai_mesh->mVertices[i].x;
@@ -124,19 +118,17 @@ Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene)
             vector.y = ai_mesh->mBitangents[i].y;
             vector.z = ai_mesh->mBitangents[i].z;
             vertex.Bitangent = vector;
-        }
-        else
+        } else
             vertex.TexCoords = glm::vec2(0.0f, 0.0f);
 
         vertices.push_back(vertex);
     }
     // 现在遍历网格的每个面(面是网格的三角形)并检索相应的顶点索引。
-    for (unsigned int i = 0; i < ai_mesh->mNumFaces; i++)
-    {
+    for (unsigned int i = 0; i < ai_mesh->mNumFaces; i++) {
         aiFace face = ai_mesh->mFaces[i];
         // retrieve all indices of the face and store them in the indices vector
-        for (unsigned int j = 0; j < face.mNumIndices; j++)
-        {                                        // 每个面都有顶点索引
+        for (unsigned int j = 0; j < face.mNumIndices; j++) {
+            // 每个面都有顶点索引
             indices.push_back(face.mIndices[j]); // 将索引存储在容器中，类似于VEO
         }
     }
@@ -166,14 +158,13 @@ Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene)
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 
     // return a mesh object created from the extracted mesh data
-    Mesh *mesh = new Mesh(vertices, indices);
+    auto mesh = new Mesh(vertices, indices);
     return mesh;
 }
 
 // checks all material textures of a given type and loads the textures if they're not loaded yet.
 // the required info is returned as a Texture struct.
-vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName)
-{
+vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName) {
     vector<Texture> textures;
     return textures;
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) // 检查储存在材质中(该类型)纹理的数量
@@ -182,12 +173,11 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
         mat->GetTexture(type, i, &str); // 获取每个纹理的文件位置，它会将结果储存在一个aiString中
         // check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
         bool skip = false;
-        for (unsigned int j = 0; j < m_textures_loaded.size(); j++)
-        {
-            if (std::strcmp(m_textures_loaded[j].path.data(), str.C_Str()) == 0)
-            {
+        for (unsigned int j = 0; j < m_textures_loaded.size(); j++) {
+            if (std::strcmp(m_textures_loaded[j].path.data(), str.C_Str()) == 0) {
                 textures.push_back(m_textures_loaded[j]);
-                skip = true; // a texture with the same filepath has already been loaded, continue to next one. (optimization)
+                skip = true;
+                // a texture with the same filepath has already been loaded, continue to next one. (optimization)
                 break;
             }
         }
@@ -204,29 +194,28 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
     return textures;
 }
 
-void Model::SetMesh(vector<Mesh *> meshes)
-{
-    for (auto m : meshes)
-    {
+void Model::SetMesh(Mesh *mesh) {
+    this->m_meshes.push_back(mesh);
+}
+
+void Model::SetMeshes(vector<Mesh *> meshes) {
+    for (auto m: meshes) {
         this->m_meshes.push_back(m);
     }
 }
 
-void Model::SetScale(glm::vec3 scale)
-{
+void Model::SetScale(glm::vec3 scale) {
     this->m_scale = scale;
     m_matrix = glm::scale(m_matrix, scale);
 }
 
-void Model::SetRotate(glm::f32 rotation)
-{
+void Model::SetRotate(glm::f32 rotation) {
     m_rotation = rotation;
     m_matrix = glm::rotate(m_matrix, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
 // 绕指定轴旋转
-void Model::SetRotate(glm::f32 rotation, glm::vec3 axis)
-{
+void Model::SetRotate(glm::f32 rotation, glm::vec3 axis) {
     m_rotation = rotation;
     // 先将模型平移到原点
     glm::mat4 translateToOrigin = glm::translate(glm::mat4(1.0f), -m_position);
@@ -239,8 +228,7 @@ void Model::SetRotate(glm::f32 rotation, glm::vec3 axis)
     m_matrix = translateBack * rotate * translateToOrigin * m_matrix;
 }
 
-void Model::SetTranslate(glm::vec3 position)
-{
+void Model::SetTranslate(glm::vec3 position) {
     // 先将模型平移到原点
     m_matrix = glm::translate(m_matrix, -m_position);
     // 更新位置
@@ -249,8 +237,7 @@ void Model::SetTranslate(glm::vec3 position)
     m_matrix = glm::translate(m_matrix, m_position);
 }
 
-void Model::SetPosition(glm::vec3 position)
-{
+void Model::SetPosition(glm::vec3 position) {
     // 先将模型平移到原点
     m_matrix = glm::translate(m_matrix, -m_position);
     // 更新位置
@@ -269,31 +256,25 @@ void Model::SetPosition(glm::vec3 position)
 //     this->m_effect = effect;
 // }
 
-vector<Mesh *> Model::GetMeshes() const
-{
-   return m_meshes;
+vector<Mesh *> Model::GetMeshes() const {
+    return m_meshes;
 }
 
-glm::vec3 Model::GetPosition() const
-{
+glm::vec3 Model::GetPosition() const {
     return m_position;
 }
 
-glm::vec3 Model::GetScale() const
-{
+glm::vec3 Model::GetScale() const {
     return m_scale;
 }
 
-glm::f32 Model::GetRotation() const
-{
+glm::f32 Model::GetRotation() const {
     return m_rotation;
 }
 
 void Model::Draw(long long elapsed,
                  const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
-                 const glm::vec3 &camera, const std::vector<Light *> &lights)
-{
-
+                 const glm::vec3 &camera, const std::vector<Light *> &lights) {
     glLineWidth(5);
     auto model_local = glm::mat4(1.0f);
     model_local = glm::translate(model_local, m_position);
@@ -314,8 +295,49 @@ void Model::Draw(long long elapsed,
     // this->m_effect->SetMaterial(this->m_material);
     // this->m_effect->GetShader()->BindFragDataLocation();
 
-    for (int i = 0; i < this->m_meshes.size(); i++)
-    {
+    for (int i = 0; i < this->m_meshes.size(); i++) {
         this->m_meshes[i]->Draw(elapsed, projection, view, model_local, camera, lights);
     }
+}
+
+Model *Model::CreatePointLightModelV1() {
+    // 创建光源模型
+    auto model = new Model(std::format("light-{}", 1));
+    auto meshes = Mesh::CreatePointLightMeshes(5);
+    model->SetMeshes(meshes);
+    model->SetPosition(glm::vec3{0.0f, 0.0f, 0.0f});
+
+    Technique *effect = new Technique(
+        "only_vertex_color",
+        "./resource/shader/only_vertex_color.vert",
+        "./resource/shader/only_vertex_color.frag"
+    );
+
+    for (auto m: meshes) {
+        m->SetEffect(effect);
+    }
+    return model;
+}
+
+Model *Model::CreatePointLightModelV2() {
+    // 创建光源模型
+    auto model = new Model(std::format("light-{}", 1));
+
+    Technique *effect = new Technique(
+        "only_vertex_color",
+        "./resource/shader/only_vertex_color.vert",
+        "./resource/shader/only_vertex_color.frag"
+    );
+
+    for (auto m: Mesh::CreateIcosphereMesh(5, glm::vec3{0.0f}, glm::vec3{1.0f})) {
+        model->SetMesh(m);
+        m->SetEffect(effect);
+    }
+
+    for (auto m: Mesh::CreatePointLightMeshes(5)) {
+        model->SetMesh(m);
+        m->SetEffect(effect);
+    }
+    model->SetScale(glm::vec3{0.5f});
+    return model;
 }

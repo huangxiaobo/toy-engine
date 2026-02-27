@@ -2,5 +2,5 @@
 #include "renderer.h"
 #include "config.h"
 
-Config *gConfig = new Config();
-Renderer *gRenderer = new Renderer();
+auto gConfig = new Config();
+auto gRenderer = new Renderer();

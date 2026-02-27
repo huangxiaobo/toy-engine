@@ -63,11 +63,18 @@ public:
     static vector<Mesh *> CreateIcosphereMesh(int subdivisions = 0);
     static vector<Mesh *> CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color);
     static vector<Mesh *> CreateAxisMesh();
+    static vector<Mesh*> CreatePointLightMeshes(int radius);
 
     Mesh *Clone();
+    void UpdateVertexBuffer();
 
 private:
     void SetUpMesh();
+
+
+
+public:
+    vector<Vertex>& GetVertices();
 
 public:
     string name;

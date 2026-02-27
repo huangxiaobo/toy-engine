@@ -22,57 +22,44 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/transform.hpp>
 
-#include <tinyxml2/tinyxml2.h>
-
-Renderer::Renderer()
-{
+Renderer::Renderer() {
 }
 
-Renderer::~Renderer()
-{
-    if (m_camera != nullptr)
-    {
+Renderer::~Renderer() {
+    if (m_camera != nullptr) {
         delete m_camera;
         m_camera = nullptr;
     }
-    if (m_axis != nullptr)
-    {
+    if (m_axis != nullptr) {
         delete m_axis;
         m_axis = nullptr;
     }
-    while (!m_models.empty())
-    {
-        for (auto model : m_models)
-        {
+    while (!m_models.empty()) {
+        for (auto model: m_models) {
             delete model;
         }
         m_models.clear();
     }
-    while (!m_lights.empty())
-    {
-        for (auto light : m_lights)
-        {
+    while (!m_lights.empty()) {
+        for (auto light: m_lights) {
             delete light;
         }
         m_lights.clear();
     }
-    if (m_fps_counter != nullptr)
-    {
+    if (m_fps_counter != nullptr) {
         delete m_fps_counter;
         m_fps_counter = nullptr;
     }
 }
 
-void Renderer::init(int w, int h)
-{
+void Renderer::init(int w, int h) {
     // glad 初始化
-    if (!gladLoaderLoadGL())
-    {
+    if (!gladLoaderLoadGL()) {
         std::cout << ("glad init failed!") << std::endl;
         return;
     }
 
-    const char *version = (const char *)glGetString(GL_VERSION);
+    const char *version = (const char *) glGetString(GL_VERSION);
     std::cout << "OpenGL Version: " << version << std::endl;
 
     glEnable(GL_DEPTH_TEST);
@@ -92,7 +79,7 @@ void Renderer::init(int w, int h)
     m_fps_counter = new FPSCounter();
 
     m_projection_matrix = glm::mat4(1.0f);
-    m_view_matrix = glm::mat4(1.0f);  //  默认生成的是一个单位矩阵（对角线上的元素为1）
+    m_view_matrix = glm::mat4(1.0f); //  默认生成的是一个单位矩阵（对角线上的元素为1）
     m_model_matrix = glm::mat4(1.0f); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
     m_eye_pos = glm::vec3(0, 0, 0);
     calculateProjectMatrix(w, h);
@@ -100,14 +87,13 @@ void Renderer::init(int w, int h)
     // 创建坐标系模型
     auto axis_model = new Model("axis");
     auto axis_mesh = Mesh::CreateAxisMesh();
-    axis_model->SetMesh(axis_mesh);
+    axis_model->SetMeshes(axis_mesh);
 
     Technique *axis_effect = new Technique("axis",
                                            "./resource/shader/axis.vert",
                                            "./resource/shader/axis.frag");
 
-    for (auto m : axis_mesh)
-    {
+    for (auto m: axis_mesh) {
         m->SetEffect(axis_effect);
     }
 
@@ -123,9 +109,8 @@ void Renderer::init(int w, int h)
 
     Model *plane = new Model("plane");
     plane->SetScale(glm::vec3(5.0f, 5.0f, 5.0f));
-    plane->SetMesh(plane_mesh);
-    for (auto m : plane_mesh)
-    {
+    plane->SetMeshes(plane_mesh);
+    for (auto m: plane_mesh) {
         m->SetEffect(plane_effect);
     }
 
@@ -139,9 +124,8 @@ void Renderer::init(int w, int h)
 
     m_ground = new Model("ground");
     m_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
-    m_ground->SetMesh(ground_mesh);
-    for (auto m : ground_mesh)
-    {
+    m_ground->SetMeshes(ground_mesh);
+    for (auto m: ground_mesh) {
         m->SetEffect(ground_effect);
     }
 
@@ -151,9 +135,7 @@ void Renderer::init(int w, int h)
         gConfig->Camera.Up);
 
     int i = 0;
-    for (auto lightConfig : gConfig->PointLights)
-    {
-
+    for (auto lightConfig: gConfig->PointLights) {
         auto light = new PointLight(std::format("light-{}", i + 1));
         light->Color = lightConfig.Color;
         light->Position = lightConfig.Position;
@@ -166,30 +148,22 @@ void Renderer::init(int w, int h)
         m_lights.push_back(light);
 
         // 创建光源模型
-        auto model = new Model(std::format("light-{}", i++));
-        // auto mesh = Mesh::CreatePointMesh(light->Position, light->Color);
-        auto mesh = Mesh::CreateIcosphereMesh(5, light->Position, light->Color);
-        model->SetMesh(mesh);
-        model->SetScale(glm::vec3(0.5f));
+        auto model = Model::CreatePointLightModelV2();
+        model->SetPosition(light->Position);
+        light->SetModel(model);
 
-        Technique *effect = Technique::GetDefaultTechnique();
-        for (auto m : mesh)
-        {
-            m->SetEffect(effect);
-        }
 
-        light->m_model = model;
+        //
+        // m_light_models[light->GetUUID()] = model;
         std::cout << "Setup light finish" << std::endl;
     }
     std::cout << "Setup lights finish" << std::endl;
 
-    for (auto modelConfig : gConfig->Models)
-    {
+    for (auto modelConfig: gConfig->Models) {
         std::cout << "model name : " << modelConfig.Name << std::endl;
         std::cout << "mesh name  : " << modelConfig.Mesh.Name << std::endl;
         std::cout << "mesh file  : " << modelConfig.Mesh.File << std::endl;
-        if (modelConfig.Mesh.File.length() == 0)
-        {
+        if (modelConfig.Mesh.File.length() == 0) {
             continue;
         }
         auto model_obj = new Model(modelConfig.Name);
@@ -208,8 +182,7 @@ void Renderer::init(int w, int h)
         );
         effect->SetMaterial(material);
         effect->SetLights(m_lights);
-        for (auto m : model_obj->GetMeshes())
-        {
+        for (auto m: model_obj->GetMeshes()) {
             m->SetEffect(effect);
         }
 
@@ -222,84 +195,191 @@ void Renderer::init(int w, int h)
     std::cout << "Setup world finish" << std::endl;
 }
 
-void Renderer::draw(long long elapsed)
-{
+void Renderer::draw(long long elapsed) {
     // 绘制帧数量加1
     m_fps_counter->Add();
 
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_view_matrix = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
     m_eye_pos = m_camera->GetEyePosition();
 
-    m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights); // 【重点】 绘制坐标轴
-
+    // 绘制坐标轴
+    m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    // 绘制地面网格
     m_ground->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
-
-    for (auto light : m_lights)
-    {
-        light->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    // 绘制光源模式
+    // 更新灯光
+    // for (auto light: m_lights) {
+    //     if (light->GetLightType() == LightTypePoint) {
+    //         auto point_light = (PointLight *) light;
+    //         if (m_light_models.contains(point_light->GetUUID()) == 0) {
+    //             continue;
+    //         }
+    //         auto model = m_light_models.at(point_light->GetUUID());
+    //         if (model != nullptr) {
+    //             model->SetTranslate(point_light->Position);
+    //             for (const auto &m: model->GetMeshes()) {
+    //                 auto tech = m->GetEffect();
+    //                 tech->Enable();
+    //                 tech->SetUniform("color", point_light->Color);
+    //             }
+    //         }
+    //     }
+    // }
+    // for (const auto &kv: m_light_models) {
+    //     auto m = kv.second;
+    //     m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    // }
+    for (const auto &l: m_lights) {
+        if (l->GetModel() != nullptr) {
+            const auto model = l->GetModel();
+            model->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+        }
     }
-
-    for (auto model : m_models)
-    {
-        model->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    // 绘制模式
+    for (const auto &m: m_models) {
+        m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
     }
 }
 
-void Renderer::resize(int w, int h)
-{
+void Renderer::resize(int w, int h) {
     width = w;
     height = h;
-    calculateProjectMatrix(w, h);
     glViewport(0, 0, w, h);
+    calculateProjectMatrix(w, h);
 }
 
-void Renderer::update(long long elapsed)
-{
-
+void Renderer::update(long long elapsed) {
     m_eye_pos = m_camera->GetEyePosition();
-
+    return;
     // 更新灯光
-    for (auto light : m_lights)
-    {
-        if (light->GetLightType() == LightTypePoint)
-        {
-            auto point_light = (PointLight *)light;
-            point_light->Position = glm::vec3(glm::rotate(glm::radians(0.5f), glm::vec3(0, 1, 0)) * glm::vec4(point_light->Position, 1.0f));
-            point_light->m_model->SetTranslate(point_light->Position);
+    for (auto light: m_lights) {
+        if (light->GetLightType() == LightTypePoint) {
+            auto point_light = static_cast<PointLight *>(light);
+            point_light->SetPosition(glm::vec3(
+                glm::rotate(
+                    glm::radians(0.5f),
+                    glm::vec3(0, 1, 0)
+                ) * glm::vec4(point_light->Position, 1.0f)
+            ));
         }
     }
 }
 
-Model *Renderer::GetModel(string name)
-{
-    for (auto model : m_models)
-    {
-        if (model->GetName() == name)
-        {
+void Renderer::LoadWorldFromFile(const string &filename) {
+    try {
+        YAML::Node yaml_config = YAML::LoadFile(filename);
+
+        const YAML::Node &world_config = yaml_config["world"];
+        // windows
+        const YAML::Node &window = world_config["window"];
+        gConfig->Window.WindowWidth = window["width"].as<int>();
+        gConfig->Window.WindowHeight = window["height"].as<int>();
+
+        // clip
+        const YAML::Node &clip = world_config["clip"];
+        gConfig->Clip.ClipNear = clip["near"].as<float>();
+        gConfig->Clip.ClipFar = clip["far"].as<float>();
+        gConfig->Clip.ClipFov = clip["fov"].as<float>();
+        gConfig->Clip.ClipAspect = clip["aspect"].as<float>();
+
+        // camera
+        if (m_camera != nullptr) {
+            delete m_camera;
+        }
+        m_camera = LoadCameraFromYaml(world_config["camera"]);
+
+
+        // lights
+        for (auto &m_light: m_lights) {
+            delete m_light;
+        }
+        m_lights.clear();
+        for (auto &m: m_light_models) {
+            delete m.second;
+        }
+        m_light_models.clear();
+
+        const YAML::Node &light_nodes = world_config["lights"];
+        size_t index = 0;
+        for (auto &i: light_nodes) {
+            const YAML::Node &light_node = i;
+            auto light = LoadLightFromYaml(light_node, ++index);
+            auto pointLight = (PointLight *) light;
+            m_lights.push_back(light);
+
+            // 创建光源模型
+            auto model = Model::CreatePointLightModelV1();
+            model->SetPosition(pointLight->Position);
+            light->SetModel(model);
+            std::cout << "Setup light finish" << std::endl;
+        }
+
+        // models
+        for (auto &m: m_models) {
+            delete m;
+        }
+        m_models.clear();
+        const YAML::Node &model_nodes = world_config["models"];
+        for (const auto &i: model_nodes) {
+            const YAML::Node &model_node = i;
+            m_models.push_back(LoadModelFromYaml(model_node, ++index));
+        }
+    } catch (const YAML::BadFile &e) {
+        Utils::PrintStackTrace();
+        std::cerr << "Error loading world from yaml file: " << e.what() << std::endl;
+    } catch (const std::exception &e) {
+        Utils::PrintStackTrace();
+    }
+    std::cout << "load world from yaml file done" << std::endl;
+}
+
+Camera *Renderer::LoadCameraFromYaml(const YAML::Node &camera_node) {
+    auto cameraPosition = glm::vec3(
+        camera_node["position"]["x"].as<float>(),
+        camera_node["position"]["y"].as<float>(),
+        camera_node["position"]["z"].as<float>()
+    );
+    auto cameraTarget = glm::vec3(
+        camera_node["target"]["x"].as<float>(),
+        camera_node["target"]["y"].as<float>(),
+        camera_node["target"]["z"].as<float>()
+    );
+
+    auto cameraUp = glm::vec3(
+        camera_node["up"]["x"].as<float>(),
+        camera_node["up"]["y"].as<float>(),
+        camera_node["up"]["z"].as<float>()
+    );
+    return new Camera(
+        cameraPosition,
+        cameraTarget,
+        cameraUp
+    );
+}
+
+Model *Renderer::GetModel(const string& name) {
+    for (auto model: m_models) {
+        if (model->GetName() == name) {
             return model;
         }
     }
     return nullptr;
 }
 
-Model *Renderer::GetModelByUUID(string uuid)
-{
-    for (auto model : m_models)
-    {
-        if (model->GetUUID() == uuid)
-        {
+Model *Renderer::GetModelByUUID(const string& uuid) {
+    for (auto model: m_models) {
+        if (model->GetUUID() == uuid) {
             return model;
         }
     }
     return nullptr;
 }
 
-Light *Renderer::GetLightByUUID(std::string uuid)
-{
-    for (auto light : m_lights) {
+Light *Renderer::GetLightByUUID(const std::string &uuid) const {
+    for (auto const light: m_lights) {
         if (light->GetUUID() == uuid) {
             return light;
         }
@@ -307,16 +387,186 @@ Light *Renderer::GetLightByUUID(std::string uuid)
     return nullptr;
 }
 
-float Renderer::GetFPS()
-{
+float Renderer::GetFPS() const {
     return m_fps_counter->GetFPS();
 }
 
-void Renderer::calculateProjectMatrix(int w, int h)
-{
-    float fov = gConfig->Clip.ClipFov;                                                           // 视野角度
-    float aspectRatio = (float)w / (float)(1 * h);                                               // 宽高比
-    float nearPlane = gConfig->Clip.ClipNear;                                                    // 近平面距离
-    float farPlane = gConfig->Clip.ClipFar;                                                      // 远平面距离
-    m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
+void Renderer::SerProjectionType(ProjectionType type) {
+    m_projectionType = type;
+}
+
+const ProjectionType Renderer::GetProjectionType() const {
+    return m_projectionType;
+}
+
+void Renderer::calculateProjectMatrix(const int w, const int h) {
+    if (m_projectionType == ProjectionType::Perspective) {
+        float fov = gConfig->Clip.ClipFov; // 视野角度
+        float aspectRatio = (float) w / (float) (1 * h); // 宽高比
+        float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
+        float farPlane = gConfig->Clip.ClipFar; // 远平面距离
+        m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
+    } else {
+        // 设置正交投影
+        float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+
+        // 定义一个合适的范围，这里我们假设使用 -10 到 10 的范围作为示例
+        // 你可以根据实际需求调整这些值
+        float left = -20.0f * aspectRatio;
+        float right = 20.0f * aspectRatio;
+        float bottom = -20.0f;
+        float top = 20.0f;
+
+        float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
+        float farPlane = gConfig->Clip.ClipFar; // 远平面距离
+        m_projection_matrix = glm::ortho(left, right, bottom, top, nearPlane, farPlane);
+    }
+}
+
+
+Light *Renderer::LoadLightFromYaml(const YAML::Node &light_node, size_t index) {
+    auto lightColor = glm::vec3(
+        light_node["color"]["r"].as<float>(),
+        light_node["color"]["g"].as<float>(),
+        light_node["color"]["b"].as<float>()
+    );
+    auto lightPosition = glm::vec3(
+        light_node["position"]["x"].as<float>(),
+        light_node["position"]["y"].as<float>(),
+        light_node["position"]["z"].as<float>()
+    );
+    auto lightAmbientColor = glm::vec3(
+        light_node["ambient"]["color"]["r"].as<float>(),
+        light_node["ambient"]["color"]["g"].as<float>(),
+        light_node["ambient"]["color"]["b"].as<float>()
+    );
+    auto lightDiffuseColor = glm::vec3(
+        light_node["diffuse"]["color"]["r"].as<float>(),
+        light_node["diffuse"]["color"]["g"].as<float>(),
+        light_node["diffuse"]["color"]["b"].as<float>()
+    );
+    auto lightSpecularColor = glm::vec3(
+        light_node["specular"]["color"]["r"].as<float>(),
+        light_node["specular"]["color"]["g"].as<float>(),
+        light_node["specular"]["color"]["b"].as<float>()
+    );
+
+    auto lightAttenuationConstant = light_node["attenuation"]["constant"].as<float>();
+    auto lightAttenuationLinear = light_node["attenuation"]["linear"].as<float>();
+    auto lightAttenuationExp = light_node["attenuation"]["exp"].as<float>();
+
+
+    // // 创建光源模型
+    // auto model = new Model(std::format("light-{}", 1));
+    // auto mesh = Mesh::CreatePointLightMesh(5);
+    // model->SetMeshes(mesh);
+    // // model->SetScale(glm::vec3(0.5f));
+    // model->SetPosition(glm::vec3{0.0f});
+    //
+    // Technique *effect = new Technique(
+    //     "onlycolor",
+    //     "./resource/shader/onlycolor.vert",
+    //     "./resource/shader/onlycolor.frag"
+    // );
+    //
+    // for (auto m: mesh) {
+    //     m->SetEffect(effect);
+    // }
+
+
+    auto light = new PointLight(std::format("light-{}", index));
+    light->Color = lightColor;
+    light->Position = lightPosition;
+    light->AmbientColor = lightAmbientColor;
+    light->DiffuseColor = lightDiffuseColor;
+    light->SpecularColor = lightSpecularColor;
+    light->Attenuation.Constant = lightAttenuationConstant;
+    light->Attenuation.Linear = lightAttenuationLinear;
+    light->Attenuation.Exp = lightAttenuationExp;
+    // light->SetModel(model);
+    return light;
+}
+
+Model *Renderer::LoadModelFromYaml(const YAML::Node &model_node, size_t index) {
+    auto modelName = model_node["name"].as<std::string>();
+
+    auto modelMeshName = model_node["mesh"]["name"].as<std::string>();
+    auto modelMeshFile = model_node["mesh"]["file"].as<std::string>();
+
+
+    auto modelShaderVertFile = model_node["shader"]["vert"].as<std::string>();
+    auto modelShaderFragFile = model_node["shader"]["frag"].as<std::string>();
+
+    auto modelEffect = "light";
+
+    auto modelPosition = glm::vec3(
+        model_node["position"]["x"].as<float>(),
+        model_node["position"]["y"].as<float>(),
+        model_node["position"]["z"].as<float>()
+    );
+    auto modelRotation = model_node["rotation"].as<float>();
+    auto modelScale = glm::vec3(
+        model_node["scale"]["x"].as<float>(),
+        model_node["scale"]["y"].as<float>(),
+        model_node["scale"]["z"].as<float>()
+    );
+
+    std::cout << "model name : " << modelName << std::endl;
+    std::cout << "mesh name  : " << modelMeshName << std::endl;
+    std::cout << "mesh file  : " << modelMeshFile << std::endl;
+    if (modelMeshFile.empty()) {
+        return nullptr;
+    }
+    auto model_obj = new Model(modelName);
+    model_obj->LoadModel(modelMeshFile);
+
+
+    auto *effect = new TechniqueLight(
+        "default",
+        modelShaderVertFile,
+        modelShaderFragFile
+    );
+    auto material = LoadMaterialFromYaml(model_node["material"], 0);
+    effect->SetMaterial(material);
+
+    // effect->SetLights(m_lights);
+    for (auto m: model_obj->GetMeshes()) {
+        m->SetEffect(effect);
+    }
+
+    model_obj->SetScale(modelScale);
+    model_obj->SetTranslate(modelPosition);
+    model_obj->SetRotate(modelRotation);
+
+    return model_obj;
+}
+
+Material *Renderer::LoadMaterialFromYaml(const YAML::Node &node, size_t index) {
+    auto modelMaterialAmbientColor = glm::vec3(
+        node["ambient"]["r"].as<float>(),
+        node["ambient"]["g"].as<float>(),
+        node["ambient"]["b"].as<float>()
+    );
+    auto modelMaterialDiffuseColor = glm::vec3(
+        node["diffuse"]["r"].as<float>(),
+        node["diffuse"]["g"].as<float>(),
+        node["diffuse"]["b"].as<float>()
+    );
+    auto modelMaterialSpecularColor = glm::vec3(
+        node["specular"]["r"].as<float>(),
+        node["specular"]["g"].as<float>(),
+        node["specular"]["b"].as<float>()
+    );
+    auto modelMaterialShininess = node["shininess"].as<float>();
+
+
+    Material *material = new Material();
+    material->AmbientColor = modelMaterialAmbientColor;
+    material->DiffuseColor = modelMaterialDiffuseColor;
+    material->SpecularColor = modelMaterialSpecularColor;
+    material->Shininess = modelMaterialShininess;
+    return material;
+}
+
+Technique *Renderer::LoadTechniqueFromYaml(const YAML::Node &node, size_t index) {
 }

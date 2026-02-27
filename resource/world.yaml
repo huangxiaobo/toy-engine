@@ -1,0 +1,124 @@
+world:
+  window:
+    width: 1296
+    height: 800
+    gamma-correction: false
+  clip:
+    near: 0.1
+    far: 1000.0
+    fov: 45.0
+    aspect: 1
+  camera:
+    position:
+      x: 20.0
+      y: 20.0
+      z: 20.0
+    target:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    up:
+      x: 0.0
+      y: 1.0
+      z: 0.0
+  lights:
+    - type: 1
+      position:
+        x: 10.0
+        y: 10.0
+        z: 0.0
+      color:
+        r: 1.0
+        g: 0.0
+        b: 0.0
+      diffuse:
+        color:
+          r: 1.0
+          g: 0.5
+          b: 0.0
+        intensity: 2.0
+      ambient:
+        color:
+          r: 1.0
+          g: 0.5
+          b: 0.0
+        intensity: 1.0
+      specular:
+        color:
+          r: 1.0
+          g: 0.5
+          b: 0.0
+        intensity: 1.0
+      attenuation:
+        constant: 1.0
+        linear: 0.0
+        exp: 0.0
+    - type: 1
+      position:
+        x: -10.0
+        y: 10.0
+        z: 0.0
+        w: 1.0
+      color:
+        r: 0.0
+        g: 0.0
+        b: 1.0
+      diffuse:
+        color:
+          r: 0.0
+          g: 0.5
+          b: 1.0
+        intensity: 2.0
+      ambient:
+        color:
+          r: 0.0
+          g: 0.5
+          b: 1.0
+        intensity: 1.0
+      specular:
+        color:
+          r: 1.0
+          g: 0.5
+          b: 0.0
+        intensity: 1.0
+      attenuation:
+        constant: 1.0
+        linear: 0.0
+        exp: 0.0
+  models:
+    - resource_class: Model
+      name: bunny
+      id: "9128d629-c651-4688-85ad-11bc3e6c2293"
+      position:
+        x: 0
+        y: 0
+        z: 0
+      scale:
+        x: 2
+        y: 2
+        z: 2
+      rotation: 0
+      mesh:
+        name: bunny
+        file: "./resource/model/bunny/bunny.obj"
+      technique:
+        technique:
+          name: light
+      shader:
+        vert: "./resource/model/bunny/shader.vert"
+        frag: "./resource/model/bunny/shader.frag"
+
+      material:
+        ambient:
+          r: 0.25
+          g: 0.25
+          b: 0.25
+        diffuse:
+          r: 0.45
+          g: 0.45
+          b: 0.45
+        specular:
+          r: 1.0
+          g: 1.0
+          b: 1.0
+        shininess: 15
