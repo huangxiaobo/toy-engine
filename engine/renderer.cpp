@@ -11,6 +11,7 @@
 #include "technique/technique_light.h"
 #include "model/model.h"
 #include "axis/axis.h"
+#include "terrain/terrain.h"
 #include "utils/utils.h"
 #include "light/light.h"
 #include "material/material.h"
@@ -33,6 +34,10 @@ Renderer::~Renderer() {
     if (m_axis != nullptr) {
         delete m_axis;
         m_axis = nullptr;
+    }
+    if (m_terrain != nullptr) {
+        delete m_terrain;
+        m_terrain = nullptr;
     }
     while (!m_models.empty()) {
         for (auto model: m_models) {
@@ -116,27 +121,15 @@ void Renderer::init(int w, int h) {
 
     m_models.push_back(plane);
 
-    // Create Ground with texture
-    vector<Mesh *> ground_mesh = Mesh::CreateTexturedGroundMesh(10.0f, 5); // 10x10大小，纹理重复5次
-    Technique *ground_effect = new Technique("ground",
-                                             "./resource/shader/ground.vert",
-                                             "./resource/shader/ground.frag");
-
-    m_ground = new Model("ground");
-    m_ground->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
-    m_ground->SetMeshes(ground_mesh);
-    
-    // 创建棋盘格纹理 (512x512, 每个格子64像素)
-    unsigned int groundTextureID = Utils::CreateCheckerboardTexture(512, 512, 64);
-    
-    for (auto m: ground_mesh) {
-        m->SetEffect(ground_effect);
-        m->SetTexture(groundTextureID); // 设置纹理ID
-    }
-    
-    // 设置纹理uniform
-    ground_effect->Enable();
-    ground_effect->SetUniform("groundTexture", 0); // 使用纹理单元0
+    // Create Terrain from heightmap
+    m_terrain = new Terrain();
+    m_terrain->InitFromHeightmap(
+        "./resource/iceland_heightmap.png",  // 高度图路径
+        20.0f,   // 地形大小
+        3.0f,    // 高度缩放
+        256,     // 地形分辨率
+        5        // 纹理重复次数
+    );
 
     m_camera = new Camera(
         gConfig->Camera.Position,
@@ -163,7 +156,7 @@ void Renderer::init(int w, int h) {
 
 
         //
-        // m_light_models[light->GetUUID()] = model;
+        m_light_models[light->GetUUID()] = model;
         std::cout << "Setup light finish" << std::endl;
     }
     std::cout << "Setup lights finish" << std::endl;
@@ -216,31 +209,33 @@ void Renderer::draw(long long elapsed) {
 
     // 绘制坐标轴
     m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
-    // 绘制地面网格
-    m_ground->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    
+    // 绘制地形
+    m_terrain->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos);
+    
     // 绘制光源模式
     // 更新灯光
-    // for (auto light: m_lights) {
-    //     if (light->GetLightType() == LightTypePoint) {
-    //         auto point_light = (PointLight *) light;
-    //         if (m_light_models.contains(point_light->GetUUID()) == 0) {
-    //             continue;
-    //         }
-    //         auto model = m_light_models.at(point_light->GetUUID());
-    //         if (model != nullptr) {
-    //             model->SetTranslate(point_light->Position);
-    //             for (const auto &m: model->GetMeshes()) {
-    //                 auto tech = m->GetEffect();
-    //                 tech->Enable();
-    //                 tech->SetUniform("color", point_light->Color);
-    //             }
-    //         }
-    //     }
-    // }
-    // for (const auto &kv: m_light_models) {
-    //     auto m = kv.second;
-    //     m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
-    // }
+    for (auto light: m_lights) {
+        if (light->GetLightType() == LightTypePoint) {
+            auto point_light = (PointLight *) light;
+            if (m_light_models.contains(point_light->GetUUID()) == 0) {
+                continue;
+            }
+            auto model = m_light_models.at(point_light->GetUUID());
+            if (model != nullptr) {
+                model->SetTranslate(point_light->Position);
+                for (const auto &m: model->GetMeshes()) {
+                    auto tech = m->GetEffect();
+                    tech->Enable();
+                    tech->SetUniform("color", point_light->Color);
+                }
+            }
+        }
+    }
+    for (const auto &kv: m_light_models) {
+        auto m = kv.second;
+        m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    }
     for (const auto &l: m_lights) {
         if (l->GetModel() != nullptr) {
             const auto model = l->GetModel();
@@ -323,6 +318,9 @@ void Renderer::LoadWorldFromFile(const string &filename) {
             auto model = Model::CreatePointLightModelV1();
             model->SetPosition(pointLight->Position);
             light->SetModel(model);
+            
+            // 添加到light_models map
+            m_light_models[light->GetUUID()] = model;
             std::cout << "Setup light finish" << std::endl;
         }
 

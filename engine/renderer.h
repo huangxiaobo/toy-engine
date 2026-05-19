@@ -15,6 +15,7 @@ class Material;
 class Technique;
 class Camera;
 class FPSCounter;
+class Terrain;
 
 enum class ProjectionType {
     Perspective,
@@ -97,7 +98,7 @@ private:
     FPSCounter *m_fps_counter;
     Axis *m_axis;
     Camera *m_camera;
-    Model *m_ground;
+    Terrain *m_terrain;
     vector<Model *> m_models;
     map<string, Model *> m_light_models;
     vector<Model *> m_light_modes_ext;

@@ -103,11 +103,7 @@ bool ToyEngineMainWindow::Initialize() {
     // 初始化渲染器
     m_renderer = new Renderer();
     m_renderer->init(m_windowWidth, m_windowHeight);
-    try {
-        m_renderer->LoadWorldFromFile("./resource/world.yaml");
-    } catch (...) {
-        std::cerr << "Warning: Failed to load world from file" << std::endl;
-    }
+    // LoadWorldFromFile已经在renderer::init中调用过了，不需要再次调用
 
     m_lastTime = static_cast<float>(glfwGetTime());
 
@@ -288,6 +284,7 @@ void ToyEngineMainWindow::CreateSceneTreePanel() {
         auto models = m_renderer->GetModels();
         for (size_t i = 0; i < models.size(); ++i) {
             auto model = models[i];
+            if (model == nullptr) continue;
             std::string nodeName = model->GetName() + "##" + std::to_string(i);
             if (ImGui::Selectable(nodeName.c_str(), 
                 m_selectedObject == model && m_selectedObjectType == "Model")) {
@@ -303,6 +300,7 @@ void ToyEngineMainWindow::CreateSceneTreePanel() {
         auto lights = m_renderer->GetLights();
         for (size_t i = 0; i < lights.size(); ++i) {
             auto light = lights[i];
+            if (light == nullptr) continue;
             std::string nodeName = light->GetName() + "##" + std::to_string(i);
             if (ImGui::Selectable(nodeName.c_str(),
                 m_selectedObject == light && m_selectedObjectType == "Light")) {
