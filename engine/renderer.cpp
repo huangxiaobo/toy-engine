@@ -211,7 +211,7 @@ void Renderer::draw(long long elapsed) {
     m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
     
     // 绘制地形
-    m_terrain->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos);
+    m_terrain->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
     
     // 绘制光源模式
     // 更新灯光

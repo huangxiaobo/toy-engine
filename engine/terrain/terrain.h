@@ -43,7 +43,8 @@ public:
               const glm::mat4 &projection, 
               const glm::mat4 &view, 
               const glm::mat4 &model,
-              const glm::vec3 &camera);
+              const glm::vec3 &camera,
+              const vector<class Light *> &lights);
     
     Model* GetModel() const { return m_model; }
     void SetScale(glm::vec3 scale);

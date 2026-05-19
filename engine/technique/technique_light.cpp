@@ -56,6 +56,12 @@ void TechniqueLight::InitPointLightUniform(int num) {
         name = std::format("gPointLights[{}].Position", i);
         uniform.Position = this->m_shader->GetUniformLocation(name.c_str());
 
+        name = std::format("gPointLights[{}].AmbientIntensity", i);
+        uniform.AmbientIntensity = this->m_shader->GetUniformLocation(name.c_str());
+
+        name = std::format("gPointLights[{}].DiffuseIntensity", i);
+        uniform.DiffuseIntensity = this->m_shader->GetUniformLocation(name.c_str());
+
         name = std::format("gPointLights[{}].DiffuseColor", i);
         uniform.DiffuseColor = this->m_shader->GetUniformLocation(name.c_str());
 
@@ -81,6 +87,8 @@ void TechniqueLight::InitPointLightUniform(int num) {
 void TechniqueLight::SetPointLight(int i, PointLight *light) {
     this->m_shader->SetUniformValue(PointLightUniforms[i].Color, light->Color);
     this->m_shader->SetUniformValue(PointLightUniforms[i].Position, light->Position);
+    this->m_shader->SetUniformValue(PointLightUniforms[i].AmbientIntensity, light->AmbientIntensity);
+    this->m_shader->SetUniformValue(PointLightUniforms[i].DiffuseIntensity, light->DiffuseIntensity);
     this->m_shader->SetUniformValue(PointLightUniforms[i].DiffuseColor, light->DiffuseColor);
     this->m_shader->SetUniformValue(PointLightUniforms[i].SpecularColor, light->SpecularColor);
     this->m_shader->SetUniformValue(PointLightUniforms[i].AmbienColor, light->AmbientColor);

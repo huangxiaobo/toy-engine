@@ -2,7 +2,8 @@
 #include <glad/gl.h>
 #include "../model/model.h"
 #include "../mesh/mesh.h"
-#include "../technique/technique.h"
+#include "../technique/technique_light.h"
+#include "../material/material.h"
 #include "../utils/utils.h"
 
 // 使用stb_image加载高度图（实现在utils.cpp中）
@@ -72,10 +73,18 @@ void Terrain::InitFromHeightmap(const string &heightmapPath,
     // 从高度图生成地形网格
     vector<Mesh *> terrain_mesh = GenerateTerrainFromHeightmap();
     
-    // 创建着色器效果
-    m_effect = new Technique("terrain",
-                             "./resource/shader/ground.vert",
-                             "./resource/shader/ground.frag");
+    // 创建支持光照的着色器效果
+    m_effect = new TechniqueLight("terrain",
+                                  "./resource/shader/terrain.vert",
+                                  "./resource/shader/terrain.frag");
+    
+    // 设置材质
+    Material *material = new Material();
+    material->AmbientColor = glm::vec3(0.3f, 0.3f, 0.3f);
+    material->DiffuseColor = glm::vec3(0.8f, 0.8f, 0.8f);
+    material->SpecularColor = glm::vec3(0.5f, 0.5f, 0.5f);
+    material->Shininess = 32.0f;
+    ((TechniqueLight *)m_effect)->SetMaterial(material);
     
     // 创建模型
     m_model = new Model("terrain");
@@ -100,9 +109,16 @@ void Terrain::Draw(long long elapsed,
                    const glm::mat4 &projection,
                    const glm::mat4 &view,
                    const glm::mat4 &model,
-                   const glm::vec3 &camera) {
+                   const glm::vec3 &camera,
+                   const vector<class Light *> &lights) {
     if (m_model != nullptr) {
-        m_model->Draw(elapsed, projection, view, model, camera, std::vector<class Light *>());
+        // 设置光照
+        if (m_effect != nullptr && m_effect->GetType() == TechniqueTypeLight) {
+            ((TechniqueLight *)m_effect)->SetLights(lights);
+            ((TechniqueLight *)m_effect)->Enable();
+            ((TechniqueLight *)m_effect)->SetUniform("gViewPos", camera);
+        }
+        m_model->Draw(elapsed, projection, view, model, camera, lights);
     }
 }
 
