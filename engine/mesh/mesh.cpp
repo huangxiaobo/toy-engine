@@ -26,10 +26,7 @@ Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices) {
 }
 
 Mesh::~Mesh() {
-    if (m_effect) {
-        delete m_effect;
-        m_effect = nullptr;
-    }
+    // m_effect 是裸指针，只引用不拥有，不需要释放
 }
 
 void Mesh::SetUpMesh() {

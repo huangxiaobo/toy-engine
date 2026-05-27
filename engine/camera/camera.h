@@ -49,6 +49,9 @@ public:
     void Pan(float dx, float dy);
     void Zoom(float amount);
     
+    // 绕世界原点轨道旋转
+    void OrbitAroundOrigin(float horizontalAngle, float verticalAngle);
+    
     glm::vec3 GetPosition() const { return m_position; }
     void SetPosition(const glm::vec3& position) { m_position = position; updateCameraVectors(); }
     

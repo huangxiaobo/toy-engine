@@ -445,41 +445,36 @@ void ToyEngineMainWindow::OnMouseRightButtonDown() {
         return;
     }
     
-    m_cameraRotating = true;
-    std::cout << "开始相机旋转" << std::endl;
+    m_cameraPanning = true;
+    std::cout << "开始相机平移" << std::endl;
 }
 
 void ToyEngineMainWindow::OnMouseRightButtonUp() {
-    m_cameraRotating = false;
-    std::cout << "结束相机旋转" << std::endl;
+    m_cameraPanning = false;
+    std::cout << "结束相机平移" << std::endl;
 }
 
 void ToyEngineMainWindow::OnMouseMove(double deltaX, double deltaY) {
-    // 相机旋转控制
-    if (m_cameraRotating && m_renderer) {
+    // 相机绕世界原点旋转控制（鼠标左键拖动）
+    if (m_mouseLeftPressed && m_renderer) {
         auto camera = m_renderer->GetCamera();
         if (camera) {
             // 根据鼠标移动调整相机角度
-            float sensitivity = 0.1f;
-            camera->RotateHorizontal(static_cast<float>(-deltaX * sensitivity));
-            camera->RotateVertical(static_cast<float>(-deltaY * sensitivity));
+            float sensitivity = 0.5f;
+            camera->OrbitAroundOrigin(static_cast<float>(-deltaX * sensitivity), 
+                                     static_cast<float>(-deltaY * sensitivity));
             std::cout << "相机旋转 - deltaX: " << deltaX << ", deltaY: " << deltaY << std::endl;
         }
     }
     
-    // 相机平移控制（按住Shift键时）
-    if (m_mouseLeftPressed && glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-        m_cameraPanning = true;
-        if (m_renderer) {
-            auto camera = m_renderer->GetCamera();
-            if (camera) {
-                float panSpeed = 0.01f;
-                camera->Pan(static_cast<float>(deltaX * panSpeed), static_cast<float>(-deltaY * panSpeed));
-                std::cout << "相机平移 - deltaX: " << deltaX << ", deltaY: " << deltaY << std::endl;
-            }
+    // 相机平移控制（鼠标右键拖动）
+    if (m_cameraPanning && m_renderer) {
+        auto camera = m_renderer->GetCamera();
+        if (camera) {
+            float panSpeed = 0.01f;
+            camera->Pan(static_cast<float>(deltaX * panSpeed), static_cast<float>(-deltaY * panSpeed));
+            std::cout << "相机平移 - deltaX: " << deltaX << ", deltaY: " << deltaY << std::endl;
         }
-    } else {
-        m_cameraPanning = false;
     }
 }
 

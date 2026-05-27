@@ -116,3 +116,45 @@ void Camera::Zoom(float amount)
     if (m_zoom > 45.0f) m_zoom = 45.0f;
     updateCameraVectors();
 }
+
+void Camera::OrbitAroundOrigin(float horizontalAngle, float verticalAngle)
+{
+    // 计算相机到世界原点的向量
+    glm::vec3 toOrigin = -m_position;
+    float radius = glm::length(toOrigin);
+    
+    // 如果距离原点太近，避免除零错误
+    if (radius < 0.001f) {
+        return;
+    }
+    
+    // 将相机位置转换为球坐标系
+    float currentYaw = atan2(m_position.z, m_position.x);
+    float currentPitch = asin(m_position.y / radius);
+    
+    // 应用旋转角度
+    float newYaw = currentYaw + glm::radians(horizontalAngle);
+    float newPitch = currentPitch + glm::radians(verticalAngle);
+    
+    // 限制俯仰角，避免万向节锁
+    const float pitchLimit = glm::radians(89.0f);
+    if (newPitch > pitchLimit) newPitch = pitchLimit;
+    if (newPitch < -pitchLimit) newPitch = -pitchLimit;
+    
+    // 将球坐标转换回笛卡尔坐标
+    glm::vec3 newPosition;
+    newPosition.x = radius * cos(newPitch) * cos(newYaw);
+    newPosition.y = radius * sin(newPitch);
+    newPosition.z = radius * cos(newPitch) * sin(newYaw);
+    
+    // 更新相机位置
+    m_position = newPosition;
+    
+    // 更新相机方向（始终看向原点）
+    m_front = glm::normalize(-m_position);
+    m_right = glm::normalize(glm::cross(m_front, m_world_up));
+    m_up = glm::normalize(glm::cross(m_right, m_front));
+    
+    // 更新目标点
+    m_target = m_position + m_front * 10.0f;
+}

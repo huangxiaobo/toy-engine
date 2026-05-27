@@ -94,7 +94,7 @@ public:
 
     GLuint DrawMode; // 绘制模式
 
-    Technique *m_effect;
+    Technique *m_effect;  // 裸指针，只引用不拥有，由外部管理生命周期
     
     unsigned int m_textureID; // 纹理ID
 };
