@@ -24,6 +24,7 @@ public:
 
 class CameraConfig {
 public:
+    std::string Name;  // 摄像机名称
     glm::vec3 Position;
     glm::vec3 Target;
     glm::vec3 Up;
@@ -90,7 +91,7 @@ public:
     WindowConfig Window;
     glm::vec4 ClearColor;
     ClipConfig Clip;
-    CameraConfig Camera;
+    std::vector<CameraConfig> Cameras;  // 支持多个摄像机
     std::vector<PointLightConfig> PointLights;
     std::vector<ModelCoinfig> Models;
 };

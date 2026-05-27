@@ -29,24 +29,59 @@ Config *Config::LoadFromYaml(const std::string &filename) {
         config->Clip.ClipFar = clip["far"].as<float>();
         config->Clip.ClipFov = clip["fov"].as<float>();
         config->Clip.ClipAspect = clip["aspect"].as<float>();
-        // camera
-        const YAML::Node &camera = world_config["camera"];
-        config->Camera.Position = glm::vec3(
-            camera["position"]["x"].as<float>(),
-            camera["position"]["y"].as<float>(),
-            camera["position"]["z"].as<float>()
-        );
-        config->Camera.Target = glm::vec3(
-            camera["target"]["x"].as<float>(),
-            camera["target"]["y"].as<float>(),
-            camera["target"]["z"].as<float>()
-        );
-
-        config->Camera.Up = glm::vec3(
-            camera["up"]["x"].as<float>(),
-            camera["up"]["y"].as<float>(),
-            camera["up"]["z"].as<float>()
-        );
+        
+        // cameras - 支持多个摄像机
+        const YAML::Node &camera_nodes = world_config["cameras"];
+        if (camera_nodes && camera_nodes.IsSequence()) {
+            for (const auto &camera_node : camera_nodes) {
+                CameraConfig cameraConfig;
+                // 读取名称（可选）
+                if (camera_node["name"]) {
+                    cameraConfig.Name = camera_node["name"].as<std::string>();
+                } else {
+                    cameraConfig.Name = "Camera " + std::to_string(config->Cameras.size());
+                }
+                cameraConfig.Position = glm::vec3(
+                    camera_node["position"]["x"].as<float>(),
+                    camera_node["position"]["y"].as<float>(),
+                    camera_node["position"]["z"].as<float>()
+                );
+                cameraConfig.Target = glm::vec3(
+                    camera_node["target"]["x"].as<float>(),
+                    camera_node["target"]["y"].as<float>(),
+                    camera_node["target"]["z"].as<float>()
+                );
+                cameraConfig.Up = glm::vec3(
+                    camera_node["up"]["x"].as<float>(),
+                    camera_node["up"]["y"].as<float>(),
+                    camera_node["up"]["z"].as<float>()
+                );
+                config->Cameras.push_back(cameraConfig);
+            }
+        } else {
+            // 兼容旧格式：单个camera配置
+            const YAML::Node &camera = world_config["camera"];
+            if (camera) {
+                CameraConfig cameraConfig;
+                cameraConfig.Name = "Main Camera";
+                cameraConfig.Position = glm::vec3(
+                    camera["position"]["x"].as<float>(),
+                    camera["position"]["y"].as<float>(),
+                    camera["position"]["z"].as<float>()
+                );
+                cameraConfig.Target = glm::vec3(
+                    camera["target"]["x"].as<float>(),
+                    camera["target"]["y"].as<float>(),
+                    camera["target"]["z"].as<float>()
+                );
+                cameraConfig.Up = glm::vec3(
+                    camera["up"]["x"].as<float>(),
+                    camera["up"]["y"].as<float>(),
+                    camera["up"]["z"].as<float>()
+                );
+                config->Cameras.push_back(cameraConfig);
+            }
+        }
 
 
         // lights

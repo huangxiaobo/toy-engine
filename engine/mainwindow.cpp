@@ -312,11 +312,22 @@ void ToyEngineMainWindow::CreateSceneTreePanel() {
     
     // 显示相机 - 默认展开
     if (ImGui::TreeNodeEx("相机", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto camera = m_renderer->GetCamera();
-        if (camera && ImGui::Selectable("主相机", 
-            m_selectedObject == camera && m_selectedObjectType == "Camera")) {
-            SelectObject(camera);
-            m_selectedObjectType = "Camera";
+        auto cameras = m_renderer->GetCameras();
+        for (size_t i = 0; i < cameras.size(); ++i) {
+            const auto& camera = cameras[i];
+            std::string displayName = camera->GetName().empty() ?
+                "Camera " + std::to_string(i) : camera->GetName();
+            
+            if (ImGui::Selectable(displayName.c_str(), 
+                m_selectedObject == m_renderer->GetCamera() && 
+                m_selectedObjectType == "Camera" && 
+                m_currentCameraIndex == static_cast<int>(i))) {
+                // 切换到选中的摄像机
+                m_renderer->SwitchCamera(static_cast<int>(i));
+                m_currentCameraIndex = static_cast<int>(i);
+                SelectObject(m_renderer->GetCamera());
+                m_selectedObjectType = "Camera";
+            }
         }
         ImGui::TreePop();
     }

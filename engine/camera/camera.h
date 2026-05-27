@@ -1,7 +1,9 @@
 #ifndef __CAMERA_H__
 #define __CAMERA_H__
-
+#include <string>
 #include <glm/glm.hpp>
+
+using namespace std;
 
 enum CameraMoveType
 {
@@ -18,6 +20,8 @@ public:
     Camera();
     Camera(glm::vec3 position, glm::vec3 target, glm::vec3 world_up);
     ~Camera();
+
+    std::string GetName() const;
 
     // 滚转角(Roll)：沿z轴旋转的角（对于摄像机而言，一般不关心这个)
     void Roll(float angle);
@@ -59,6 +63,7 @@ private:
     void updateCameraVectors();
 
 public:
+    std::string m_name;
     glm::vec3 m_position; // 摄像机位置
     glm::vec3 m_target;
 

@@ -133,9 +133,21 @@ void Renderer::init(int w, int h) {
     );
 
     m_camera = new Camera(
-        gConfig->Camera.Position,
-        gConfig->Camera.Target,
-        gConfig->Camera.Up);
+        gConfig->Cameras[0].Position,
+        gConfig->Cameras[0].Target,
+        gConfig->Cameras[0].Up);
+
+    for (auto i = 0; i <  gConfig->Cameras.size(); i++) {
+        auto cameraConfig = gConfig->Cameras[i];
+        auto camera = new Camera(
+            cameraConfig.Position,
+            cameraConfig.Target,
+            cameraConfig.Up
+        );
+        camera->m_name = cameraConfig.Name;
+        m_cameras.push_back(camera);
+    }
+    m_camera = m_cameras[0];
 
     int i = 0;
     for (auto lightConfig: gConfig->PointLights) {
@@ -290,11 +302,24 @@ void Renderer::LoadWorldFromFile(const string &filename) {
         gConfig->Clip.ClipFov = clip["fov"].as<float>();
         gConfig->Clip.ClipAspect = clip["aspect"].as<float>();
 
-        // camera
-        if (m_camera != nullptr) {
-            delete m_camera;
+        // cameras - 支持多个摄像机，默认使用第一个
+        const YAML::Node &camera_nodes = world_config["cameras"];
+        if (camera_nodes && camera_nodes.IsSequence()) {
+            // 使用第一个摄像机
+            if (m_camera != nullptr) {
+                delete m_camera;
+            }
+            m_camera = LoadCameraFromYaml(camera_nodes[0]);
+        } else {
+            // 兼容旧格式：单个camera配置
+            const YAML::Node &camera = world_config["camera"];
+            if (camera) {
+                if (m_camera != nullptr) {
+                    delete m_camera;
+                }
+                m_camera = LoadCameraFromYaml(camera);
+            }
         }
-        m_camera = LoadCameraFromYaml(world_config["camera"]);
 
 
         // lights
@@ -397,6 +422,21 @@ Light *Renderer::GetLightByUUID(const std::string &uuid) const {
 
 float Renderer::GetFPS() const {
     return m_fps_counter->GetFPS();
+}
+
+void Renderer::SwitchCamera(int index) {
+    if (index < 0 || static_cast<size_t>(index) >= m_cameras.size()) {
+        std::cerr << "Invalid camera index: " << index << std::endl;
+        return;
+    }
+    m_camera = m_cameras[index];
+
+    // 通过设置位置来触发相机向量更新
+    m_camera->m_front = glm::normalize(m_camera->m_target - m_camera->m_position);
+    m_camera->m_right = glm::normalize(glm::cross(m_camera->m_front, m_camera->m_world_up));
+    m_camera->m_up = glm::normalize(glm::cross(m_camera->m_right, m_camera->m_front));
+
+    std::cout << "Camera switch to " << m_camera->GetName() << std::endl;
 }
 
 void Renderer::SerProjectionType(ProjectionType type) {

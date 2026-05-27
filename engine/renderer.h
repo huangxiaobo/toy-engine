@@ -5,6 +5,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <yaml-cpp/yaml.h>
+#include "config.h"
 
 using namespace std;
 
@@ -72,6 +73,12 @@ public:
 
     // 获取相机
     Camera *GetCamera() const { return m_camera; }
+    
+    // 获取所有摄像机配置
+    const std::vector<Camera*>& GetCameras() const { return m_cameras; }
+    
+    // 切换到指定索引的摄像机
+    void SwitchCamera(int index);
 
     // 切换视角
     void SerProjectionType(ProjectionType type);
@@ -97,7 +104,9 @@ private:
 
     FPSCounter *m_fps_counter;
     Axis *m_axis;
-    Camera *m_camera;
+    Camera* m_camera;
+    vector<Camera *> m_cameras;
+
     Terrain *m_terrain;
     vector<Model *> m_models;
     map<string, Model *> m_light_models;

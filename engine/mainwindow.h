@@ -101,6 +101,7 @@ private:
     // 相机控制状态
     bool m_cameraRotating = false;  // 已废弃，保留用于兼容性
     bool m_cameraPanning = false;   // 鼠标右键拖动时进行相机平移
+    int m_currentCameraIndex = 0;   // 当前选中的摄像机索引
     
     // 时间相关
     float m_lastTime = 0.0f;

@@ -8,19 +8,46 @@ world:
     far: 1000.0
     fov: 45.0
     aspect: 1
-  camera:
-    position:
-      x: 20.0
-      y: 20.0
-      z: 20.0
-    target:
-      x: 0.0
-      y: 0.0
-      z: 0.0
-    up:
-      x: 0.0
-      y: 1.0
-      z: 0.0
+  cameras:
+    - name: "Main Camera"
+      position:
+        x: 20.0
+        y: 20.0
+        z: 20.0
+      target:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+      up:
+        x: 0.0
+        y: 1.0
+        z: 0.0
+    - name: "Top View"
+      position:
+        x: 0.0
+        y: 50.0
+        z: 0.0
+      target:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+      up:
+        x: 0.0
+        y: 0.0
+        z: -1.0
+    - name: "Side View"
+      position:
+        x: 50.0
+        y: 0.0
+        z: 0.0
+      target:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+      up:
+        x: 0.0
+        y: 1.0
+        z: 0.0
   lights:
     - type: 1
       position:

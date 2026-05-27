@@ -63,6 +63,10 @@ Camera::~Camera()
 {
 }
 
+std::string Camera::GetName() const {
+    return m_name;
+}
+
 // ... 已有代码 ...
 
 void Camera::Roll(float angle)
