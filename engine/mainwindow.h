@@ -54,7 +54,7 @@ private:
     
     // 创建状态栏
     void CreateStatusBar();
-    
+
     // 选择对象
     void SelectObject(void* obj);
     

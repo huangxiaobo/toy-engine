@@ -1,4 +1,5 @@
 #include <glad/gl.h>
+#include <GLFW/glfw3.h>
 #include "globals.h"
 #include "config.h"
 #include "renderer.h"
@@ -59,7 +60,7 @@ Renderer::~Renderer() {
 
 void Renderer::init(int w, int h) {
     // glad 初始化
-    if (!gladLoaderLoadGL()) {
+    if (!gladLoadGL(glfwGetProcAddress)) {
         std::cout << ("glad init failed!") << std::endl;
         return;
     }
@@ -461,7 +462,6 @@ Light *Renderer::LoadLightFromYaml(const YAML::Node &light_node, size_t index) {
     auto lightAttenuationConstant = light_node["attenuation"]["constant"].as<float>();
     auto lightAttenuationLinear = light_node["attenuation"]["linear"].as<float>();
     auto lightAttenuationExp = light_node["attenuation"]["exp"].as<float>();
-
 
     // // 创建光源模型
     // auto model = new Model(std::format("light-{}", 1));

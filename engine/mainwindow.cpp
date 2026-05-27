@@ -259,12 +259,7 @@ void ToyEngineMainWindow::CreateUI() {
 void ToyEngineMainWindow::CreateToolbar() {
     ImGui::Begin("工具栏", &m_showToolbar, ImGuiWindowFlags_NoCollapse);
     
-    if (ImGui::Button("播放")) {}
-    ImGui::SameLine();
-    if (ImGui::Button("暂停")) {}
-    ImGui::SameLine();
-    if (ImGui::Button("停止")) {}
-    ImGui::SameLine();
+
     
     ImGui::Separator();
     ImGui::SameLine();
@@ -277,10 +272,14 @@ void ToyEngineMainWindow::CreateToolbar() {
 }
 
 void ToyEngineMainWindow::CreateSceneTreePanel() {
-    ImGui::Begin("场景树", &m_showSceneTree, ImGuiWindowFlags_NoCollapse);
+    // 设置窗口位置在左侧，宽度固定，高度为窗口高度减去状态栏和属性面板
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(250, ImGui::GetIO().DisplaySize.y - 300), ImGuiCond_Always);
     
-    // 显示模型列表
-    if (ImGui::TreeNode("模型")) {
+    ImGui::Begin("场景树", &m_showSceneTree, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    
+    // 显示模型列表 - 默认展开
+    if (ImGui::TreeNodeEx("模型", ImGuiTreeNodeFlags_DefaultOpen)) {
         auto models = m_renderer->GetModels();
         for (size_t i = 0; i < models.size(); ++i) {
             auto model = models[i];
@@ -295,8 +294,8 @@ void ToyEngineMainWindow::CreateSceneTreePanel() {
         ImGui::TreePop();
     }
     
-    // 显示光源列表
-    if (ImGui::TreeNode("光源")) {
+    // 显示光源列表 - 默认展开
+    if (ImGui::TreeNodeEx("光源", ImGuiTreeNodeFlags_DefaultOpen)) {
         auto lights = m_renderer->GetLights();
         for (size_t i = 0; i < lights.size(); ++i) {
             auto light = lights[i];
@@ -311,8 +310,8 @@ void ToyEngineMainWindow::CreateSceneTreePanel() {
         ImGui::TreePop();
     }
     
-    // 显示相机
-    if (ImGui::TreeNode("相机")) {
+    // 显示相机 - 默认展开
+    if (ImGui::TreeNodeEx("相机", ImGuiTreeNodeFlags_DefaultOpen)) {
         auto camera = m_renderer->GetCamera();
         if (camera && ImGui::Selectable("主相机", 
             m_selectedObject == camera && m_selectedObjectType == "Camera")) {
@@ -326,7 +325,11 @@ void ToyEngineMainWindow::CreateSceneTreePanel() {
 }
 
 void ToyEngineMainWindow::CreatePropertiesPanel() {
-    ImGui::Begin("属性", &m_showProperties, ImGuiWindowFlags_NoCollapse);
+    // 设置窗口位置在场景树面板下方
+    ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y - 300), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(250, 270), ImGuiCond_Always);
+    
+    ImGui::Begin("属性", &m_showProperties, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
     
     if (m_selectedObject) {
         UpdateSelectedObjectProperties();
@@ -338,8 +341,12 @@ void ToyEngineMainWindow::CreatePropertiesPanel() {
 }
 
 void ToyEngineMainWindow::CreateStatusBar() {
-    ImGui::Begin("状态栏", &m_showStatusBar, 
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
+    // 设置窗口位置在右下角
+    ImGui::SetNextWindowPos(ImVec2(m_windowWidth - 400, m_windowHeight - 35), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(400, 35), ImGuiCond_Always);
+    
+    ImGui::Begin("##StatusBar", &m_showStatusBar, 
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
     
     // 显示FPS

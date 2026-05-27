@@ -613,7 +613,6 @@ vector<Mesh *> Mesh::CreatePointLightMeshes(int radius) {
             up
         );
         for (size_t i = 0; i < points.size(); i += 1) {
-            std::cout << "point: " << Utils::GetString(points[i]) << std::endl;
             m1->vertices.push_back({
                 points[i],
                 glm::vec3(1.0f),

@@ -12,7 +12,7 @@
 #include <cxxabi.h>
 #include <cstdlib>
 
-// 定义STB_IMAGE_IMPLEMENTATION以确保stb_image的实现被包含
+// 定义 STB_IMAGE_IMPLEMENTATION 以包含 stb_image 的实现
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 

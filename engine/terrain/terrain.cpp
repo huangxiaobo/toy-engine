@@ -6,8 +6,8 @@
 #include "../material/material.h"
 #include "../utils/utils.h"
 
-// 使用stb_image加载高度图（实现在utils.cpp中）
-#include "../utils/stb_image.h"
+// stb_image 已经在3rdparty/stb模块中编译，这里只需要包含头文件
+#include "stb_image.h"
 
 Terrain::Terrain() 
     : m_model(nullptr)
