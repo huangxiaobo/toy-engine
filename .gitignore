@@ -33,3 +33,10 @@ _deps
 CMakeUserPresets.json
 .qt
 *_autogen
+
+# Third-party libraries (use ./download_deps.sh to download)
+3rdparty/glfw
+3rdparty/imgui
+3rdparty/assimp
+3rdparty/yaml-cpp
+3rdparty/stb

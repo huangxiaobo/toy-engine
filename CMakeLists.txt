@@ -23,35 +23,16 @@ set(SOURCE_FILES
     ${HEADER_FILES}
 )
 
-# 使用FetchContent自动下载第三方库
-include(FetchContent)
-
 # 设置默认构建静态库
 set(BUILD_SHARED_LIBS OFF)
 
-# 使用本地3rdparty中的glad
+# 使用本地3rdparty中的第三方库
+# 注意: 首次使用前需要运行 ./download_deps.sh 下载依赖
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/glad)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/glfw)
 
-
-# 下载glfw
-FetchContent_Declare(
-    glfw
-    GIT_REPOSITORY https://gitcode.com/GitHub_Trending/gl/glfw.git
-    GIT_TAG 3.4
-)
-FetchContent_MakeAvailable(glfw)
-
-# 下载imgui
-FetchContent_Declare(
-    imgui
-    GIT_REPOSITORY git@gitee.com:mirrors/imgui.git
-    GIT_TAG v1.91.0
-)
-
-# 获取imgui源码并手动配置（因为官方没有提供符合需求的CMakeLists）
-FetchContent_MakeAvailable(imgui)
-
-# 创建imgui库
+# ImGui 没有官方CMakeLists,需要手动配置
+set(imgui_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/imgui)
 add_library(imgui_lib
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_demo.cpp
@@ -61,50 +42,28 @@ add_library(imgui_lib
     ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
-
 target_include_directories(imgui_lib PUBLIC
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
 )
-
 target_link_libraries(imgui_lib PRIVATE glfw)
 add_library(imgui::imgui ALIAS imgui_lib)
 
-# 下载assimp
-FetchContent_Declare(
-    assimp
-    GIT_REPOSITORY git@gitee.com:mirrors/assimp.git
-    GIT_TAG v5.4.2
-    CMAKE_ARGS
-        -DASSIMP_BUILD_TESTS=OFF
-        -DASSIMP_INSTALL=OFF
-        -DASSIMP_NO_EXPORT=OFF
-        -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
-        -DBUILD_SHARED_LIBS=OFF
-)
-FetchContent_MakeAvailable(assimp)
+# Assimp
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+set(ASSIMP_NO_EXPORT OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/assimp)
 
-# 下载yaml-cpp
-FetchContent_Declare(
-    yaml-cpp
-    GIT_REPOSITORY https://gitcode.com/gh_mirrors/ya/yaml-cpp.git
-    GIT_TAG yaml-cpp-0.9.0
-    CMAKE_ARGS
-        -DYAML_CPP_BUILD_TESTS=OFF
-        -DYAML_CPP_BUILD_TOOLS=OFF
-        -DYAML_CPP_BUILD_CONTRIB=OFF
-)
-FetchContent_MakeAvailable(yaml-cpp)
+# yaml-cpp
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/yaml-cpp)
 
-# 配置stb（header-only库）
-FetchContent_Declare(
-    stb
-    GIT_REPOSITORY git@gitee.com:mirrors/stb.git
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(stb)
-
-# 为stb创建接口库（header-only）
+# stb (header-only库)
+set(stb_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/stb)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 
@@ -117,11 +76,6 @@ add_compile_definitions(GLAD_GLAPI_EXPORT_BUILD)
 find_package(glm CONFIG REQUIRED)
 
 add_executable(toy-engine main.cpp ${SOURCE_FILES})
-
-# 添加glad头文件路径
-target_include_directories(toy-engine PRIVATE 
-    ${glad_BINARY_DIR}/include
-)
 
 target_link_libraries(toy-engine PRIVATE
     glm::glm
