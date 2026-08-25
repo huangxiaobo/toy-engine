@@ -13,6 +13,8 @@
 #include "model/model.h"
 #include "axis/axis.h"
 #include "terrain/terrain.h"
+#include "particle/particle_system.h"
+#include "particle/particle_emitter.h"
 #include "utils/utils.h"
 #include "light/light.h"
 #include "material/material.h"
@@ -20,11 +22,12 @@
 #include "fps/fps.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
+#include <ranges>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/transform.hpp>
 
-Renderer::Renderer() {
+Renderer::Renderer() : m_eye_pos(0) {
 }
 
 Renderer::~Renderer() {
@@ -39,6 +42,12 @@ Renderer::~Renderer() {
     if (m_terrain != nullptr) {
         delete m_terrain;
         m_terrain = nullptr;
+    }
+    while (!m_particle_systems.empty()) {
+        for (auto ps: m_particle_systems) {
+            delete ps;
+        }
+        m_particle_systems.clear();
     }
     while (!m_models.empty()) {
         for (auto model: m_models) {
@@ -95,9 +104,9 @@ void Renderer::init(int w, int h) {
     auto axis_mesh = Mesh::CreateAxisMesh();
     axis_model->SetMeshes(axis_mesh);
 
-    Technique *axis_effect = new Technique("axis",
-                                           "./resource/shader/axis.vert",
-                                           "./resource/shader/axis.frag");
+    auto *axis_effect = new Technique("axis",
+                                      "./resource/shader/axis.vert",
+                                      "./resource/shader/axis.frag");
 
     for (auto m: axis_mesh) {
         m->SetEffect(axis_effect);
@@ -109,11 +118,11 @@ void Renderer::init(int w, int h) {
 
     // Create Plane
     vector<Mesh *> plane_mesh = Mesh::CreatePlaneMesh();
-    Technique *plane_effect = new Technique("plane",
-                                            "./resource/shader/light.vert",
-                                            "./resource/shader/light.frag");
+    auto *plane_effect = new Technique("plane",
+                                       "./resource/shader/light.vert",
+                                       "./resource/shader/light.frag");
 
-    Model *plane = new Model("plane");
+    auto *plane = new Model("plane");
     plane->SetScale(glm::vec3(5.0f, 5.0f, 5.0f));
     plane->SetMeshes(plane_mesh);
     for (auto m: plane_mesh) {
@@ -125,20 +134,47 @@ void Renderer::init(int w, int h) {
     // Create Terrain from heightmap
     m_terrain = new Terrain();
     m_terrain->InitFromHeightmap(
-        "./resource/iceland_heightmap.png",  // 高度图路径
-        20.0f,   // 地形大小
-        3.0f,    // 高度缩放
-        256,     // 地形分辨率
-        5        // 纹理重复次数
+        "./resource/iceland_heightmap.png", // 高度图路径
+        20.0f, // 地形大小
+        3.0f, // 高度缩放
+        256, // 地形分辨率
+        5 // 纹理重复次数
     );
+
+    // Create Particle Systems from config
+    for (const auto &particleConfig: gConfig->Particles) {
+        auto *ps = new ParticleSystem();
+        ps->Init(particleConfig.Position);
+        
+        // 应用配置
+        auto *emitter = ps->GetEmitter();
+        emitter->SetMaxParticles(particleConfig.MaxParticles);
+        ps->ReallocateVBO();
+        emitter->EmitRate = particleConfig.EmitRate;
+        emitter->MinLife = particleConfig.MinLife;
+        emitter->MaxLife = particleConfig.MaxLife;
+        emitter->MinSize = particleConfig.MinSize;
+        emitter->MaxSize = particleConfig.MaxSize;
+        emitter->MinVelocity = particleConfig.MinVelocity;
+        emitter->MaxVelocity = particleConfig.MaxVelocity;
+        emitter->MinColor = particleConfig.MinColor;
+        emitter->MaxColor = particleConfig.MaxColor;
+        emitter->MinColorEnd = particleConfig.MinColorEnd;
+        emitter->MaxColorEnd = particleConfig.MaxColorEnd;
+        emitter->MinSizeEnd = particleConfig.MinSizeEnd;
+        emitter->MaxSizeEnd = particleConfig.MaxSizeEnd;
+        emitter->Gravity = particleConfig.Gravity;
+        emitter->Drag = particleConfig.Drag;
+        
+        m_particle_systems.push_back(ps);
+    }
 
     m_camera = new Camera(
         gConfig->Cameras[0].Position,
         gConfig->Cameras[0].Target,
         gConfig->Cameras[0].Up);
 
-    for (auto i = 0; i <  gConfig->Cameras.size(); i++) {
-        auto cameraConfig = gConfig->Cameras[i];
+    for (const auto &cameraConfig: gConfig->Cameras) {
         auto camera = new Camera(
             cameraConfig.Position,
             cameraConfig.Target,
@@ -174,23 +210,23 @@ void Renderer::init(int w, int h) {
     }
     std::cout << "Setup lights finish" << std::endl;
 
-    for (auto modelConfig: gConfig->Models) {
+    for (const auto &modelConfig: gConfig->Models) {
         std::cout << "model name : " << modelConfig.Name << std::endl;
         std::cout << "mesh name  : " << modelConfig.Mesh.Name << std::endl;
         std::cout << "mesh file  : " << modelConfig.Mesh.File << std::endl;
-        if (modelConfig.Mesh.File.length() == 0) {
+        if (modelConfig.Mesh.File.empty()) {
             continue;
         }
         auto model_obj = new Model(modelConfig.Name);
         model_obj->LoadModel(modelConfig.Mesh.File);
 
-        Material *material = new Material();
+        auto *material = new Material();
         material->AmbientColor = modelConfig.Material.AmbientColor;
         material->DiffuseColor = modelConfig.Material.DiffuseColor;
         material->SpecularColor = modelConfig.Material.SpecularColor;
         material->Shininess = modelConfig.Material.Shininess;
 
-        TechniqueLight *effect = new TechniqueLight(
+        auto *effect = new TechniqueLight(
             "default",
             modelConfig.ShaderVertFile,
             modelConfig.ShaderFragFile
@@ -222,10 +258,15 @@ void Renderer::draw(long long elapsed) {
 
     // 绘制坐标轴
     m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
-    
+
     // 绘制地形
     m_terrain->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
-    
+
+    // 绘制配置的粒子系统
+    for (auto ps: m_particle_systems) {
+        ps->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    }
+
     // 绘制光源模式
     // 更新灯光
     for (auto light: m_lights) {
@@ -270,6 +311,12 @@ void Renderer::resize(int w, int h) {
 
 void Renderer::update(long long elapsed) {
     m_eye_pos = m_camera->GetEyePosition();
+    
+    // 更新配置的粒子系统
+    for (auto ps: m_particle_systems) {
+        ps->Update(elapsed / 1000.0f);
+    }
+    
     return;
     // 更新灯光
     for (auto light: m_lights) {
@@ -304,31 +351,17 @@ void Renderer::LoadWorldFromFile(const string &filename) {
 
         // cameras - 支持多个摄像机，默认使用第一个
         const YAML::Node &camera_nodes = world_config["cameras"];
-        if (camera_nodes && camera_nodes.IsSequence()) {
-            // 使用第一个摄像机
-            if (m_camera != nullptr) {
-                delete m_camera;
-            }
-            m_camera = LoadCameraFromYaml(camera_nodes[0]);
-        } else {
-            // 兼容旧格式：单个camera配置
-            const YAML::Node &camera = world_config["camera"];
-            if (camera) {
-                if (m_camera != nullptr) {
-                    delete m_camera;
-                }
-                m_camera = LoadCameraFromYaml(camera);
-            }
-        }
-
+        // 使用第一个摄像机
+        delete m_camera;
+        m_camera = LoadCameraFromYaml(camera_nodes[0]);
 
         // lights
-        for (auto &m_light: m_lights) {
+        for (const auto &m_light: m_lights) {
             delete m_light;
         }
         m_lights.clear();
-        for (auto &m: m_light_models) {
-            delete m.second;
+        for (auto &val: m_light_models | views::values) {
+            delete val;
         }
         m_light_models.clear();
 
@@ -337,14 +370,14 @@ void Renderer::LoadWorldFromFile(const string &filename) {
         for (auto &i: light_nodes) {
             const YAML::Node &light_node = i;
             auto light = LoadLightFromYaml(light_node, ++index);
-            auto pointLight = (PointLight *) light;
+            auto pointLight = static_cast<PointLight *>(light);
             m_lights.push_back(light);
 
             // 创建光源模型
-            auto model = Model::CreatePointLightModelV1();
+            const auto model = Model::CreatePointLightModelV1();
             model->SetPosition(pointLight->Position);
             light->SetModel(model);
-            
+
             // 添加到light_models map
             m_light_models[light->GetUUID()] = model;
             std::cout << "Setup light finish" << std::endl;
@@ -393,7 +426,7 @@ Camera *Renderer::LoadCameraFromYaml(const YAML::Node &camera_node) {
     );
 }
 
-Model *Renderer::GetModel(const string& name) {
+Model *Renderer::GetModel(const string &name) {
     for (auto model: m_models) {
         if (model->GetName() == name) {
             return model;
@@ -402,7 +435,7 @@ Model *Renderer::GetModel(const string& name) {
     return nullptr;
 }
 
-Model *Renderer::GetModelByUUID(const string& uuid) {
+Model *Renderer::GetModelByUUID(const string &uuid) {
     for (auto model: m_models) {
         if (model->GetUUID() == uuid) {
             return model;
@@ -607,7 +640,7 @@ Material *Renderer::LoadMaterialFromYaml(const YAML::Node &node, size_t index) {
     auto modelMaterialShininess = node["shininess"].as<float>();
 
 
-    Material *material = new Material();
+    auto *material = new Material();
     material->AmbientColor = modelMaterialAmbientColor;
     material->DiffuseColor = modelMaterialDiffuseColor;
     material->SpecularColor = modelMaterialSpecularColor;
@@ -616,4 +649,5 @@ Material *Renderer::LoadMaterialFromYaml(const YAML::Node &node, size_t index) {
 }
 
 Technique *Renderer::LoadTechniqueFromYaml(const YAML::Node &node, size_t index) {
+    return nullptr;
 }

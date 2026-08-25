@@ -17,6 +17,7 @@ class Technique;
 class Camera;
 class FPSCounter;
 class Terrain;
+class ParticleSystem;
 
 enum class ProjectionType {
     Perspective,
@@ -89,25 +90,26 @@ private:
     void calculateProjectMatrix(int w, int h);
 
 private:
-    int width;
-    int height;
+    int width{};
+    int height{};
 
     // 世界矩阵
-    glm::mat4 m_projection_matrix;
-    glm::mat4 m_view_matrix;
-    glm::mat4 m_model_matrix;
-    glm::mat4 m_mvp_matrix;
-    glm::vec3 m_eye_pos;
+    glm::mat4 m_projection_matrix{};
+    glm::mat4 m_view_matrix{};
+    glm::mat4 m_model_matrix{};
+    glm::mat4 m_mvp_matrix{};
+    glm::vec3 m_eye_pos{};
 
     ProjectionType m_projectionType = ProjectionType::Perspective;
 
 
-    FPSCounter *m_fps_counter;
-    Axis *m_axis;
-    Camera* m_camera;
+    FPSCounter *m_fps_counter{};
+    Axis *m_axis{};
+    Camera* m_camera{};
     vector<Camera *> m_cameras;
 
-    Terrain *m_terrain;
+    Terrain *m_terrain{};
+    vector<ParticleSystem *> m_particle_systems;
     vector<Model *> m_models;
     map<string, Model *> m_light_models;
     vector<Model *> m_light_modes_ext;

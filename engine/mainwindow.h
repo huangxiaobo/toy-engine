@@ -45,12 +45,15 @@ private:
     
     // 创建场景树面板
     void CreateSceneTreePanel();
+
+    void CreateLightPannel();
+
+    void CreateCameraPanel();
     
     // 创建属性面板
     void CreatePropertiesPanel();
     
-    // 创建工具栏
-    void CreateToolbar();
+
     
     // 创建状态栏
     void CreateStatusBar();
@@ -85,6 +88,9 @@ private:
     bool m_showProperties = true;
     bool m_showToolbar = true;
     bool m_showStatusBar = true;
+    bool m_showLightPanel = true;
+    bool m_showCameraPanel = true;
+
     
     // 选中的对象
     void* m_selectedObject = nullptr;

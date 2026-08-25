@@ -4,6 +4,7 @@
         "iostream": "cpp",
         "qopenglfunctions_4_1_core": "cpp",
         "qopenglfunctions": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "__config": "cpp"
     }
 }

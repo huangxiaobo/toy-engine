@@ -17,6 +17,7 @@ output
 build
 bin
 .idea
+.omo
 
 # CMake generated files
 CMakeLists.txt.user

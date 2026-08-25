@@ -231,6 +231,42 @@ void ToyEngineMainWindow::CreateUI() {
             ImGui::EndMenu();
         }
         
+        if (ImGui::BeginMenu("光源")) {
+            auto lights = m_renderer->GetLights();
+            for (size_t i = 0; i < lights.size(); ++i) {
+                auto light = lights[i];
+                if (light == nullptr) continue;
+                std::string nodeName = light->GetName() + "##" + std::to_string(i);
+                bool isSelected = (m_selectedObject == light && m_selectedObjectType == "Light");
+                if (ImGui::MenuItem(nodeName.c_str(), nullptr, isSelected)) {
+                    SelectObject(light);
+                    m_selectedObjectType = "Light";
+                }
+            }
+            ImGui::EndMenu();
+        }
+        
+        if (ImGui::BeginMenu("摄像机")) {
+            auto cameras = m_renderer->GetCameras();
+            for (size_t i = 0; i < cameras.size(); ++i) {
+                const auto& camera = cameras[i];
+                std::string displayName = camera->GetName().empty() ?
+                    "Camera " + std::to_string(i) : camera->GetName();
+                
+                bool isSelected = (m_selectedObject == m_renderer->GetCamera() && 
+                    m_selectedObjectType == "Camera" && 
+                    m_currentCameraIndex == static_cast<int>(i));
+                if (ImGui::MenuItem(displayName.c_str(), nullptr, isSelected)) {
+                    // 切换到选中的摄像机
+                    m_renderer->SwitchCamera(static_cast<int>(i));
+                    m_currentCameraIndex = static_cast<int>(i);
+                    SelectObject(m_renderer->GetCamera());
+                    m_selectedObjectType = "Camera";
+                }
+            }
+            ImGui::EndMenu();
+        }
+        
         if (ImGui::BeginMenu("帮助")) {
             if (ImGui::MenuItem("关于")) {}
             ImGui::EndMenu();
@@ -238,13 +274,16 @@ void ToyEngineMainWindow::CreateUI() {
         ImGui::EndMainMenuBar();
     }
 
-    // 创建各个面板
-    if (m_showToolbar) {
-        CreateToolbar();
-    }
+
     
     if (m_showSceneTree) {
         CreateSceneTreePanel();
+    }
+    if (m_showCameraPanel) {
+        CreateCameraPanel();
+    }
+    if (m_showLightPanel) {
+        CreateLightPannel();
     }
     
     if (m_showProperties) {
@@ -256,20 +295,7 @@ void ToyEngineMainWindow::CreateUI() {
     }
 }
 
-void ToyEngineMainWindow::CreateToolbar() {
-    ImGui::Begin("工具栏", &m_showToolbar, ImGuiWindowFlags_NoCollapse);
-    
 
-    
-    ImGui::Separator();
-    ImGui::SameLine();
-    
-    if (ImGui::Button("添加模型")) {}
-    ImGui::SameLine();
-    if (ImGui::Button("添加光源")) {}
-    
-    ImGui::End();
-}
 
 void ToyEngineMainWindow::CreateSceneTreePanel() {
     // 设置窗口位置在左侧，宽度固定，高度为窗口高度减去状态栏和属性面板
@@ -332,6 +358,66 @@ void ToyEngineMainWindow::CreateSceneTreePanel() {
         ImGui::TreePop();
     }
     
+    ImGui::End();
+}
+
+void ToyEngineMainWindow::CreateLightPannel() {
+       // 设置窗口位置在左侧，宽度固定，高度为窗口高度减去状态栏和属性面板
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(250, ImGui::GetIO().DisplaySize.y - 600), ImGuiCond_Always);
+
+    ImGui::Begin("光源", &m_showLightPanel, ImGuiWindowFlags_NoCollapse  );
+
+    // 显示光源列表 - 默认展开
+    if (ImGui::TreeNodeEx("光源", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto lights = m_renderer->GetLights();
+        for (size_t i = 0; i < lights.size(); ++i) {
+            auto light = lights[i];
+            if (light == nullptr) continue;
+            std::string nodeName = light->GetName() + "##" + std::to_string(i);
+            if (ImGui::Selectable(nodeName.c_str(),
+                m_selectedObject == light && m_selectedObjectType == "Light")) {
+                SelectObject(light);
+                m_selectedObjectType = "Light";
+            }
+        }
+        ImGui::TreePop();
+    }
+
+
+
+    ImGui::End();
+}
+
+void ToyEngineMainWindow::CreateCameraPanel() {
+        // 设置窗口位置在左侧，宽度固定，高度为窗口高度减去状态栏和属性面板
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(250, ImGui::GetIO().DisplaySize.y - 300), ImGuiCond_Always);
+
+    ImGui::Begin("相机", &m_showCameraPanel, ImGuiWindowFlags_NoCollapse  );
+
+    // 显示相机 - 默认展开
+    if (ImGui::TreeNodeEx("相机", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto cameras = m_renderer->GetCameras();
+        for (size_t i = 0; i < cameras.size(); ++i) {
+            const auto& camera = cameras[i];
+            std::string displayName = camera->GetName().empty() ?
+                "Camera " + std::to_string(i) : camera->GetName();
+
+            if (ImGui::Selectable(displayName.c_str(),
+                m_selectedObject == m_renderer->GetCamera() &&
+                m_selectedObjectType == "Camera" &&
+                m_currentCameraIndex == static_cast<int>(i))) {
+                // 切换到选中的摄像机
+                m_renderer->SwitchCamera(static_cast<int>(i));
+                m_currentCameraIndex = static_cast<int>(i);
+                SelectObject(m_renderer->GetCamera());
+                m_selectedObjectType = "Camera";
+            }
+        }
+        ImGui::TreePop();
+    }
+
     ImGui::End();
 }
 

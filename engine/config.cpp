@@ -122,6 +122,110 @@ Config *Config::LoadFromYaml(const std::string &filename) {
             config->PointLights.push_back(lightConfig);
         }
 
+        // particles
+        const YAML::Node &particle_nodes = world_config["particles"];
+        if (particle_nodes && particle_nodes.IsSequence()) {
+            for (const auto &particle_node : particle_nodes) {
+                ParticleConfig particleConfig;
+                
+                particleConfig.Name = particle_node["name"].as<std::string>();
+                particleConfig.Id = particle_node["id"].as<std::string>();
+                
+                particleConfig.Position = glm::vec3(
+                    particle_node["position"]["x"].as<float>(),
+                    particle_node["position"]["y"].as<float>(),
+                    particle_node["position"]["z"].as<float>()
+                );
+                
+                // 可选属性，有默认值
+                particleConfig.EmitRate = particle_node["emit_rate"] ? particle_node["emit_rate"].as<float>() : 50.0f;
+                particleConfig.MaxParticles = particle_node["max_particles"] ? particle_node["max_particles"].as<int>() : 500;
+                
+                particleConfig.MinLife = particle_node["min_life"] ? particle_node["min_life"].as<float>() : 1.0f;
+                particleConfig.MaxLife = particle_node["max_life"] ? particle_node["max_life"].as<float>() : 2.0f;
+                
+                particleConfig.MinSize = particle_node["min_size"] ? particle_node["min_size"].as<float>() : 0.05f;
+                particleConfig.MaxSize = particle_node["max_size"] ? particle_node["max_size"].as<float>() : 0.15f;
+                
+                if (particle_node["min_velocity"]) {
+                    particleConfig.MinVelocity = glm::vec3(
+                        particle_node["min_velocity"]["x"].as<float>(),
+                        particle_node["min_velocity"]["y"].as<float>(),
+                        particle_node["min_velocity"]["z"].as<float>()
+                    );
+                } else {
+                    particleConfig.MinVelocity = glm::vec3(-0.5f, 1.0f, -0.5f);
+                }
+                
+                if (particle_node["max_velocity"]) {
+                    particleConfig.MaxVelocity = glm::vec3(
+                        particle_node["max_velocity"]["x"].as<float>(),
+                        particle_node["max_velocity"]["y"].as<float>(),
+                        particle_node["max_velocity"]["z"].as<float>()
+                    );
+                } else {
+                    particleConfig.MaxVelocity = glm::vec3(0.5f, 3.0f, 0.5f);
+                }
+                
+                if (particle_node["min_color"]) {
+                    particleConfig.MinColor = glm::vec3(
+                        particle_node["min_color"]["r"].as<float>(),
+                        particle_node["min_color"]["g"].as<float>(),
+                        particle_node["min_color"]["b"].as<float>()
+                    );
+                } else {
+                    particleConfig.MinColor = glm::vec3(1.0f, 0.6f, 0.0f);
+                }
+                
+                if (particle_node["max_color"]) {
+                    particleConfig.MaxColor = glm::vec3(
+                        particle_node["max_color"]["r"].as<float>(),
+                        particle_node["max_color"]["g"].as<float>(),
+                        particle_node["max_color"]["b"].as<float>()
+                    );
+                } else {
+                    particleConfig.MaxColor = glm::vec3(1.0f, 1.0f, 0.2f);
+                }
+                
+                if (particle_node["min_color_end"]) {
+                    particleConfig.MinColorEnd = glm::vec3(
+                        particle_node["min_color_end"]["r"].as<float>(),
+                        particle_node["min_color_end"]["g"].as<float>(),
+                        particle_node["min_color_end"]["b"].as<float>()
+                    );
+                } else {
+                    particleConfig.MinColorEnd = glm::vec3(1.0f, 0.0f, 0.0f);
+                }
+                
+                if (particle_node["max_color_end"]) {
+                    particleConfig.MaxColorEnd = glm::vec3(
+                        particle_node["max_color_end"]["r"].as<float>(),
+                        particle_node["max_color_end"]["g"].as<float>(),
+                        particle_node["max_color_end"]["b"].as<float>()
+                    );
+                } else {
+                    particleConfig.MaxColorEnd = glm::vec3(0.8f, 0.2f, 0.0f);
+                }
+                
+                particleConfig.MinSizeEnd = particle_node["min_size_end"] ? particle_node["min_size_end"].as<float>() : 0.0f;
+                particleConfig.MaxSizeEnd = particle_node["max_size_end"] ? particle_node["max_size_end"].as<float>() : 0.02f;
+                
+                if (particle_node["gravity"]) {
+                    particleConfig.Gravity = glm::vec3(
+                        particle_node["gravity"]["x"].as<float>(),
+                        particle_node["gravity"]["y"].as<float>(),
+                        particle_node["gravity"]["z"].as<float>()
+                    );
+                } else {
+                    particleConfig.Gravity = glm::vec3(0.0f, -2.0f, 0.0f);
+                }
+                
+                particleConfig.Drag = particle_node["drag"] ? particle_node["drag"].as<float>() : 0.98f;
+                
+                config->Particles.push_back(particleConfig);
+            }
+        }
+
         // models
         const YAML::Node &model_nodes = world_config["models"];
         for (const auto &i: model_nodes) {

@@ -112,6 +112,50 @@ world:
         constant: 1.0
         linear: 0.0
         exp: 0.0
+  particles:
+    - name: firework
+      id: "9128d629-c651-4688-85ad-11bc3e6c2293"
+      position:
+          x: 0
+          y: 10
+          z: 0
+      emit_rate: 150.0
+      max_particles: 5000
+      min_life: 7.5
+      max_life: 12.5
+      min_size: 8.0
+      max_size: 15.0
+      min_velocity:
+        x: -5.0
+        y: 2.0
+        z: -5.0
+      max_velocity:
+        x: 5.0
+        y: 8.0
+        z: 5.0
+      min_color:
+        r: 1.0
+        g: 1.0
+        b: 1.0
+      max_color:
+        r: 1.0
+        g: 0.8
+        b: 0.2
+      min_color_end:
+        r: 1.0
+        g: 0.2
+        b: 0.5
+      max_color_end:
+        r: 0.5
+        g: 0.0
+        b: 1.0
+      min_size_end: 0.0
+      max_size_end: 0.5
+      gravity:
+        x: 0.0
+        y: -3.0
+        z: 0.0
+      drag: 0.97
   models:
     - resource_class: Model
       name: bunny

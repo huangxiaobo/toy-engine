@@ -58,6 +58,26 @@ public:
     float Shininess;
 };
 
+class ParticleConfig {
+public:
+    std::string Name;
+    std::string Id;
+    glm::vec3 Position;
+    
+    float EmitRate;
+    int MaxParticles;
+    
+    float MinLife, MaxLife;
+    float MinSize, MaxSize;
+    glm::vec3 MinVelocity, MaxVelocity;
+    glm::vec3 MinColor, MaxColor;
+    glm::vec3 MinColorEnd, MaxColorEnd;
+    float MinSizeEnd, MaxSizeEnd;
+    
+    glm::vec3 Gravity;
+    float Drag;
+};
+
 class MeshConfig {
 public:
     std::string Name;
@@ -93,6 +113,7 @@ public:
     ClipConfig Clip;
     std::vector<CameraConfig> Cameras;  // 支持多个摄像机
     std::vector<PointLightConfig> PointLights;
+    std::vector<ParticleConfig> Particles;
     std::vector<ModelCoinfig> Models;
 };
 

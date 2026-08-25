@@ -142,12 +142,12 @@ unsigned int Utils::CreateCheckerboardTexture(int width, int height, int checkSi
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
-    // 创建棋盘格数据
-    std::vector<unsigned char> data(width * height * 3); // RGB
+    // 创建棋盘格数据 (RGBA)
+    std::vector<unsigned char> data(width * height * 4); // RGBA
     
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            int index = (y * width + x) * 3;
+            int index = (y * width + x) * 4;
             
             // 计算棋盘格颜色
             int xCheck = (x / checkSize) % 2;
@@ -158,17 +158,19 @@ unsigned int Utils::CreateCheckerboardTexture(int width, int height, int checkSi
                 data[index] = 255;     // R
                 data[index + 1] = 255; // G
                 data[index + 2] = 255; // B
+                data[index + 3] = 255; // A
             } else {
                 // 黑色方格
                 data[index] = 0;       // R
                 data[index + 1] = 0;   // G
                 data[index + 2] = 0;   // B
+                data[index + 3] = 255; // A
             }
         }
     }
 
     glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.data());
     glGenerateMipmap(GL_TEXTURE_2D);
 
     // 设置纹理环绕和过滤参数
