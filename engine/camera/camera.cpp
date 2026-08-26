@@ -20,7 +20,8 @@ Camera::Camera(glm::vec3 position, glm::vec3 target, glm::vec3 world_up)
 glm::mat4 Camera::GetViewMatrix()
 {
     // glm::LookAt函数需要一个相机世界空间位置、一个目标位置、世界空间中的上向量,创建作为观察矩阵
-    return glm::lookAt(m_position, m_position + m_front * 10.0f, m_world_up);
+    // 使用m_target作为目标点，确保相机始终看向配置的目标位置
+    return glm::lookAt(m_position, m_target, m_world_up);
 }
 void Camera::ProcessKeyboard(CameraMoveType direction, float deltaTime)
 {
@@ -88,8 +89,8 @@ void Camera::RotateHorizontal(float angle)
     m_front = glm::vec3(rotation * glm::vec4(m_front, 0.0f));
     m_right = glm::vec3(rotation * glm::vec4(m_right, 0.0f));
     
-    // 更新目标点
-    m_target = m_position + m_front * 10.0f;
+    // 更新目标点为原点（0,0,0），确保水平旋转时始终看向世界原点
+    m_target = glm::vec3(0.0f, 0.0f, 0.0f);
 }
 
 void Camera::RotateVertical(float angle)
@@ -101,8 +102,8 @@ void Camera::RotateVertical(float angle)
     m_front = glm::vec3(rotation * glm::vec4(m_front, 0.0f));
     m_up = glm::vec3(rotation * glm::vec4(m_up, 0.0f));
     
-    // 更新目标点
-    m_target = m_position + m_front * 10.0f;
+    // 更新目标点为原点（0,0,0），确保垂直旋转时始终看向世界原点
+    m_target = glm::vec3(0.0f, 0.0f, 0.0f);
 }
 
 void Camera::Pan(float dx, float dy)
@@ -159,6 +160,6 @@ void Camera::OrbitAroundOrigin(float horizontalAngle, float verticalAngle)
     m_right = glm::normalize(glm::cross(m_front, m_world_up));
     m_up = glm::normalize(glm::cross(m_right, m_front));
     
-    // 更新目标点
-    m_target = m_position + m_front * 10.0f;
+    // 更新目标点为原点（0,0,0），确保轨道旋转时始终看向世界原点
+    m_target = glm::vec3(0.0f, 0.0f, 0.0f);
 }

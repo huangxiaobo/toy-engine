@@ -84,6 +84,15 @@ public:
     std::string File;
 };
 
+class SkyDomeConfig {
+public:
+    float Radius = 500.0f;
+    int Sectors = 32;
+    int Stacks = 16;
+    glm::vec3 HorizonColor = glm::vec3(0.6f, 0.7f, 0.9f);
+    glm::vec3 ZenithColor = glm::vec3(0.1f, 0.2f, 0.5f);
+};
+
 class ModelCoinfig {
 public:
     std::string Name;
@@ -114,6 +123,7 @@ public:
     std::vector<CameraConfig> Cameras;  // 支持多个摄像机
     std::vector<PointLightConfig> PointLights;
     std::vector<ParticleConfig> Particles;
+    SkyDomeConfig SkyDome;
     std::vector<ModelCoinfig> Models;
 };
 

@@ -130,6 +130,8 @@ void ParticleSystem::Draw(long long elapsed,
     glGetBooleanv(GL_DEPTH_WRITEMASK, &depthWriteEnabled);
     GLboolean programPointSizeEnabled;
     glGetBooleanv(GL_PROGRAM_POINT_SIZE, &programPointSizeEnabled);
+    GLboolean cullFaceEnabled;
+    glGetBooleanv(GL_CULL_FACE, &cullFaceEnabled);
     
     // 启用混合
     glEnable(GL_BLEND);
@@ -164,7 +166,7 @@ void ParticleSystem::Draw(long long elapsed,
     if (!blendEnabled) glDisable(GL_BLEND);
     glDepthMask(depthWriteEnabled ? GL_TRUE : GL_FALSE);
     if (!programPointSizeEnabled) glDisable(GL_PROGRAM_POINT_SIZE);
-    glEnable(GL_CULL_FACE);
+    if (!cullFaceEnabled) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE);
 }
 
 void ParticleSystem::ReallocateVBO() {

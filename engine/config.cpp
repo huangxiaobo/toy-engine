@@ -226,6 +226,34 @@ Config *Config::LoadFromYaml(const std::string &filename) {
             }
         }
 
+        // sky_dome
+        const YAML::Node &sky_dome_node = world_config["sky_dome"];
+        if (sky_dome_node) {
+            if (sky_dome_node["radius"]) {
+                config->SkyDome.Radius = sky_dome_node["radius"].as<float>();
+            }
+            if (sky_dome_node["sectors"]) {
+                config->SkyDome.Sectors = sky_dome_node["sectors"].as<int>();
+            }
+            if (sky_dome_node["stacks"]) {
+                config->SkyDome.Stacks = sky_dome_node["stacks"].as<int>();
+            }
+            if (sky_dome_node["horizon_color"]) {
+                config->SkyDome.HorizonColor = glm::vec3(
+                    sky_dome_node["horizon_color"]["r"].as<float>(),
+                    sky_dome_node["horizon_color"]["g"].as<float>(),
+                    sky_dome_node["horizon_color"]["b"].as<float>()
+                );
+            }
+            if (sky_dome_node["zenith_color"]) {
+                config->SkyDome.ZenithColor = glm::vec3(
+                    sky_dome_node["zenith_color"]["r"].as<float>(),
+                    sky_dome_node["zenith_color"]["g"].as<float>(),
+                    sky_dome_node["zenith_color"]["b"].as<float>()
+                );
+            }
+        }
+
         // models
         const YAML::Node &model_nodes = world_config["models"];
         for (const auto &i: model_nodes) {

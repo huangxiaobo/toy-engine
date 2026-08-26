@@ -12,9 +12,10 @@
 #include "technique/technique_light.h"
 #include "model/model.h"
 #include "axis/axis.h"
-#include "terrain/terrain.h"
+#include "terrain/terrain_manager.h"
 #include "particle/particle_system.h"
 #include "particle/particle_emitter.h"
+#include "sky/sky_dome.h"
 #include "utils/utils.h"
 #include "light/light.h"
 #include "material/material.h"
@@ -39,9 +40,13 @@ Renderer::~Renderer() {
         delete m_axis;
         m_axis = nullptr;
     }
-    if (m_terrain != nullptr) {
-        delete m_terrain;
-        m_terrain = nullptr;
+    if (m_terrain_manager != nullptr) {
+        delete m_terrain_manager;
+        m_terrain_manager = nullptr;
+    }
+    if (m_sky_dome != nullptr) {
+        delete m_sky_dome;
+        m_sky_dome = nullptr;
     }
     while (!m_particle_systems.empty()) {
         for (auto ps: m_particle_systems) {
@@ -131,15 +136,41 @@ void Renderer::init(int w, int h) {
 
     m_models.push_back(plane);
 
-    // Create Terrain from heightmap
-    m_terrain = new Terrain();
-    m_terrain->InitFromHeightmap(
-        "./resource/iceland_heightmap.png", // 高度图路径
-        20.0f, // 地形大小
-        3.0f, // 高度缩放
-        256, // 地形分辨率
-        5 // 纹理重复次数
+    // 创建地形管理器（LOD无穷地形）
+    m_terrain_manager = new TerrainManager();
+    TerrainConfig terrainConfig;
+    terrainConfig.chunkSize = 100.0f;      // 每个chunk 100×100单位
+    terrainConfig.renderDistance = 5;       // 渲染距离5个chunk（500单位）
+    terrainConfig.unloadDistance = 7;       // 卸载距离7个chunk（700单位）
+    terrainConfig.heightScale = 20.0f;     // 最大高度20单位
+    terrainConfig.noiseSeed = 12345;       // 噪声种子
+    m_terrain_manager->Init(m_eye_pos, terrainConfig);
+
+    // 创建地形着色器和材质
+    auto *terrainEffect = new TechniqueLight("terrain",
+                                             "./resource/shader/terrain.vert",
+                                             "./resource/shader/terrain.frag");
+    Material *terrainMaterial = new Material();
+    terrainMaterial->AmbientColor = glm::vec3(0.3f, 0.3f, 0.3f);
+    terrainMaterial->DiffuseColor = glm::vec3(0.8f, 0.8f, 0.8f);
+    terrainMaterial->SpecularColor = glm::vec3(0.5f, 0.5f, 0.5f);
+    terrainMaterial->Shininess = 32.0f;
+    terrainEffect->SetMaterial(terrainMaterial);
+    terrainEffect->SetLights(m_lights);
+    m_terrain_manager->SetTechnique(terrainEffect);
+
+    // 创建并绑定地形纹理
+    unsigned int terrainTexture = Utils::CreateCheckerboardTexture(512, 512, 64);
+    m_terrain_manager->SetTexture(terrainTexture);
+
+    m_sky_dome = new SkyDome();
+    m_sky_dome->Init(
+        gConfig->SkyDome.Radius,
+        gConfig->SkyDome.Sectors,
+        gConfig->SkyDome.Stacks
     );
+    m_sky_dome->SetHorizonColor(gConfig->SkyDome.HorizonColor);
+    m_sky_dome->SetZenithColor(gConfig->SkyDome.ZenithColor);
 
     // Create Particle Systems from config
     for (const auto &particleConfig: gConfig->Particles) {
@@ -253,14 +284,18 @@ void Renderer::draw(long long elapsed) {
     glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    m_view_matrix = m_camera->GetViewMatrix(); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
+    m_view_matrix = m_camera->GetViewMatrix();
     m_eye_pos = m_camera->GetEyePosition();
+
+    glDepthMask(GL_FALSE);
+    m_sky_dome->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos);
+    glDepthMask(GL_TRUE);
 
     // 绘制坐标轴
     m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
 
     // 绘制地形
-    m_terrain->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, m_lights);
 
     // 绘制配置的粒子系统
     for (auto ps: m_particle_systems) {
@@ -268,7 +303,6 @@ void Renderer::draw(long long elapsed) {
     }
 
     // 绘制光源模式
-    // 更新灯光
     for (auto light: m_lights) {
         if (light->GetLightType() == LightTypePoint) {
             auto point_light = (PointLight *) light;
@@ -296,7 +330,7 @@ void Renderer::draw(long long elapsed) {
             model->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
         }
     }
-    // 绘制模式
+    // 绘制模型
     for (const auto &m: m_models) {
         m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
     }
@@ -311,6 +345,9 @@ void Renderer::resize(int w, int h) {
 
 void Renderer::update(long long elapsed) {
     m_eye_pos = m_camera->GetEyePosition();
+    
+    // 更新地形管理器（动态加载/卸载chunk）
+    m_terrain_manager->Update(m_eye_pos, elapsed);
     
     // 更新配置的粒子系统
     for (auto ps: m_particle_systems) {

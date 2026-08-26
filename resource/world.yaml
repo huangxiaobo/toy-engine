@@ -11,9 +11,9 @@ world:
   cameras:
     - name: "Main Camera"
       position:
-        x: 20.0
+        x: 50.0
         y: 20.0
-        z: 20.0
+        z: 50.0
       target:
         x: 0.0
         y: 0.0
@@ -25,7 +25,7 @@ world:
     - name: "Top View"
       position:
         x: 0.0
-        y: 50.0
+        y: 200.0
         z: 0.0
       target:
         x: 0.0
@@ -37,7 +37,7 @@ world:
         z: -1.0
     - name: "Side View"
       position:
-        x: 50.0
+        x: 200.0
         y: 0.0
         z: 0.0
       target:
@@ -51,8 +51,8 @@ world:
   lights:
     - type: 1
       position:
-        x: 10.0
-        y: 10.0
+        x: 20.0
+        y: 20.0
         z: 0.0
       color:
         r: 1.0
@@ -82,8 +82,8 @@ world:
         exp: 0.0
     - type: 1
       position:
-        x: -10.0
-        y: 10.0
+        x: -20.0
+        y: 20.0
         z: 0.0
         w: 1.0
       color:
@@ -116,9 +116,9 @@ world:
     - name: firework
       id: "9128d629-c651-4688-85ad-11bc3e6c2293"
       position:
-          x: 0
-          y: 10
-          z: 0
+          x: 5
+          y: 0
+          z: -5
       emit_rate: 150.0
       max_particles: 5000
       min_life: 7.5
@@ -156,6 +156,18 @@ world:
         y: -3.0
         z: 0.0
       drag: 0.97
+  sky_dome:
+    radius: 300.0
+    sectors: 32
+    stacks: 16
+    horizon_color:
+      r: 0.6
+      g: 0.7
+      b: 0.9
+    zenith_color:
+      r: 0.1
+      g: 0.2
+      b: 0.5
   models:
     - resource_class: Model
       name: bunny
@@ -165,9 +177,9 @@ world:
         y: 0
         z: 0
       scale:
-        x: 2
-        y: 2
-        z: 2
+        x: 5
+        y: 5
+        z: 5
       rotation: 0
       mesh:
         name: bunny

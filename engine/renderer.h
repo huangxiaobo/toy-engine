@@ -16,8 +16,9 @@ class Material;
 class Technique;
 class Camera;
 class FPSCounter;
-class Terrain;
+class TerrainManager;
 class ParticleSystem;
+class SkyDome;
 
 enum class ProjectionType {
     Perspective,
@@ -108,7 +109,8 @@ private:
     Camera* m_camera{};
     vector<Camera *> m_cameras;
 
-    Terrain *m_terrain{};
+    TerrainManager *m_terrain_manager{};
+    SkyDome *m_sky_dome{};
     vector<ParticleSystem *> m_particle_systems;
     vector<Model *> m_models;
     map<string, Model *> m_light_models;
