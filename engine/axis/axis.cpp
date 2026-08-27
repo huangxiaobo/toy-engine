@@ -16,7 +16,11 @@ Axis::Axis()
 
 Axis::~Axis()
 {
-
+    // 释放 Axis 持有的模型
+    if (m_model != nullptr) {
+        delete m_model;
+        m_model = nullptr;
+    }
 }
 
 void Axis::init(int width, int height)

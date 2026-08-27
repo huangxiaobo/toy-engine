@@ -93,6 +93,30 @@ public:
     glm::vec3 ZenithColor = glm::vec3(0.1f, 0.2f, 0.5f);
 };
 
+/*
+ * 地形配置（TerrainConfig）
+ *
+ * 对应 world.yaml 中的 terrain 段，用于配置程序化 LOD 地形。
+ * 这些参数会被解析后传给 TerrainManager（engine/terrain/terrain_manager.h）。
+ *
+ * 各字段含义：
+ *   - chunkSize:       每个 chunk 的世界尺寸（单位）
+ *   - baseResolution:  基础网格分辨率（顶点数 = resolution × resolution）
+ *   - renderDistance:  渲染距离（chunk 数量），摄像机周围多少圈 chunk 会被加载
+ *   - unloadDistance:  卸载距离（chunk 数量），超过该距离的 chunk 被卸载
+ *   - heightScale:     地形最大高度（噪声高度缩放因子）
+ *   - noiseSeed:       噪声生成器的随机种子，相同种子产生相同地形
+ */
+class TerrainConfigCfg {
+public:
+    float ChunkSize = 100.0f;
+    int BaseResolution = 64;
+    int RenderDistance = 5;
+    int UnloadDistance = 7;
+    float HeightScale = 20.0f;
+    unsigned int NoiseSeed = 12345;
+};
+
 class ModelCoinfig {
 public:
     std::string Name;
@@ -125,6 +149,9 @@ public:
     std::vector<ParticleConfig> Particles;
     SkyDomeConfig SkyDome;
     std::vector<ModelCoinfig> Models;
+
+    // 地形配置（程序化LOD地形）
+    TerrainConfigCfg Terrain;
 };
 
 #endif // __CONFIG_H__

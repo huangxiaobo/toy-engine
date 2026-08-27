@@ -103,7 +103,6 @@ bool ToyEngineMainWindow::Initialize() {
     // 初始化渲染器
     m_renderer = new Renderer();
     m_renderer->init(m_windowWidth, m_windowHeight);
-    // LoadWorldFromFile已经在renderer::init中调用过了，不需要再次调用
 
     m_lastTime = static_cast<float>(glfwGetTime());
 

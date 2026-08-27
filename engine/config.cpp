@@ -254,6 +254,30 @@ Config *Config::LoadFromYaml(const std::string &filename) {
             }
         }
 
+        // terrain（程序化LOD地形）
+        // 所有字段均可选，未配置时使用 TerrainConfigCfg 的默认值
+        const YAML::Node &terrain_node = world_config["terrain"];
+        if (terrain_node) {
+            if (terrain_node["chunk-size"]) {
+                config->Terrain.ChunkSize = terrain_node["chunk-size"].as<float>();
+            }
+            if (terrain_node["base-resolution"]) {
+                config->Terrain.BaseResolution = terrain_node["base-resolution"].as<int>();
+            }
+            if (terrain_node["render-distance"]) {
+                config->Terrain.RenderDistance = terrain_node["render-distance"].as<int>();
+            }
+            if (terrain_node["unload-distance"]) {
+                config->Terrain.UnloadDistance = terrain_node["unload-distance"].as<int>();
+            }
+            if (terrain_node["height-scale"]) {
+                config->Terrain.HeightScale = terrain_node["height-scale"].as<float>();
+            }
+            if (terrain_node["noise-seed"]) {
+                config->Terrain.NoiseSeed = terrain_node["noise-seed"].as<unsigned int>();
+            }
+        }
+
         // models
         const YAML::Node &model_nodes = world_config["models"];
         for (const auto &i: model_nodes) {

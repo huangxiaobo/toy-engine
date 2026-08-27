@@ -157,7 +157,7 @@ world:
         z: 0.0
       drag: 0.97
   sky_dome:
-    radius: 300.0
+    radius: 100.0
     sectors: 32
     stacks: 16
     horizon_color:
@@ -168,6 +168,13 @@ world:
       r: 0.1
       g: 0.2
       b: 0.5
+  terrain:
+    chunk-size: 100.0
+    base-resolution: 64
+    render-distance: 25
+    unload-distance: 30
+    height-scale: 0.0
+    noise-seed: 12345
   models:
     - resource_class: Model
       name: bunny
@@ -205,3 +212,38 @@ world:
           g: 1.0
           b: 1.0
         shininess: 15
+    - resource_class: Model
+      name: sphere
+      id: "9128d629-c651-4688-85ad-11bc3e6c2294"
+      position:
+        x: 25
+        y: 15
+        z: 0
+      scale:
+        x: 0.5
+        y: 0.5
+        z: 0.5
+      rotation: 0
+      mesh:
+        name: sphere
+        file: "./resource/model/sphere/sphere.obj"
+      technique:
+        technique:
+          name: light
+      shader:
+        vert: "./resource/model/bunny/shader.vert"
+        frag: "./resource/model/bunny/shader.frag"
+      material:
+        ambient:
+          r: 0.2
+          g: 0.2
+          b: 0.2
+        diffuse:
+          r: 0.7
+          g: 0.3
+          b: 0.3
+        specular:
+          r: 0.8
+          g: 0.8
+          b: 0.8
+        shininess: 32

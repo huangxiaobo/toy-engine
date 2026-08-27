@@ -4,7 +4,6 @@
 #include <map>
 #include <vector>
 #include <glm/glm.hpp>
-#include <yaml-cpp/yaml.h>
 #include "config.h"
 
 using namespace std;
@@ -41,22 +40,10 @@ public:
     void update(long long elapsed);
 
 public:
-    void LoadWorldFromFile(const string &filename);
-
-    static Camera *LoadCameraFromYaml(const YAML::Node &light_node);
-
-    static Light *LoadLightFromYaml(const YAML::Node &light_node, size_t index);
-
-    static Model *LoadModelFromYaml(const YAML::Node &model_node, size_t index);
-
-    static Material *LoadMaterialFromYaml(const YAML::Node &node, size_t index);
-
-    static Technique *LoadTechniqueFromYaml(const YAML::Node &node, size_t index);
-
     // 获取模型数量
     int GetModelCount() const { return m_models.size(); }
-    // 获取全部模型
-    std::vector<Model *> GetModels() { return m_models; }
+    // 获取全部模型（引用返回，避免每帧拷贝）
+    const std::vector<Model *> &GetModels() const { return m_models; }
 
     // 通过名字获取模型
     Model *GetModel(const string& name);
@@ -64,8 +51,8 @@ public:
     // 通过uuid获取模型
     Model *GetModelByUUID(const string& uuid);
 
-    // 获取全部灯光
-    std::vector<Light *> GetLights() { return m_lights; }
+    // 获取全部灯光（引用返回，避免每帧拷贝）
+    const std::vector<Light *> &GetLights() const { return m_lights; }
 
     // 通过uuid获取灯光
     Light *GetLightByUUID(const std::string &uuid) const;
@@ -114,8 +101,15 @@ private:
     vector<ParticleSystem *> m_particle_systems;
     vector<Model *> m_models;
     map<string, Model *> m_light_models;
-    vector<Model *> m_light_modes_ext;
     vector<Light *> m_lights;
+
+    // 渲染器创建并拥有的地形纹理，用于退出时统一释放
+    unsigned int m_terrain_texture = 0;
+
+    // 渲染器创建并拥有的着色器技术（Technique），用于统一释放
+    vector<Technique *> m_techniques;
+    // 渲染器创建并拥有的材质（Material），用于统一释放
+    vector<Material *> m_materials;
 };
 
 #endif

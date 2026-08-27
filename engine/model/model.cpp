@@ -275,25 +275,12 @@ glm::f32 Model::GetRotation() const {
 void Model::Draw(long long elapsed,
                  const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
                  const glm::vec3 &camera, const std::vector<Light *> &lights) {
-    glLineWidth(5);
     auto model_local = glm::mat4(1.0f);
     model_local = glm::translate(model_local, m_position);
     model_local = glm::scale(model_local, m_scale);
     model_local = glm::rotate(m_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 1.0f, 0.0f));
 
     model_local = model * model_local;
-    glm::mat4 mvp = projection * view * model_local;
-
-    // this->m_effect->Enable();
-    // this->m_effect->SetProjectionMatrix(projection);
-    // this->m_effect->SetViewMatrix(view);
-    // this->m_effect->SetModelMatrix(model_local);
-    // this->m_effect->SetWVPMatrix(mvp);
-    // this->m_effect->SetCamera(camera);
-
-    // this->m_effect->SetLights(lights);
-    // this->m_effect->SetMaterial(this->m_material);
-    // this->m_effect->GetShader()->BindFragDataLocation();
 
     for (int i = 0; i < this->m_meshes.size(); i++) {
         this->m_meshes[i]->Draw(elapsed, projection, view, model_local, camera, lights);

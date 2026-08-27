@@ -1,0 +1,8 @@
+# 斯坦福兔子材质（对应 world.yaml 中 bunny 模型的材质参数）
+# 颜色分量取值 0.0~1.0，与引擎 Material::AmbientColor/DiffuseColor/SpecularColor 对应
+# Ns 为高光指数，与 Material::Shininess 对应
+newmtl bunny_material
+Ka 0.25 0.25 0.25
+Kd 0.45 0.45 0.45
+Ks 1.0 1.0 1.0
+Ns 15

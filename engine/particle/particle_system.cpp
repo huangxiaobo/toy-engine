@@ -5,15 +5,6 @@
 #include <glad/gl.h>
 #include <iostream>
 
-// 粒子顶点数据结构
-struct ParticleVertex {
-    glm::vec3 Position;
-    glm::vec3 Color;
-    float Size;
-    float Life;
-    float MaxLife;
-};
-
 ParticleSystem::ParticleSystem()
     : m_emitter(nullptr)
     , m_effect(nullptr)
@@ -37,6 +28,11 @@ ParticleSystem::~ParticleSystem() {
     }
     if (m_VBO) {
         glDeleteBuffers(1, &m_VBO);
+    }
+    // 释放粒子纹理
+    if (m_textureID != 0) {
+        glDeleteTextures(1, &m_textureID);
+        m_textureID = 0;
     }
 }
 
@@ -106,12 +102,6 @@ void ParticleSystem::Update(float deltaTime) {
     if (m_emitter) {
         m_emitter->Update(deltaTime);
         UpdateBuffers();
-        
-        // 调试输出
-        static int frameCount = 0;
-        if (frameCount++ % 60 == 0) {
-            std::cout << "Particles alive: " << m_emitter->GetAliveCount() << std::endl;
-        }
     }
 }
 
@@ -180,27 +170,28 @@ void ParticleSystem::ReallocateVBO() {
 
 void ParticleSystem::UpdateBuffers() {
     if (!m_emitter) return;
-    
+
     const auto& particles = m_emitter->GetParticles();
-    std::vector<ParticleVertex> vertices;
-    vertices.reserve(m_emitter->GetAliveCount());
-    
+    // 复用成员缓冲，避免每帧重新分配内存
+    m_vertices.clear();
+    m_vertices.reserve(m_emitter->GetAliveCount());
+
     for (const auto& p : particles) {
         if (!p.IsAlive()) continue;
-        
+
         ParticleVertex vertex;
         vertex.Position = p.Position;
         vertex.Color = glm::mix(p.ColorEnd, p.Color, p.GetLifeRatio());
         vertex.Size = glm::mix(p.SizeEnd, p.Size, p.GetLifeRatio());
         vertex.Life = p.Life;
         vertex.MaxLife = p.MaxLife;
-        vertices.push_back(vertex);
+        m_vertices.push_back(vertex);
     }
-    
-    m_vertexCount = vertices.size();
-    
+
+    m_vertexCount = static_cast<int>(m_vertices.size());
+
     // 更新VBO
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(ParticleVertex), vertices.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(ParticleVertex), m_vertices.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }

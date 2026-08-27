@@ -21,7 +21,8 @@ public:
 
 
 private:
-    Model* m_model;
+    // Axis 持有并负责释放其模型
+    Model* m_model = nullptr;
 };
 
 #endif
