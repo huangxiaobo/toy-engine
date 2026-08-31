@@ -61,6 +61,10 @@ public:
     void SetTexture(unsigned int textureID) { m_textureID = textureID; }
     unsigned int GetTexture() const { return m_textureID; }
 
+    // 设置法线贴图纹理ID（用于切线空间的法线映射）
+    void SetNormalMap(unsigned int normalMapID) { m_normalMapID = normalMapID; }
+    unsigned int GetNormalMap() const { return m_normalMapID; }
+
     virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *> &lights);
 
     static vector<Mesh *> CreatePlaneMesh();
@@ -97,6 +101,8 @@ public:
     Technique *m_effect;  // 裸指针，只引用不拥有，由外部管理生命周期
     
     unsigned int m_textureID; // 纹理ID
+    
+    unsigned int m_normalMapID; // 法线贴图纹理ID（切线空间法线映射用），0 表示未使用
 };
 
 #endif

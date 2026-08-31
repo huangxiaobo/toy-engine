@@ -20,6 +20,7 @@
 #include "utils/utils.h"
 #include "light/light.h"
 #include "material/material.h"
+#include "material/mtl_parser.h"
 #include "camera/camera.h"
 #include "fps/fps.h"
 
@@ -91,6 +92,12 @@ Renderer::~Renderer() {
     if (m_terrain_texture != 0) {
         glDeleteTextures(1, &m_terrain_texture);
         m_terrain_texture = 0;
+    }
+
+    // 释放模型纹理（漫反射/法线贴图等）
+    if (!m_textures.empty()) {
+        glDeleteTextures(static_cast<GLsizei>(m_textures.size()), m_textures.data());
+        m_textures.clear();
     }
 
     if (m_fps_counter != nullptr) {
@@ -297,11 +304,23 @@ void Renderer::init(int w, int h) {
         auto model_obj = new Model(modelConfig.Name);
         model_obj->LoadModel(modelConfig.Mesh.File);
 
-        auto *material = new Material();
-        material->AmbientColor = modelConfig.Material.AmbientColor;
-        material->DiffuseColor = modelConfig.Material.DiffuseColor;
-        material->SpecularColor = modelConfig.Material.SpecularColor;
-        material->Shininess = modelConfig.Material.Shininess;
+        // 材质改为从 MTL 文件加载（自定义 MtlParser 解析），不再内联在 yaml 中
+        MtlParser mtlParser;
+        auto *material = mtlParser.ParseSingle(modelConfig.Material.File, modelConfig.Material.Name);
+        if (material == nullptr) {
+            // MTL 解析失败或材质名未找到时，退回默认材质，避免后续空指针
+            material = new Material();
+            material->Name = modelConfig.Material.Name;
+            material->AmbientColor = glm::vec3(0.2f);
+            material->DiffuseColor = glm::vec3(0.8f);
+            material->SpecularColor = glm::vec3(0.0f);
+            material->Shininess = 0.0f;
+        }
+        std::cout << "material loaded from mtl: " << material->Name
+                  << " (Ka " << material->AmbientColor.r << "," << material->AmbientColor.g << "," << material->AmbientColor.b
+                  << " Kd " << material->DiffuseColor.r << "," << material->DiffuseColor.g << "," << material->DiffuseColor.b
+                  << " Ks " << material->SpecularColor.r << "," << material->SpecularColor.g << "," << material->SpecularColor.b
+                  << " Ns " << material->Shininess << ")" << std::endl;
 
         auto *effect = new TechniqueLight(
             "default",
@@ -455,10 +474,10 @@ const ProjectionType Renderer::GetProjectionType() const {
 
 void Renderer::calculateProjectMatrix(const int w, const int h) {
     if (m_projectionType == ProjectionType::Perspective) {
-        float fov = gConfig->Clip.ClipFov; // 视野角度
-        float aspectRatio = (float) w / (float) (1 * h); // 宽高比
-        float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
-        float farPlane = gConfig->Clip.ClipFar; // 远平面距离
+        const float fov = gConfig->Clip.ClipFov; // 视野角度
+        const float aspectRatio = (float) w / (float) (1 * h); // 宽高比
+        const float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
+        const float farPlane = gConfig->Clip.ClipFar; // 远平面距离
         m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
     } else {
         // 设置正交投影
@@ -466,7 +485,7 @@ void Renderer::calculateProjectMatrix(const int w, const int h) {
 
         // 定义一个合适的范围，这里我们假设使用 -10 到 10 的范围作为示例
         // 你可以根据实际需求调整这些值
-        float left = -20.0f * aspectRatio;
+        const float left = -20.0f * aspectRatio;
         float right = 20.0f * aspectRatio;
         float bottom = -20.0f;
         float top = 20.0f;

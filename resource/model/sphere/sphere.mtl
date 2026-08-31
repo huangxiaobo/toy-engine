@@ -2,7 +2,7 @@
 # 颜色分量取值 0.0~1.0，与引擎 Material::AmbientColor/DiffuseColor/SpecularColor 对应
 # Ns 为高光指数，与 Material::Shininess 对应
 newmtl sphere_material
-Ka 0.25 0.25 0.25
-Kd 0.45 0.45 0.45
-Ks 1.0 1.0 1.0
-Ns 15
+Ka 0.2 0.2 0.2
+Kd 0.7 0.3 0.3
+Ks 0.8 0.8 0.8
+Ns 32

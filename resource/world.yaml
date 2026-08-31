@@ -184,13 +184,13 @@ world:
         y: 0
         z: 0
       scale:
-        x: 5
-        y: 5
-        z: 5
+        x: 15
+        y: 15
+        z: 15
       rotation: 0
       mesh:
         name: bunny
-        file: "./resource/model/bunny/bunny.obj"
+        file: "./resource/model/bunny/bunny_10k.obj"
       technique:
         technique:
           name: light
@@ -199,19 +199,8 @@ world:
         frag: "./resource/model/bunny/shader.frag"
 
       material:
-        ambient:
-          r: 0.25
-          g: 0.25
-          b: 0.25
-        diffuse:
-          r: 0.45
-          g: 0.45
-          b: 0.45
-        specular:
-          r: 1.0
-          g: 1.0
-          b: 1.0
-        shininess: 15
+        file: "./resource/model/bunny/bunny.mtl"
+        name: "bunny_material"
     - resource_class: Model
       name: sphere
       id: "9128d629-c651-4688-85ad-11bc3e6c2294"
@@ -234,16 +223,5 @@ world:
         vert: "./resource/model/bunny/shader.vert"
         frag: "./resource/model/bunny/shader.frag"
       material:
-        ambient:
-          r: 0.2
-          g: 0.2
-          b: 0.2
-        diffuse:
-          r: 0.7
-          g: 0.3
-          b: 0.3
-        specular:
-          r: 0.8
-          g: 0.8
-          b: 0.8
-        shininess: 32
+        file: "./resource/model/sphere/sphere.mtl"
+        name: "sphere_material"

@@ -289,22 +289,9 @@ Config *Config::LoadFromYaml(const std::string &filename) {
             modelConfig.Mesh.Name = model_node["mesh"]["name"].as<std::string>();
             modelConfig.Mesh.File = model_node["mesh"]["file"].as<std::string>();
 
-            modelConfig.Material.AmbientColor = glm::vec3(
-                model_node["material"]["ambient"]["r"].as<float>(),
-                model_node["material"]["ambient"]["g"].as<float>(),
-                model_node["material"]["ambient"]["b"].as<float>()
-            );
-            modelConfig.Material.DiffuseColor = glm::vec3(
-                model_node["material"]["diffuse"]["r"].as<float>(),
-                model_node["material"]["diffuse"]["g"].as<float>(),
-                model_node["material"]["diffuse"]["b"].as<float>()
-            );
-            modelConfig.Material.SpecularColor = glm::vec3(
-                model_node["material"]["specular"]["r"].as<float>(),
-                model_node["material"]["specular"]["g"].as<float>(),
-                model_node["material"]["specular"]["b"].as<float>()
-            );
-            modelConfig.Material.Shininess = model_node["material"]["shininess"].as<float>();
+            // 材质改为引用 MTL 文件：material.file 为 MTL 路径，material.name 为材质名
+            modelConfig.Material.File = model_node["material"]["file"].as<std::string>();
+            modelConfig.Material.Name = model_node["material"]["name"].as<std::string>();
 
 
             modelConfig.ShaderVertFile = model_node["shader"]["vert"].as<std::string>();

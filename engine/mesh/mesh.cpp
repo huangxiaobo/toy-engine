@@ -16,6 +16,7 @@ Mesh::Mesh() : DrawMode(GL_TRIANGLES) {
     VBO = 0;
     EBO = 0;
     m_textureID = 0;
+    m_normalMapID = 0;
 }
 
 Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices) {
@@ -148,10 +149,19 @@ void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
 
     this->m_effect->SetLights(lights);
     
-    // 如果网格有纹理，则绑定纹理
+    // 绑定纹理：漫反射贴图用第0纹理单元（gTexture），法线贴图用第1纹理单元（gNormalMap）
     if (m_textureID != 0) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_textureID);
+        // 通知着色器：漫反射采样器绑定到纹理单元0
+        this->m_effect->SetUniform("gTexture", 0);
+    }
+
+    if (m_normalMapID != 0) {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_normalMapID);
+        // 通知着色器：法线贴图采样器绑定到纹理单元1
+        this->m_effect->SetUniform("gNormalMap", 1);
     }
 
     /* 重新绑定 VAO */

@@ -106,6 +106,9 @@ private:
     // 渲染器创建并拥有的地形纹理，用于退出时统一释放
     unsigned int m_terrain_texture = 0;
 
+    // 渲染器创建并拥有的模型纹理（如漫反射贴图与法线贴图），用于退出时统一释放
+    vector<unsigned int> m_textures;
+
     // 渲染器创建并拥有的着色器技术（Technique），用于统一释放
     vector<Technique *> m_techniques;
     // 渲染器创建并拥有的材质（Material），用于统一释放

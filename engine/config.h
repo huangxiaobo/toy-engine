@@ -50,12 +50,22 @@ public:
     } Attenuation;
 };
 
+/*
+ * 材质配置（MaterialConfig）
+ *
+ * 对应 world.yaml 中 model 的 material 段。为支持「用 MTL 实现材质」，
+ * 材质不再内联在 yaml 中，而是通过 MTL 文件路径 + 材质名引用：
+ *
+ *   material:
+ *     file: "./resource/model/sphere/sphere.mtl"  # MTL 文件路径
+ *     name: "sphere_material"                     # newmtl 声明的材质名
+ *
+ * 渲染器使用 MtlParser 从 MTL 文件加载出 Material 对象。
+ */
 class MaterialConfig {
 public:
-    glm::vec3 AmbientColor;
-    glm::vec3 DiffuseColor;
-    glm::vec3 SpecularColor;
-    float Shininess;
+    std::string File; // MTL 文件路径
+    std::string Name; // 材质名称（对应 newmtl <name>）
 };
 
 class ParticleConfig {

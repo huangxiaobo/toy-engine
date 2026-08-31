@@ -3,12 +3,15 @@
 
 #include <glm/glm.hpp>
 
+#include <string>
+
 class Material {
 public:
     Material();
 
     ~Material();
 
+    std::string Name; // 材质名称（对应 MTL 中的 newmtl <name>）
     glm::vec3 AmbientColor; // 环境
     glm::vec3 DiffuseColor; // 漫反射
     glm::vec3 SpecularColor; // 镜面反射
