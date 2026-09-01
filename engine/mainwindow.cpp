@@ -15,6 +15,9 @@
 
 // Dear ImGui
 #include <imgui.h>
+// imgui_internal.h：DockBuilder*（DockBuilderAddNode/SplitNode/DockWindow/Finish/GetCentralNode）
+// 及 ImGuiDockNode 结构体（中央节点 Pos/Size）定义所在，仅在 mainwindow.cpp 使用
+#include <imgui_internal.h>
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 
@@ -155,6 +158,8 @@ bool ToyEngineMainWindow::Initialize() {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    // 启用 Docking：DockSpace/DockBuilder 布局（imgui-docking 分支特性）依赖此标志
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // 加载中文字体
     std::cout << "正在加载中文字体..." << std::endl;
@@ -209,9 +214,12 @@ void ToyEngineMainWindow::ProcessInput() {
 /*
  * 渲染一帧
  *
- * 布局策略：先将 OpenGL 视口设置为中间渲染区域（跳过左右面板），
- * 然后绘制 3D 场景，最后让 ImGui 覆盖在上面绘制面板。
- * 这样 3D 场景不会穿透到左右面板区域。
+ * 布局策略（DockSpace 版本）：
+ *   1. 先启动 ImGui 帧并渲染 DockSpace，拿到中央节点（3D 渲染视口）在
+ *      ImGui 逻辑坐标下的矩形（左上原点、Y 向下）；
+ *   2. 将该矩形换算为 framebuffer 像素（含 Retina 像素/点缩放与 Y 轴翻转），
+ *      设置为 OpenGL 视口并绘制 3D 场景；
+ *   3. 恢复全窗口视口让 ImGui 面板（停靠于左右节点）覆盖其上。
  */
 void ToyEngineMainWindow::RenderFrame() {
     float currentTime = static_cast<float>(glfwGetTime());
@@ -221,34 +229,42 @@ void ToyEngineMainWindow::RenderFrame() {
     m_renderer->update(static_cast<long long>(m_deltaTime * 1000));
 
     // 获取实际 framebuffer 像素尺寸（Retina 下通常为窗口 points 尺寸的 2 倍）。
-    // glViewport 作用于 framebuffer 像素空间，而 m_windowWidth/Height 是 GLFW points 坐标，
-    // 若直接用 points 数值会与 ImGui 面板的像素位置错位，导致视口整体偏移。
     int fbWidth = 0, fbHeight = 0;
     glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
 
-    // 计算像素/points 缩放因子，将面板宽度常量换算为 framebuffer 像素
-    const float xScale = fbWidth > 0 ? static_cast<float>(fbWidth) / static_cast<float>(m_windowWidth) : 1.0f;
+    // ---- ImGui 帧先行：DockSpace 完成布局后才能查询中央节点矩形 ----
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 
-    // 3x1 网格：中间渲染视口 = 左栏右边界 到 右栏左边界（全部换算为 framebuffer 像素）
-    const int viewportX = static_cast<int>(m_leftPanelWidth * xScale);
-    const int viewportY = 0;
-    const int viewportW = static_cast<int>((m_windowWidth - m_leftPanelWidth - m_rightPanelWidth) * xScale);
-    const int viewportH = fbHeight;
+    // 创建/渲染 DockSpace，并将中央节点矩形写入 m_viewportX/Y/Width/Height
+    CreateDockSpace();
 
-    // 设置 OpenGL 视口为中间网格，然后绘制 3D 场景
-    // 注意：resize() 内部会调用 glViewport(0,0,...)，必须在它之后重新设置视口位置
-    m_renderer->resize(viewportW, viewportH);
-    glViewport(viewportX, viewportY, viewportW, viewportH);
+    // 将中央节点矩形从 ImGui 逻辑坐标（左上原点、Y 向下）换算为
+    // framebuffer 像素坐标（左下原点、Y 向上）：像素 = 逻辑值 × 缩放比
+    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    const float xScale = (displaySize.x > 0.0f) ? static_cast<float>(fbWidth) / displaySize.x : 1.0f;
+    const float yScale = (displaySize.y > 0.0f) ? static_cast<float>(fbHeight) / displaySize.y : 1.0f;
+
+    const int viewportX = static_cast<int>(m_viewportX * xScale);
+    const int viewportY = static_cast<int>(static_cast<float>(fbHeight) - (m_viewportY + m_viewportHeight) * yScale);
+    const int viewportW = static_cast<int>(m_viewportWidth * xScale);
+    const int viewportH = static_cast<int>(m_viewportHeight * yScale);
+
+    // 中央节点尺寸异常（首帧布局尚未完成）时回退到全窗口视口
+    if (viewportW <= 0 || viewportH <= 0) {
+        m_renderer->resize(fbWidth, fbHeight);
+        glViewport(0, 0, fbWidth, fbHeight);
+    } else {
+        m_renderer->resize(viewportW, viewportH);
+        glViewport(viewportX, viewportY, viewportW, viewportH);
+    }
     m_renderer->draw(static_cast<long long>(m_deltaTime * 1000));
 
     // 恢复完整 framebuffer 视口给 ImGui 使用
     glViewport(0, 0, fbWidth, fbHeight);
 
-    // 开始ImGui帧
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
+    // 绘制面板（资源列表/属性面板停靠于 DockSpace 左右节点，状态条浮动于视口底部）
     CreateUI();
 
     ImGui::Render();
@@ -258,90 +274,131 @@ void ToyEngineMainWindow::RenderFrame() {
 }
 
 /*
- * 创建整个ImGui界面
+ * 创建/渲染 DockSpace 并建立初始三栏布局
  *
- * 3x1 网格布局：整个窗口被划分为三列，每格上下占满：
- *   - 左格：资源列表（宽度 m_leftPanelWidth）
- *   - 中格：渲染视口（ImGui 留空，由 OpenGL 直接绘制 3D 场景）
- *   - 右格：属性面板（宽度 m_rightPanelWidth）
- * 左右格与中格之间各有一条可拖动的竖直分隔条。
+ * 布局：DockBuilder 将 DockSpace 竖直分为左/中/右三栏——
+ *   - 左节点：资源列表（占 25% 宽度）
+ *   - 右节点：属性面板（占 30% 宽度）
+ *   - 中央节点：留空，作为 3D 渲染视口（PassthruCentralNode 模式，输入穿透用于相机控制）
+ *
+ * 仅首帧执行 DockBuilder 初始化；此后 DockSpace 完全接管布局，用户可自由
+ * 拖拽/浮动/调整各面板。每帧结束时将中央节点矩形记录到 m_viewport* 成员，
+ * 供 RenderFrame 换算 glViewport 以及状态条定位使用。
  */
-void ToyEngineMainWindow::CreateUI() {
-    // 左格：资源列表（占满整个窗口高度）
-    if (m_showResourceList) {
-        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(m_leftPanelWidth, m_windowHeight), ImGuiCond_Always);
-        CreateResourceListPanel();
+void ToyEngineMainWindow::CreateDockSpace() {
+    ImGuiID dockspaceId = ImGui::GetID("ToyEngineDockSpace");
+
+    // 首次运行时用 DockBuilder 建立初始布局（之后保留用户调整结果）
+    if (!m_dockspaceInitialized) {
+        m_dockspaceInitialized = true;
+
+        // 清空可能的残留节点，重新创建 DockSpace 根节点
+        ImGui::DockBuilderRemoveNode(dockspaceId);
+        ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->WorkSize);
+
+        // 依次切分：先分出左栏（25%），再在剩余空间中分出右栏（30%），
+        // 剩余部分即中央 3D 视口节点
+        ImGuiID mainNode = dockspaceId;
+        ImGuiID leftNode = ImGui::DockBuilderSplitNode(
+            mainNode, ImGuiDir_Left, 0.25f, nullptr, &mainNode);
+        ImGuiID rightNode = ImGui::DockBuilderSplitNode(
+            mainNode, ImGuiDir_Right, 0.30f, nullptr, &mainNode);
+
+        // 将面板窗口按标题绑定到对应节点（窗口标题必须与停靠目标一致）
+        ImGui::DockBuilderDockWindow("资源列表", leftNode);
+        ImGui::DockBuilderDockWindow("属性", rightNode);
+
+        ImGui::DockBuilderFinish(dockspaceId);
     }
 
-    // 左分隔条：资源列表 与 中格视口 之间
-    CreateSplitter(m_leftPanelWidth, m_draggingLeftSplitter, m_leftPanelWidth, MIN_PANEL_WIDTH, m_windowWidth - m_rightPanelWidth - MIN_PANEL_WIDTH);
+    // 全屏宿主窗口承载菜单栏 + DockSpace：无标题、无边框，仅作为两者的容器
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
+    // PassthruCentralNode 模式要求宿主窗口背景透明，否则中央节点会被刷上
+    // ImGuiCol_WindowBg，遮挡 3D 场景
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    ImGui::Begin("##DockSpaceHost", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+        ImGuiWindowFlags_MenuBar);
+    ImGui::PopStyleVar(3);
 
-    // 右格：属性面板（占满整个窗口高度）
-    if (m_showProperties) {
-        ImGui::SetNextWindowPos(ImVec2(m_windowWidth - m_rightPanelWidth, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(m_rightPanelWidth, m_windowHeight), ImGuiCond_Always);
-        CreatePropertiesPanel();
-    }
+    // 主菜单栏（退出/资源/属性）：必须位于 DockSpace 之前渲染，
+    // DockSpace 的可用区域会自动扣除菜单栏高度
+    CreateMenuBar();
 
-    // 右分隔条：中格视口 与 属性面板 之间
-    CreateSplitter(m_windowWidth - m_rightPanelWidth, m_draggingRightSplitter, m_rightPanelWidth, MIN_PANEL_WIDTH, m_windowWidth - m_leftPanelWidth - MIN_PANEL_WIDTH);
+    // 渲染 DockSpace：PassthruCentralNode = 中央节点保持为空且输入穿透，
+    // 让 GLFW 回调（相机控制）在中央区域可正常收到鼠标事件
+    ImGui::DockSpace(dockspaceId, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::End();
 
-    // 中格视口底部悬浮状态条（FPS/投影方式）
-    if (m_showViewportStatusBar) {
-        ShowViewportStatusBar();
+    // 记录中央节点矩形（ImGui 逻辑坐标，左上原点、Y 向下），供 RenderFrame 换算
+    ImGuiDockNode* centralNode = ImGui::DockBuilderGetCentralNode(dockspaceId);
+    if (centralNode) {
+        m_viewportX = centralNode->Pos.x;
+        m_viewportY = centralNode->Pos.y;
+        m_viewportWidth = centralNode->Size.x;
+        m_viewportHeight = centralNode->Size.y;
     }
 }
 
 /*
- * 创建竖直分隔条
+ * 主菜单栏（退出 / 面板）
  *
- * splitterPosX: 分隔条中心的 X 坐标（窗口 points 坐标）
- * active:       当前是否正在拖动该分隔条（拖动状态的引用）
- * panelWidth:   被调整的面板宽度（引用，拖动时实时更新）
- * minWidth:     面板最小宽度
- * maxWidth:     面板最大宽度（避免挤压中格或其他面板）
+ * 菜单结构：
+ *   - 退出：请求关闭窗口（与 ESC 键行为一致，ESC 在 KeyCallback 中处理）
+ *   - 面板：子菜单，包含
+ *       - 资源：切换左侧资源列表面板的显示 / 隐藏（勾选状态 = 面板可见）
+ *       - 属性：切换右侧属性面板的显示 / 隐藏（勾选状态 = 面板可见）
  *
- * 交互：鼠标悬停在分隔条上时显示水平调整光标，按住左键拖动即可改变面板宽度。
+ * 必须在宿主窗口 Begin() 之后、DockSpace() 之前调用，
+ * 这样 DockSpace 可用区域自动扣除菜单栏高度，中央节点随之正确下移。
  */
-void ToyEngineMainWindow::CreateSplitter(float splitterPosX, bool& active, float& panelWidth, float minWidth, float maxWidth) {
-    ImGui::SetNextWindowPos(ImVec2(splitterPosX - SPLITTER_WIDTH * 0.5f, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(SPLITTER_WIDTH, m_windowHeight), ImGuiCond_Always);
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-    ImGui::Begin("##Splitter", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
-
-    ImGui::SetCursorScreenPos(ImVec2(splitterPosX - SPLITTER_WIDTH * 0.5f, 0));
-    ImGui::InvisibleButton("##splitterHit", ImVec2(SPLITTER_WIDTH, m_windowHeight));
-
-    // 悬停时显示双向水平调整光标
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-    }
-
-    // 处理拖动
-    if (ImGui::IsItemActive() || active) {
-        active = true;
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-        ImGuiIO& io = ImGui::GetIO();
-        // 根据鼠标横向移动量调整面板宽度，并限制在最小/最大范围内
-        panelWidth = panelWidth + io.MouseDelta.x;
-        if (panelWidth < minWidth) panelWidth = minWidth;
-        if (panelWidth > maxWidth) panelWidth = maxWidth;
-        // 鼠标释放时结束拖动
-        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            active = false;
+void ToyEngineMainWindow::CreateMenuBar() {
+    if (ImGui::BeginMenuBar()) {
+        // 退出：点击后设置关闭标志，主循环在下一帧退出
+        if (ImGui::MenuItem("退出", "Esc")) {
+            glfwSetWindowShouldClose(m_window, true);
         }
+
+        // 面板：子菜单收纳所有可开关面板；MenuItem 的第四个参数为选中状态
+        // 指针（bool*），点击时自动切换并显示勾选标记，与面板可见性绑定
+        if (ImGui::BeginMenu("面板")) {
+            ImGui::MenuItem("资源", nullptr, &m_showResourceList);
+            ImGui::MenuItem("属性", nullptr, &m_showProperties);
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMenuBar();
+    }
+}
+
+/*
+ * 创建整个ImGui界面
+ *
+ * DockSpace 版本：布局由 DockSpace 统一管理（初始三栏已在 CreateDockSpace()
+ * 中通过 DockBuilder 建立），此处仅负责绘制停靠的面板窗口，不再手动设置
+ * 位置/尺寸，也不再使用自绘分隔条。
+ */
+void ToyEngineMainWindow::CreateUI() {
+    // 资源列表面板：停靠于左节点
+    if (m_showResourceList) {
+        CreateResourceListPanel();
     }
 
-    ImGui::End();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar(2);
+    // 属性面板：停靠于右节点
+    if (m_showProperties) {
+        CreatePropertiesPanel();
+    }
+
+    // 视口底部浮动状态条（FPS/投影方式）
+    if (m_showViewportStatusBar) {
+        ShowViewportStatusBar();
+    }
 }
 
 /*
@@ -356,8 +413,10 @@ void ToyEngineMainWindow::CreateSplitter(float splitterPosX, bool& active, float
  *   - 粒子系统（可选中编辑发射器参数）
  */
 void ToyEngineMainWindow::CreateResourceListPanel() {
+    // 停靠于 DockSpace 左节点：不能带 NoMove/NoResize，否则无法被 DockBuilder 停靠
+    // 与用户拖拽调整
     ImGui::Begin("资源列表", &m_showResourceList,
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+        ImGuiWindowFlags_NoCollapse);
 
     // ---- 摄像机 ----
     if (ImGui::TreeNodeEx("摄像机", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -456,8 +515,9 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
  * 确保所有可编辑属性都能在面板中展示和修改。
  */
 void ToyEngineMainWindow::CreatePropertiesPanel() {
+    // 停靠于 DockSpace 右节点：与资源列表面板同理，不设 NoMove/NoResize
     ImGui::Begin("属性", &m_showProperties,
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+        ImGuiWindowFlags_NoCollapse);
 
     if (m_selectedObject == nullptr) {
         ImGui::Text("请选择一个资源来编辑属性");
@@ -711,8 +771,9 @@ void ToyEngineMainWindow::ShowParticleProperties() {
 // 以悬浮条覆盖在中间 3D 视口底部，不占用独立网格行，保持 3x1 网格布局
 void ToyEngineMainWindow::ShowViewportStatusBar() {
     const float barHeight = ImGui::GetFrameHeight() + 8.0f;
-    ImGui::SetNextWindowPos(ImVec2(m_leftPanelWidth, m_windowHeight - barHeight), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(m_windowWidth - m_leftPanelWidth - m_rightPanelWidth, barHeight), ImGuiCond_Always);
+    // 状态条悬浮于中央节点（3D 视口）底部，位置随 DockSpace 布局动态跟随
+    ImGui::SetNextWindowPos(ImVec2(m_viewportX, m_viewportY + m_viewportHeight - barHeight), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(m_viewportWidth, barHeight), ImGuiCond_Always);
 
     ImGui::Begin("##ViewportStatusBar", &m_showViewportStatusBar,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |

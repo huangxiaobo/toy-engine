@@ -21,11 +21,17 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <string>
 
+/*
+ * 构造函数：初始化模型名称、位置/旋转/缩放默认值，并生成唯一 ID
+ *
+ * m_matrix 为累积变换矩阵，后续 SetScale/SetRotate/SetTranslate 都会叠加到它上面。
+ */
 Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f) {
     m_uuid = Utils::GenerateUUID();
     m_matrix = glm::mat4(1.0f);
 }
 
+/* 析构函数：释放模型持有的所有网格对象 */
 Model::~Model() {
     while (!m_meshes.empty()) {
         delete m_meshes[0];
@@ -36,7 +42,18 @@ Model::~Model() {
 void Model::Init() {
 }
 
-// 使用assimp加载模型
+/*
+ * 使用 assimp 加载外部模型文件（.obj/.fbx/.gltf 等）
+ *
+ * 导入参数说明：
+ *   - aiProcess_Triangulate        ：将多边形网格三角化，统一为三角形
+ *   - aiProcess_FlipUVs            ：翻转 UV 纵轴（assimp 的 UV 原点在左上角，OpenGL 在左下角）
+ *   - aiProcess_JoinIdenticalVertices：合并重复顶点，减少顶点数
+ *   - aiProcess_GenSmoothNormals   ：缺失法线时生成平滑法线
+ *   - aiProcess_CalcTangentSpace   ：计算切线/副切线（用于法线贴图）
+ *
+ * 加载成功后从根节点递归处理所有子节点几何。
+ */
 void Model::LoadModel(const string &path) {
     // read file via ASSIMP
     Assimp::Importer importer; // c++接口
@@ -59,6 +76,13 @@ void Model::LoadModel(const string &path) {
     ProcessNode(scene->mRootNode, scene); // 处理结点
 }
 
+/*
+ * 递归处理 assimp 场景节点（场景树遍历）
+ *
+ * assimp 的场景是节点树：节点不含几何数据，只保存对场景中
+ * Mesh 的索引引用。本函数处理当前节点引用的所有 Mesh，
+ * 并递归遍历所有子节点，最终把所有几何数据收集到 m_meshes。
+ */
 void Model::ProcessNode(aiNode *node, const aiScene *scene) {
     std::cout << "ProcessNode: " << node->mNumMeshes << std::endl;
     // process each mesh located at the current node处理当前结点的每个网络
@@ -74,6 +98,17 @@ void Model::ProcessNode(aiNode *node, const aiScene *scene) {
     }
 }
 
+/*
+ * 将单个 assimp aiMesh 转换为引擎 Mesh
+ *
+ * 数据转换映射：
+ *   - 顶点：assimp 的 aiVector3D 逐字段拷贝到 Vertex 结构（assimp 有自己的向量类，不能直接赋值 glm）
+ *   - 颜色：当前用顶点位置归一化值作伪色（便于调试，非真实顶点色）
+ *   - 法线/切线/副切线：仅在 aiMesh 提供对应数据时才拷贝（assimp 默认不保存，需导入时开启
+ *     aiProcess_GenSmoothNormals / aiProcess_CalcTangentSpace）
+ *   - 纹理坐标：取第 0 组（一个顶点最多 8 组 UV），缺失时为 (0,0)
+ *   - 纹理：按 assimp 材质约定的命名（texture_diffuseN 等）从 .obj 同目录加载贴图
+ */
 Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) {
     // data to fill
     vector<Vertex> vertices;
@@ -194,21 +229,25 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
     return textures;
 }
 
+/* 追加一个网格到模型 */
 void Model::SetMesh(Mesh *mesh) {
     this->m_meshes.push_back(mesh);
 }
 
+/* 批量追加网格到模型（用于一次加入整组网格，如地形/光源可视化网格） */
 void Model::SetMeshes(vector<Mesh *> meshes) {
     for (auto m: meshes) {
         this->m_meshes.push_back(m);
     }
 }
 
+/* 设置模型缩放：更新缩放分量并叠加到累积变换矩阵 */
 void Model::SetScale(glm::vec3 scale) {
     this->m_scale = scale;
     m_matrix = glm::scale(m_matrix, scale);
 }
 
+/* 设置绕 Y 轴旋转角度：叠加旋转到累积变换矩阵 */
 void Model::SetRotate(glm::f32 rotation) {
     m_rotation = rotation;
     m_matrix = glm::rotate(m_matrix, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -272,6 +311,13 @@ glm::f32 Model::GetRotation() const {
     return m_rotation;
 }
 
+/*
+ * 绘制模型：构建本地变换矩阵后逐个绘制子网格
+ *
+ * 变换组合顺序：model * Translate(position) * Scale(scale) * Rotate(m_rotation, Y轴)
+ * 说明：旋转使用成员 m_matrix（初始为单位阵，可被外部直接修改）绕 Y 轴旋转 m_rotation 度，
+ * 因此实际施加的顺序是"先绕 Y 旋转、再缩放、再平移"（逆序相乘）。
+ */
 void Model::Draw(long long elapsed,
                  const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
                  const glm::vec3 &camera, const std::vector<Light *> &lights) {
@@ -287,8 +333,13 @@ void Model::Draw(long long elapsed,
     }
 }
 
+/*
+ * 创建点光源可视化模型 V1（线段环版本）
+ *
+ * 用 CreatePointLightMeshes(5) 生成的线段勾勒光源范围，
+ * 配合 only_vertex_color 着色器（纯顶点色绘制）。
+ */
 Model *Model::CreatePointLightModelV1() {
-    // 创建光源模型
     auto model = new Model(std::format("light-{}", 1));
     auto meshes = Mesh::CreatePointLightMeshes(5);
     model->SetMeshes(meshes);
@@ -306,8 +357,13 @@ Model *Model::CreatePointLightModelV1() {
     return model;
 }
 
+/*
+ * 创建点光源可视化模型 V2（球体 + 线段环组合版本）
+ *
+ * 相比 V1，额外叠加一个细分 5 次的二十面体球体，让光源在空间中
+ * 有更立体的实体外观；两部分共用 only_vertex_color 着色器。
+ */
 Model *Model::CreatePointLightModelV2() {
-    // 创建光源模型
     auto model = new Model(std::format("light-{}", 1));
 
     Technique *effect = new Technique(

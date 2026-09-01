@@ -283,6 +283,16 @@ vector<Mesh *> Mesh::CreateGroundMesh() {
     return meshes;
 }
 
+/*
+ * 创建带 UV 纹理坐标的平面网格（用于地形/地面）
+ *
+ * 参数：
+ *   size        - 平面边长（世界单位），平面以原点为中心，位于 XZ 平面（y=0）
+ *   repeatCount - 纹理重复次数：UV 在 [0, repeatCount] 区间取值，
+ *                 使棋盘格等纹理在整块地面上重复铺贴而非拉伸
+ *
+ * 法线统一朝上 (0,1,0)，颜色白色以便纹理显示原色。
+ */
 vector<Mesh *> Mesh::CreateTexturedGroundMesh(float size, int repeatCount) {
     vector<Mesh *> meshes;
 
@@ -330,6 +340,12 @@ vector<Mesh *> Mesh::CreateTexturedGroundMesh(float size, int repeatCount) {
     return meshes;
 }
 
+/*
+ * 创建单个点的网格（GL_POINTS 绘制）
+ *
+ * 用于标记光源位置等单点对象。仅 1 个顶点 + 1 个索引，
+ * 绘制模式为 GL_POINTS，屏幕上表现为一个点（大小由 GL 状态控制）。
+ */
 vector<Mesh *> Mesh::CreatePointMesh(glm::vec3 pos, glm::vec3 color) {
     vector<Mesh *> meshes;
 
@@ -397,6 +413,15 @@ vector<glm::vec3> createCirclePoints(const float radius,
     return circleVertices;
 }
 
+/*
+ * 创建世界坐标轴网格（X/Y/Z 三轴 + 箭头）
+ *
+ * 每条轴由圆柱体（线段）+ 圆锥（箭头）组成：
+ *   - X 轴红色、Y 轴绿色、Z 轴蓝色（RGB 与 XYZ 对应，便于直观辨认）
+ *   - 圆柱侧面由两圈圆（底部圆/顶部圆）之间的三角形条带构成
+ *   - 箭头为圆锥：顶点 + 底部一圈圆
+ * 用于在视口中显示世界坐标系方位，方便观察者判断空间朝向。
+ */
 vector<Mesh *> Mesh::CreateAxisMesh() {
     vector<Mesh *> meshes;
 
@@ -600,6 +625,12 @@ vector<Mesh *> Mesh::CreateAxisMesh() {
     return meshes;
 }
 
+/*
+ * 创建点光源可视化模型（一组线段），常配合 CreatePointLightModelV2 使用
+ *
+ * 用线段勾勒出光源的空间位置与范围示意，方便在编辑器中观察光源。
+ * 具体几何由内部 SPHERE 细分或线段环组成。
+ */
 vector<Mesh *> Mesh::CreatePointLightMeshes(int radius) {
     vector<Mesh *> meshes;
 
@@ -640,6 +671,7 @@ vector<Mesh *> Mesh::CreatePointLightMeshes(int radius) {
     return meshes;
 }
 
+/* 深拷贝网格：复制顶点/索引/名称并重建 GPU 缓冲（用于多对象共享几何但独立实例） */
 Mesh *Mesh::Clone() {
     Mesh *m = new Mesh();
     m->vertices = vector<Vertex>(this->vertices);
@@ -655,7 +687,13 @@ glm::vec3 normalize(const glm::vec3 &v) {
     return glm::vec3(v.x / length, v.y / length, v.z / length);
 }
 
-// 辅助函数：细分三角形
+/*
+ * 辅助函数：Loop 细分一个三角形面
+ *
+ * 每个三角形切分为 4 个子三角形：取三条边中点（先归一化到单位球面，
+ * 保证细分后顶点始终在球面上），原顶点保持不变。
+ * 迭代 subdivisions 次后顶点数呈 4 次方增长，得到平滑球体。
+ */
 void subdivide(vector<Vertex> &vertices, vector<unsigned int> &indices) {
     vector<unsigned int> newIndices;
     for (size_t i = 0; i < indices.size(); i += 3) {
@@ -697,6 +735,19 @@ void subdivide(vector<Vertex> &vertices, vector<unsigned int> &indices) {
     indices = newIndices;
 }
 
+/*
+ * 创建二十面体球（Icosphere）网格
+ *
+ * 由正二十面体（12 顶点 / 20 三角形）迭代细分生成近似球体：
+ *   - 初始顶点全部归一化到单位球面
+ *   - 每轮 subdivide 将三角形数 ×4，顶点全部保持在球面上
+ *   - 法线取顶点归一化方向（球面法线 = 位置方向），颜色统一为入参 color
+ *
+ * 参数：
+ *   subdivisions - 细分轮数（0 = 原始二十面体，越大球体越平滑、顶点越多）
+ *   center       - 球心位置
+ *   color        - 球面颜色
+ */
 vector<Mesh *> Mesh::CreateIcosphereMesh(int subdivisions, glm::vec3 center, glm::vec3 color) {
     vector<Mesh *> meshes;
 

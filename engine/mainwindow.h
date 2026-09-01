@@ -15,11 +15,15 @@ class Light;
 /*
  * 主窗口类（ToyEngineMainWindow）
  *
- * 负责创建 GLFW 窗口、初始化 OpenGL 和 ImGui，以及管理三栏式编辑器布局：
- *   - 左栏：资源列表（来自 world.yaml 的所有资源：摄像机、灯光、模型、地形、天空穹、粒子）
- *   - 中栏：3D 渲染视口
- *   - 右栏：属性面板（显示选中资源的所有可编辑属性）
+ * 负责创建 GLFW 窗口、初始化 OpenGL 和 ImGui，以及管理基于 ImGui
+ * DockSpace 的可停靠编辑器布局：
+ *   - 左侧停靠：资源列表（来自 world.yaml 的所有资源：摄像机、灯光、模型、地形、天空穹、粒子）
+ *   - 中央节点：3D 渲染视口（PassthruCentralNode——场景直接绘制在 GL 视口上，
+ *               中央节点不创建 ImGui 窗口，鼠标输入可穿透用于相机控制）
+ *   - 右侧停靠：属性面板（显示选中资源的所有可编辑属性）
  *
+ * 与旧版「固定三栏 + 自绘分隔条」不同，DockSpace 布局允许用户自由拖拽、
+ * 浮动、调整各面板大小，并可通过 DockBuilder 在首帧建立默认布局。
  * 选择模型：点击左侧资源列表中的任意项，右侧面板即显示该项的全部属性。
  */
 class ToyEngineMainWindow  {
@@ -39,11 +43,12 @@ public:
 
 private:
     // ---- ImGui 面板创建 ----
+    void CreateDockSpace();                  // 创建 DockSpace 并建立初始三栏布局，同时记录中央节点（3D视口）矩形
+    void CreateMenuBar();                    // 渲染主菜单栏（退出 / 面板子菜单含资源、属性开关），位于 DockSpace 宿主窗口顶部
     void CreateUI();
     void CreateResourceListPanel();
     void CreatePropertiesPanel();
     void ShowViewportStatusBar();
-    void CreateSplitter(float splitterPosX, bool& active, float& panelWidth, float minWidth, float maxWidth);
 
     // ---- 各资源类型的属性编辑器 ----
     void ShowModelProperties();
@@ -79,14 +84,15 @@ private:
     int m_windowWidth = 1280;
     int m_windowHeight = 720;
 
-    // 三栏布局面板宽度（支持拖动调整）
-    float m_leftPanelWidth = 250.0f;
-    float m_rightPanelWidth = 300.0f;
-    // 分隔条拖动状态
-    bool m_draggingLeftSplitter = false;
-    bool m_draggingRightSplitter = false;
-    static constexpr float SPLITTER_WIDTH = 5.0f;   // 分隔条厚度
-    static constexpr float MIN_PANEL_WIDTH = 150.0f; // 面板最小宽度
+    // 中央节点（3D 渲染视口）矩形，单位为 ImGui 窗口逻辑坐标（左上角为原点）
+    // 每帧由 CreateDockSpace() 更新，RenderFrame() 据此设置 glViewport
+    float m_viewportX = 0.0f;
+    float m_viewportY = 0.0f;
+    float m_viewportWidth = 0.0f;
+    float m_viewportHeight = 0.0f;
+
+    // DockSpace 是否已完成初始布局（避免每帧重复执行 DockBuilder）
+    bool m_dockspaceInitialized = false;
 
     // 面板显示控制
     bool m_showResourceList = true;

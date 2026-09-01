@@ -51,7 +51,8 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/glad)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/glfw)
 
 # ImGui 没有官方CMakeLists,需要手动配置
-set(imgui_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/imgui)
+# 使用 docking 分支（支持 DockSpace 可停靠布局）
+set(imgui_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/imgui-docking)
 add_library(imgui_lib
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_demo.cpp

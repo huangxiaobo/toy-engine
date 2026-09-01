@@ -28,6 +28,14 @@ Terrain::~Terrain() {
     }
 }
 
+/*
+ * 初始化地形（带纹理平面的基础版）
+ *
+ * 创建带棋盘格纹理的平面网格 + 基础 terrain 着色器，
+ * 并设置纹理采样器绑定到纹理单元 0。
+ * 注意：此版本为简单平面（无高度起伏），
+ * 复杂地形请用 InitFromHeightmap 从高度图生成。
+ */
 void Terrain::Init(float size, int textureRepeat) {
     m_size = size;
     m_textureRepeat = textureRepeat;
@@ -59,6 +67,22 @@ void Terrain::Init(float size, int textureRepeat) {
     m_effect->SetUniform("groundTexture", 0);
 }
 
+/*
+ * 从高度图生成地形（带光照的地形版本）
+ *
+ * 流程：
+ *   1. 读取灰度高度图，按 resolution×resolution 顶点网格采样高度
+ *   2. 生成地形网格（GenerateTerrainFromHeightmap）
+ *   3. 使用支持 Blinn-Phong 光照的 TechniqueLight 着色器并设置材质参数
+ *   4. 棋盘格纹理作为地表贴图
+ *
+ * 参数：
+ *   heightmapPath    - 灰度高度图路径（白色=高，黑色=低）
+ *   size             - 地形在世界空间的边长
+ *   heightScale      - 高度缩放系数
+ *   terrainResolution - 网格分辨率（顶点数 = (resolution+1)²）
+ *   textureRepeat    - 纹理重复次数
+ */
 void Terrain::InitFromHeightmap(const string &heightmapPath, 
                                float size,
                                float heightScale,
@@ -105,6 +129,12 @@ void Terrain::InitFromHeightmap(const string &heightmapPath,
     m_effect->SetUniform("groundTexture", 0);
 }
 
+/*
+ * 绘制地形
+ *
+ * 若地形使用支持光照的 TechniqueLight，先更新光源列表与摄像机位置
+ * uniform（gViewPos 用于 Blinn-Phong 中的视线向量），再交由模型绘制。
+ */
 void Terrain::Draw(long long elapsed,
                    const glm::mat4 &projection,
                    const glm::mat4 &view,
@@ -122,18 +152,33 @@ void Terrain::Draw(long long elapsed,
     }
 }
 
+/* 设置地形在世界空间中的缩放（流转到底层 Model） */
 void Terrain::SetScale(glm::vec3 scale) {
     if (m_model != nullptr) {
         m_model->SetScale(scale);
     }
 }
 
+/* 设置地形在世界空间中的位置（流转到底层 Model 的平移变换） */
 void Terrain::SetPosition(glm::vec3 position) {
     if (m_model != nullptr) {
         m_model->SetTranslate(position);
     }
 }
 
+/*
+ * 根据高度图生成地形网格（顶点 + 索引）
+ *
+ * 算法：
+ *   1. stbi_load 将高度图按单通道灰度加载（0-255）
+ *   2. 采样：把 (resolution+1)² 的网格点映射回高度图像素坐标，
+ *      以高度值/255 作为高度（当前乘 0.0f 即保持平坦，仅为预留公式）
+ *   3. 世界坐标：以地形中心为原点，x/z 从 -halfSize 到 +halfSize
+ *   4. 索引：每个格子拆成 2 个三角形（左上/右下对角线切分）
+ *
+ * 注意：当前高度 y 乘了 0.0f（保持不变平），如需起伏可去掉 0.0f。
+ * 成功返回含一个 Mesh 的 vector；高度图加载失败返回空 vector。
+ */
 vector<Mesh *> Terrain::GenerateTerrainFromHeightmap() {
     vector<Mesh *> meshes;
     
