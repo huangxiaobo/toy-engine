@@ -1,3 +1,4 @@
+#include <glad/gl.h>
 #include "mainwindow.h"
 #include "globals.h"
 #include "config.h"
@@ -5,6 +6,10 @@
 #include "model/model.h"
 #include "light/light.h"
 #include "camera/camera.h"
+#include "terrain/terrain_manager.h"
+#include "sky/sky_dome.h"
+#include "particle/particle_system.h"
+#include "particle/particle_emitter.h"
 
 // OpenGL函数由renderer.cpp提供
 
@@ -14,10 +19,95 @@
 #include "backends/imgui_impl_opengl3.h"
 
 #include <iostream>
+#include <glm/gtc/type_ptr.hpp>
 
 // GLFW错误回调
 void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
+
+// ---- GLFW 输入回调（ImGui 优先模式） ----
+// 所有回调遵循同一模式：先转发给 ImGui → 检查 WantCapture → 再交给引擎
+// 通过 glfwSetWindowUserPointer 将 GLFWwindow 关联到 ToyEngineMainWindow 实例
+
+void ToyEngineMainWindow::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    // 先让 ImGui 处理（更新 WantCaptureMouse 状态）
+    ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+
+    // ImGui 正在捕获鼠标时，不转发给引擎
+    if (ImGui::GetIO().WantCaptureMouse) return;
+
+    // 从 window user pointer 获取实例
+    auto* self = static_cast<ToyEngineMainWindow*>(glfwGetWindowUserPointer(window));
+    if (!self) return;
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            self->OnMouseLeftButtonDown();
+            self->m_mouseLeftPressed = true;
+        } else {
+            self->OnMouseLeftButtonUp();
+            self->m_mouseLeftPressed = false;
+        }
+    } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+        if (action == GLFW_PRESS) {
+            self->OnMouseRightButtonDown();
+            self->m_mouseRightPressed = true;
+        } else {
+            self->OnMouseRightButtonUp();
+            self->m_mouseRightPressed = false;
+        }
+    }
+}
+
+void ToyEngineMainWindow::CursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    // 先让 ImGui 处理（更新 WantCaptureMouse 状态）
+    ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
+
+    auto* self = static_cast<ToyEngineMainWindow*>(glfwGetWindowUserPointer(window));
+    if (!self) return;
+
+    // 计算并更新鼠标增量基线
+    double deltaX = xpos - self->m_currentMouseX;
+    double deltaY = ypos - self->m_currentMouseY;
+    self->m_currentMouseX = xpos;
+    self->m_currentMouseY = ypos;
+
+    // ImGui 正在捕获鼠标时，不驱动相机，并重置相机交互状态避免残留
+    if (ImGui::GetIO().WantCaptureMouse) {
+        self->m_cameraPanning = false;
+        return;
+    }
+
+    if (self->m_mouseLeftPressed || self->m_mouseRightPressed) {
+        self->OnMouseMove(deltaX, deltaY);
+    }
+}
+
+void ToyEngineMainWindow::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    // 先让 ImGui 处理
+    ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+
+    if (ImGui::GetIO().WantCaptureMouse) return;
+
+    auto* self = static_cast<ToyEngineMainWindow*>(glfwGetWindowUserPointer(window));
+    if (!self) return;
+
+    self->OnMouseWheel(yoffset);
+}
+
+void ToyEngineMainWindow::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    // 先让 ImGui 处理（更新 WantCaptureKeyboard 状态）
+    ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+
+    if (ImGui::GetIO().WantCaptureKeyboard) return;
+
+    auto* self = static_cast<ToyEngineMainWindow*>(glfwGetWindowUserPointer(window));
+    if (!self) return;
+
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        glfwSetWindowShouldClose(window, true);
+    }
 }
 
 ToyEngineMainWindow::~ToyEngineMainWindow() {
@@ -25,14 +115,12 @@ ToyEngineMainWindow::~ToyEngineMainWindow() {
 }
 
 bool ToyEngineMainWindow::Initialize() {
-    // 初始化GLFW
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return false;
     }
 
-    // 配置GLFW
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -43,13 +131,11 @@ bool ToyEngineMainWindow::Initialize() {
         m_windowWidth = gConfig->Window.WindowWidth;
         m_windowHeight = gConfig->Window.WindowHeight;
     } catch (...) {
-        // 如果加载失败，使用默认尺寸
         m_windowWidth = 1280;
         m_windowHeight = 720;
         std::cerr << "Warning: Failed to load config file, using default window size" << std::endl;
     }
 
-    // 创建窗口
     m_window = glfwCreateWindow(m_windowWidth, m_windowHeight, "Toy Engine", nullptr, nullptr);
     if (!m_window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -58,34 +144,29 @@ bool ToyEngineMainWindow::Initialize() {
     }
 
     glfwMakeContextCurrent(m_window);
-    glfwSwapInterval(1); // 启用垂直同步
-    
-    // 注册鼠标滚轮回调
-    glfwSetScrollCallback(m_window, ScrollCallback);
+    glfwSwapInterval(1);
+    glfwSetWindowUserPointer(m_window, this);
 
-    // OpenGL上下文由renderer初始化
+    // 初始化鼠标位置基线，供 CursorPosCallback 计算增量
+    glfwGetCursorPos(m_window, &m_currentMouseX, &m_currentMouseY);
 
     // 初始化ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    // 注释掉停靠功能，因为可能不支持
-    // io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // 加载中文字体
     std::cout << "正在加载中文字体..." << std::endl;
-    
-    // 检查字体文件是否存在
     FILE* fontFile = fopen("./resource/font/微软雅黑.ttf", "rb");
     if (fontFile) {
         fclose(fontFile);
         std::cout << "找到字体文件" << std::endl;
-        
-        ImFont* chineseFont = io.Fonts->AddFontFromFileTTF("./resource/font/微软雅黑.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+        ImFont* chineseFont = io.Fonts->AddFontFromFileTTF(
+            "./resource/font/微软雅黑.ttf", 18.0f, nullptr,
+            io.Fonts->GetGlyphRangesChineseFull());
         if (chineseFont) {
             std::cout << "✅ 成功加载中文字体" << std::endl;
-            // 设置为默认字体
             io.FontDefault = chineseFont;
         } else {
             std::cerr << "❌ 加载中文字体失败" << std::endl;
@@ -95,17 +176,20 @@ bool ToyEngineMainWindow::Initialize() {
     }
 
     ImGui::StyleColorsDark();
-
-    // 初始化ImGui后端
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    // 注册 GLFW 输入回调（ImGui 优先模式），替代原来的轮询方式
+    glfwSetMouseButtonCallback(m_window, MouseButtonCallback);
+    glfwSetCursorPosCallback(m_window, CursorPosCallback);
+    glfwSetScrollCallback(m_window, ScrollCallback);
+    glfwSetKeyCallback(m_window, KeyCallback);
 
     // 初始化渲染器
     m_renderer = new Renderer();
     m_renderer->init(m_windowWidth, m_windowHeight);
 
     m_lastTime = static_cast<float>(glfwGetTime());
-
     return true;
 }
 
@@ -113,463 +197,590 @@ void ToyEngineMainWindow::Run() {
     while (!glfwWindowShouldClose(m_window)) {
         ProcessInput();
         RenderFrame();
-        
         glfwPollEvents();
     }
 }
 
 void ToyEngineMainWindow::ProcessInput() {
-    // ESC键退出
-    if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(m_window, true);
-    }
-    
-    // 获取鼠标位置
-    glfwGetCursorPos(m_window, &m_currentMouseX, &m_currentMouseY);
-    
-    // 处理鼠标按键
-    int leftMouseButton = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT);
-    int rightMouseButton = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT);
-    
-    bool leftPressed = (leftMouseButton == GLFW_PRESS);
-    bool rightPressed = (rightMouseButton == GLFW_PRESS);
-    
-    // 鼠标左键按下/释放检测
-    if (leftPressed && !m_mouseLeftPressed) {
-        // 左键刚按下
-        OnMouseLeftButtonDown();
-    } else if (!leftPressed && m_mouseLeftPressed) {
-        // 左键刚释放
-        OnMouseLeftButtonUp();
-    }
-    
-    // 鼠标右键按下/释放检测
-    if (rightPressed && !m_mouseRightPressed) {
-        // 右键刚按下
-        OnMouseRightButtonDown();
-    } else if (!rightPressed && m_mouseRightPressed) {
-        // 右键刚释放
-        OnMouseRightButtonUp();
-    }
-    
-    // 更新鼠标按键状态
-    m_mouseLeftPressed = leftPressed;
-    m_mouseRightPressed = rightPressed;
-    
-    // 处理鼠标移动
-    if (m_mouseLeftPressed || m_mouseRightPressed) {
-        double deltaX = m_currentMouseX - m_lastMouseX;
-        double deltaY = m_currentMouseY - m_lastMouseY;
-        
-        if (deltaX != 0.0 || deltaY != 0.0) {
-            OnMouseMove(deltaX, deltaY);
-        }
-    }
-    
-    // 处理鼠标滚轮
-    // 注意：GLFW使用回调处理滚轮事件，这里暂时注释掉
-    // double scrollX, scrollY;
-    // glfwGetScrollOffset(m_window, &scrollX, &scrollY);
-    // if (scrollY != 0.0) {
-    //     OnMouseWheel(scrollY);
-    // }
-    
-    // 更新鼠标位置
-    m_lastMouseX = m_currentMouseX;
-    m_lastMouseY = m_currentMouseY;
+    // 输入处理已迁移到 GLFW 回调（MouseButtonCallback / CursorPosCallback / ScrollCallback / KeyCallback），
+    // 见上方实现的 ImGui 优先模式。此处保留空实现以维持调用约定。
 }
 
+/*
+ * 渲染一帧
+ *
+ * 布局策略：先将 OpenGL 视口设置为中间渲染区域（跳过左右面板），
+ * 然后绘制 3D 场景，最后让 ImGui 覆盖在上面绘制面板。
+ * 这样 3D 场景不会穿透到左右面板区域。
+ */
 void ToyEngineMainWindow::RenderFrame() {
-    // 计算时间差
     float currentTime = static_cast<float>(glfwGetTime());
     m_deltaTime = currentTime - m_lastTime;
     m_lastTime = currentTime;
 
-    // 更新渲染器
     m_renderer->update(static_cast<long long>(m_deltaTime * 1000));
+
+    // 获取实际 framebuffer 像素尺寸（Retina 下通常为窗口 points 尺寸的 2 倍）。
+    // glViewport 作用于 framebuffer 像素空间，而 m_windowWidth/Height 是 GLFW points 坐标，
+    // 若直接用 points 数值会与 ImGui 面板的像素位置错位，导致视口整体偏移。
+    int fbWidth = 0, fbHeight = 0;
+    glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
+
+    // 计算像素/points 缩放因子，将面板宽度常量换算为 framebuffer 像素
+    const float xScale = fbWidth > 0 ? static_cast<float>(fbWidth) / static_cast<float>(m_windowWidth) : 1.0f;
+
+    // 3x1 网格：中间渲染视口 = 左栏右边界 到 右栏左边界（全部换算为 framebuffer 像素）
+    const int viewportX = static_cast<int>(m_leftPanelWidth * xScale);
+    const int viewportY = 0;
+    const int viewportW = static_cast<int>((m_windowWidth - m_leftPanelWidth - m_rightPanelWidth) * xScale);
+    const int viewportH = fbHeight;
+
+    // 设置 OpenGL 视口为中间网格，然后绘制 3D 场景
+    // 注意：resize() 内部会调用 glViewport(0,0,...)，必须在它之后重新设置视口位置
+    m_renderer->resize(viewportW, viewportH);
+    glViewport(viewportX, viewportY, viewportW, viewportH);
+    m_renderer->draw(static_cast<long long>(m_deltaTime * 1000));
+
+    // 恢复完整 framebuffer 视口给 ImGui 使用
+    glViewport(0, 0, fbWidth, fbHeight);
 
     // 开始ImGui帧
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // 创建UI
     CreateUI();
 
-    // 渲染3D场景
-    m_renderer->draw(static_cast<long long>(m_deltaTime * 1000));
-
-    // 渲染ImGui
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     glfwSwapBuffers(m_window);
 }
 
+/*
+ * 创建整个ImGui界面
+ *
+ * 3x1 网格布局：整个窗口被划分为三列，每格上下占满：
+ *   - 左格：资源列表（宽度 m_leftPanelWidth）
+ *   - 中格：渲染视口（ImGui 留空，由 OpenGL 直接绘制 3D 场景）
+ *   - 右格：属性面板（宽度 m_rightPanelWidth）
+ * 左右格与中格之间各有一条可拖动的竖直分隔条。
+ */
 void ToyEngineMainWindow::CreateUI() {
-    // 注释掉停靠空间，因为可能不支持
-    // ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
-
-    // 创建主菜单栏
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("文件")) {
-            if (ImGui::MenuItem("打开场景")) {}
-            if (ImGui::MenuItem("保存场景")) {}
-            ImGui::Separator();
-            if (ImGui::MenuItem("退出", "Alt+F4")) {
-                glfwSetWindowShouldClose(m_window, true);
-            }
-            ImGui::EndMenu();
-        }
-        
-        if (ImGui::BeginMenu("视图")) {
-            ImGui::MenuItem("场景树", nullptr, &m_showSceneTree);
-            ImGui::MenuItem("属性面板", nullptr, &m_showProperties);
-            ImGui::MenuItem("工具栏", nullptr, &m_showToolbar);
-            ImGui::MenuItem("状态栏", nullptr, &m_showStatusBar);
-            ImGui::EndMenu();
-        }
-        
-        if (ImGui::BeginMenu("光源")) {
-            auto lights = m_renderer->GetLights();
-            for (size_t i = 0; i < lights.size(); ++i) {
-                auto light = lights[i];
-                if (light == nullptr) continue;
-                std::string nodeName = light->GetName() + "##" + std::to_string(i);
-                bool isSelected = (m_selectedObject == light && m_selectedObjectType == "Light");
-                if (ImGui::MenuItem(nodeName.c_str(), nullptr, isSelected)) {
-                    SelectObject(light);
-                    m_selectedObjectType = "Light";
-                }
-            }
-            ImGui::EndMenu();
-        }
-        
-        if (ImGui::BeginMenu("摄像机")) {
-            auto cameras = m_renderer->GetCameras();
-            for (size_t i = 0; i < cameras.size(); ++i) {
-                const auto& camera = cameras[i];
-                std::string displayName = camera->GetName().empty() ?
-                    "Camera " + std::to_string(i) : camera->GetName();
-                
-                bool isSelected = (m_selectedObject == m_renderer->GetCamera() && 
-                    m_selectedObjectType == "Camera" && 
-                    m_currentCameraIndex == static_cast<int>(i));
-                if (ImGui::MenuItem(displayName.c_str(), nullptr, isSelected)) {
-                    // 切换到选中的摄像机
-                    m_renderer->SwitchCamera(static_cast<int>(i));
-                    m_currentCameraIndex = static_cast<int>(i);
-                    SelectObject(m_renderer->GetCamera());
-                    m_selectedObjectType = "Camera";
-                }
-            }
-            ImGui::EndMenu();
-        }
-        
-        if (ImGui::BeginMenu("帮助")) {
-            if (ImGui::MenuItem("关于")) {}
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
+    // 左格：资源列表（占满整个窗口高度）
+    if (m_showResourceList) {
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(m_leftPanelWidth, m_windowHeight), ImGuiCond_Always);
+        CreateResourceListPanel();
     }
 
+    // 左分隔条：资源列表 与 中格视口 之间
+    CreateSplitter(m_leftPanelWidth, m_draggingLeftSplitter, m_leftPanelWidth, MIN_PANEL_WIDTH, m_windowWidth - m_rightPanelWidth - MIN_PANEL_WIDTH);
 
-    
-    if (m_showSceneTree) {
-        CreateSceneTreePanel();
-    }
-    if (m_showCameraPanel) {
-        CreateCameraPanel();
-    }
-    if (m_showLightPanel) {
-        CreateLightPannel();
-    }
-    
+    // 右格：属性面板（占满整个窗口高度）
     if (m_showProperties) {
+        ImGui::SetNextWindowPos(ImVec2(m_windowWidth - m_rightPanelWidth, 0), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(m_rightPanelWidth, m_windowHeight), ImGuiCond_Always);
         CreatePropertiesPanel();
     }
-    
-    if (m_showStatusBar) {
-        CreateStatusBar();
+
+    // 右分隔条：中格视口 与 属性面板 之间
+    CreateSplitter(m_windowWidth - m_rightPanelWidth, m_draggingRightSplitter, m_rightPanelWidth, MIN_PANEL_WIDTH, m_windowWidth - m_leftPanelWidth - MIN_PANEL_WIDTH);
+
+    // 中格视口底部悬浮状态条（FPS/投影方式）
+    if (m_showViewportStatusBar) {
+        ShowViewportStatusBar();
     }
 }
 
+/*
+ * 创建竖直分隔条
+ *
+ * splitterPosX: 分隔条中心的 X 坐标（窗口 points 坐标）
+ * active:       当前是否正在拖动该分隔条（拖动状态的引用）
+ * panelWidth:   被调整的面板宽度（引用，拖动时实时更新）
+ * minWidth:     面板最小宽度
+ * maxWidth:     面板最大宽度（避免挤压中格或其他面板）
+ *
+ * 交互：鼠标悬停在分隔条上时显示水平调整光标，按住左键拖动即可改变面板宽度。
+ */
+void ToyEngineMainWindow::CreateSplitter(float splitterPosX, bool& active, float& panelWidth, float minWidth, float maxWidth) {
+    ImGui::SetNextWindowPos(ImVec2(splitterPosX - SPLITTER_WIDTH * 0.5f, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(SPLITTER_WIDTH, m_windowHeight), ImGuiCond_Always);
 
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+    ImGui::Begin("##Splitter", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-void ToyEngineMainWindow::CreateSceneTreePanel() {
-    // 设置窗口位置在左侧，宽度固定，高度为窗口高度减去状态栏和属性面板
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(250, ImGui::GetIO().DisplaySize.y - 300), ImGuiCond_Always);
-    
-    ImGui::Begin("场景树", &m_showSceneTree, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-    
-    // 显示模型列表 - 默认展开
+    ImGui::SetCursorScreenPos(ImVec2(splitterPosX - SPLITTER_WIDTH * 0.5f, 0));
+    ImGui::InvisibleButton("##splitterHit", ImVec2(SPLITTER_WIDTH, m_windowHeight));
+
+    // 悬停时显示双向水平调整光标
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
+
+    // 处理拖动
+    if (ImGui::IsItemActive() || active) {
+        active = true;
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        ImGuiIO& io = ImGui::GetIO();
+        // 根据鼠标横向移动量调整面板宽度，并限制在最小/最大范围内
+        panelWidth = panelWidth + io.MouseDelta.x;
+        if (panelWidth < minWidth) panelWidth = minWidth;
+        if (panelWidth > maxWidth) panelWidth = maxWidth;
+        // 鼠标释放时结束拖动
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            active = false;
+        }
+    }
+
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+}
+
+/*
+ * 左栏：资源列表面板
+ *
+ * 显示 world.yaml 中定义的所有资源，按类型分组：
+ *   - 摄像机（可切换当前摄像机）
+ *   - 灯光（可选中编辑属性）
+ *   - 模型（可选中编辑属性）
+ *   - 地形（单例，可选中查看配置）
+ *   - 天空穹（单例，可选中编辑颜色）
+ *   - 粒子系统（可选中编辑发射器参数）
+ */
+void ToyEngineMainWindow::CreateResourceListPanel() {
+    ImGui::Begin("资源列表", &m_showResourceList,
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+
+    // ---- 摄像机 ----
+    if (ImGui::TreeNodeEx("摄像机", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto cameras = m_renderer->GetCameras();
+        for (size_t i = 0; i < cameras.size(); ++i) {
+            const auto& camera = cameras[i];
+            std::string displayName = camera->GetName().empty()
+                ? "Camera " + std::to_string(i) : camera->GetName();
+            bool isSelected = (m_selectedObject == camera
+                && m_selectedObjectType == "Camera"
+                && m_currentCameraIndex == static_cast<int>(i));
+
+            if (ImGui::Selectable(displayName.c_str(), isSelected)) {
+                m_renderer->SwitchCamera(static_cast<int>(i));
+                m_currentCameraIndex = static_cast<int>(i);
+                SelectObject(m_renderer->GetCamera(), "Camera");
+            }
+        }
+        ImGui::TreePop();
+    }
+
+    // ---- 灯光 ----
+    if (ImGui::TreeNodeEx("灯光", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto lights = m_renderer->GetLights();
+        for (size_t i = 0; i < lights.size(); ++i) {
+            auto light = lights[i];
+            if (light == nullptr) continue;
+            std::string nodeName = light->GetName() + "##light" + std::to_string(i);
+            bool isSelected = (m_selectedObject == light && m_selectedObjectType == "Light");
+            if (ImGui::Selectable(nodeName.c_str(), isSelected)) {
+                SelectObject(light, "Light");
+            }
+        }
+        ImGui::TreePop();
+    }
+
+    // ---- 模型 ----
     if (ImGui::TreeNodeEx("模型", ImGuiTreeNodeFlags_DefaultOpen)) {
         auto models = m_renderer->GetModels();
         for (size_t i = 0; i < models.size(); ++i) {
             auto model = models[i];
             if (model == nullptr) continue;
-            std::string nodeName = model->GetName() + "##" + std::to_string(i);
-            if (ImGui::Selectable(nodeName.c_str(), 
-                m_selectedObject == model && m_selectedObjectType == "Model")) {
-                SelectObject(model);
-                m_selectedObjectType = "Model";
-            }
-        }
-        ImGui::TreePop();
-    }
-    
-    // 显示光源列表 - 默认展开
-    if (ImGui::TreeNodeEx("光源", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto lights = m_renderer->GetLights();
-        for (size_t i = 0; i < lights.size(); ++i) {
-            auto light = lights[i];
-            if (light == nullptr) continue;
-            std::string nodeName = light->GetName() + "##" + std::to_string(i);
-            if (ImGui::Selectable(nodeName.c_str(),
-                m_selectedObject == light && m_selectedObjectType == "Light")) {
-                SelectObject(light);
-                m_selectedObjectType = "Light";
-            }
-        }
-        ImGui::TreePop();
-    }
-    
-    // 显示相机 - 默认展开
-    if (ImGui::TreeNodeEx("相机", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto cameras = m_renderer->GetCameras();
-        for (size_t i = 0; i < cameras.size(); ++i) {
-            const auto& camera = cameras[i];
-            std::string displayName = camera->GetName().empty() ?
-                "Camera " + std::to_string(i) : camera->GetName();
-            
-            if (ImGui::Selectable(displayName.c_str(), 
-                m_selectedObject == m_renderer->GetCamera() && 
-                m_selectedObjectType == "Camera" && 
-                m_currentCameraIndex == static_cast<int>(i))) {
-                // 切换到选中的摄像机
-                m_renderer->SwitchCamera(static_cast<int>(i));
-                m_currentCameraIndex = static_cast<int>(i);
-                SelectObject(m_renderer->GetCamera());
-                m_selectedObjectType = "Camera";
-            }
-        }
-        ImGui::TreePop();
-    }
-    
-    ImGui::End();
-}
-
-void ToyEngineMainWindow::CreateLightPannel() {
-       // 设置窗口位置在左侧，宽度固定，高度为窗口高度减去状态栏和属性面板
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(250, ImGui::GetIO().DisplaySize.y - 600), ImGuiCond_Always);
-
-    ImGui::Begin("光源", &m_showLightPanel, ImGuiWindowFlags_NoCollapse  );
-
-    // 显示光源列表 - 默认展开
-    if (ImGui::TreeNodeEx("光源", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto lights = m_renderer->GetLights();
-        for (size_t i = 0; i < lights.size(); ++i) {
-            auto light = lights[i];
-            if (light == nullptr) continue;
-            std::string nodeName = light->GetName() + "##" + std::to_string(i);
-            if (ImGui::Selectable(nodeName.c_str(),
-                m_selectedObject == light && m_selectedObjectType == "Light")) {
-                SelectObject(light);
-                m_selectedObjectType = "Light";
+            std::string nodeName = model->GetName() + "##model" + std::to_string(i);
+            bool isSelected = (m_selectedObject == model && m_selectedObjectType == "Model");
+            if (ImGui::Selectable(nodeName.c_str(), isSelected)) {
+                SelectObject(model, "Model");
             }
         }
         ImGui::TreePop();
     }
 
-
-
-    ImGui::End();
-}
-
-void ToyEngineMainWindow::CreateCameraPanel() {
-        // 设置窗口位置在左侧，宽度固定，高度为窗口高度减去状态栏和属性面板
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(250, ImGui::GetIO().DisplaySize.y - 300), ImGuiCond_Always);
-
-    ImGui::Begin("相机", &m_showCameraPanel, ImGuiWindowFlags_NoCollapse  );
-
-    // 显示相机 - 默认展开
-    if (ImGui::TreeNodeEx("相机", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto cameras = m_renderer->GetCameras();
-        for (size_t i = 0; i < cameras.size(); ++i) {
-            const auto& camera = cameras[i];
-            std::string displayName = camera->GetName().empty() ?
-                "Camera " + std::to_string(i) : camera->GetName();
-
-            if (ImGui::Selectable(displayName.c_str(),
-                m_selectedObject == m_renderer->GetCamera() &&
-                m_selectedObjectType == "Camera" &&
-                m_currentCameraIndex == static_cast<int>(i))) {
-                // 切换到选中的摄像机
-                m_renderer->SwitchCamera(static_cast<int>(i));
-                m_currentCameraIndex = static_cast<int>(i);
-                SelectObject(m_renderer->GetCamera());
-                m_selectedObjectType = "Camera";
-            }
+    // ---- 地形（单例） ----
+    if (auto terrain = m_renderer->GetTerrainManager()) {
+        bool isSelected = (m_selectedObjectType == "Terrain");
+        if (ImGui::Selectable("地形", isSelected)) {
+            SelectObject(terrain, "Terrain");
         }
-        ImGui::TreePop();
+    }
+
+    // ---- 天空穹（单例） ----
+    if (auto sky = m_renderer->GetSkyDome()) {
+        bool isSelected = (m_selectedObjectType == "SkyDome");
+        if (ImGui::Selectable("天空穹", isSelected)) {
+            SelectObject(sky, "SkyDome");
+        }
+    }
+
+    // ---- 粒子系统 ----
+    auto& particles = m_renderer->GetParticleSystems();
+    if (!particles.empty()) {
+        if (ImGui::TreeNodeEx("粒子系统", ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (size_t i = 0; i < particles.size(); ++i) {
+                auto emitter = particles[i]->GetEmitter();
+                if (emitter == nullptr) continue;
+                // 使用发射器位置作为显示名
+                std::string displayName = "Particle " + std::to_string(i);
+                bool isSelected = (m_selectedObjectType == "Particle"
+                    && m_selectedParticleIndex == static_cast<int>(i));
+                if (ImGui::Selectable(displayName.c_str(), isSelected)) {
+                    SelectObject(particles[i], "Particle");
+                    m_selectedParticleIndex = static_cast<int>(i);
+                }
+            }
+            ImGui::TreePop();
+        }
     }
 
     ImGui::End();
 }
 
+/*
+ * 右栏：属性面板
+ *
+ * 根据当前选中的资源类型，显示对应的属性编辑器。
+ * 每种资源类型都有专门的 Show*Properties() 方法，
+ * 确保所有可编辑属性都能在面板中展示和修改。
+ */
 void ToyEngineMainWindow::CreatePropertiesPanel() {
-    // 设置窗口位置在场景树面板下方
-    ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y - 300), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(250, 270), ImGuiCond_Always);
-    
-    ImGui::Begin("属性", &m_showProperties, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-    
-    if (m_selectedObject) {
-        UpdateSelectedObjectProperties();
-    } else {
-        ImGui::Text("请选择一个对象来编辑属性");
+    ImGui::Begin("属性", &m_showProperties,
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+
+    if (m_selectedObject == nullptr) {
+        ImGui::Text("请选择一个资源来编辑属性");
+        ImGui::End();
+        return;
     }
-    
+
+    if (m_selectedObjectType == "Model") {
+        ShowModelProperties();
+    } else if (m_selectedObjectType == "Light") {
+        ShowLightProperties();
+    } else if (m_selectedObjectType == "Camera") {
+        ShowCameraProperties();
+    } else if (m_selectedObjectType == "Terrain") {
+        ShowTerrainProperties();
+    } else if (m_selectedObjectType == "SkyDome") {
+        ShowSkyDomeProperties();
+    } else if (m_selectedObjectType == "Particle") {
+        ShowParticleProperties();
+    }
+
     ImGui::End();
 }
 
-void ToyEngineMainWindow::CreateStatusBar() {
-    // 设置窗口位置在右下角
-    ImGui::SetNextWindowPos(ImVec2(m_windowWidth - 400, m_windowHeight - 35), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(400, 35), ImGuiCond_Always);
-    
-    ImGui::Begin("##StatusBar", &m_showStatusBar, 
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | 
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
-    
-    // 显示FPS
-    ImGui::Text("FPS: %.1f", m_renderer->GetFPS());
+// ---- 模型属性编辑器 ----
+// 可编辑：名称（只读）、位置、缩放、旋转
+void ToyEngineMainWindow::ShowModelProperties() {
+    Model* model = static_cast<Model*>(m_selectedObject);
+
+    ImGui::Text("类型: 模型");
+    ImGui::Separator();
+    ImGui::Text("名称: %s", model->GetName().c_str());
+    ImGui::Separator();
+
+    glm::vec3 position = model->GetPosition();
+    if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
+        model->SetTranslate(position);
+    }
+
+    glm::vec3 scale = model->GetScale();
+    if (ImGui::DragFloat3("缩放", glm::value_ptr(scale), 0.1f)) {
+        model->SetScale(scale);
+    }
+
+    float rotation = model->GetRotation();
+    if (ImGui::DragFloat("旋转 (度)", &rotation, 1.0f)) {
+        model->SetRotate(rotation);
+    }
+}
+
+// ---- 灯光属性编辑器 ----
+// 可编辑：名称（只读）、位置、颜色、环境光、漫反射、镜面反射、衰减参数
+void ToyEngineMainWindow::ShowLightProperties() {
+    PointLight* light = static_cast<PointLight*>(m_selectedObject);
+
+    ImGui::Text("类型: 点光源");
+    ImGui::Separator();
+    ImGui::Text("名称: %s", light->GetName().c_str());
+    ImGui::Separator();
+
+    // 位置
+    if (ImGui::DragFloat3("位置", glm::value_ptr(light->Position), 0.1f)) {
+        // 同步更新光源模型位置
+        if (light->GetModel()) {
+            light->GetModel()->SetPosition(light->Position);
+        }
+    }
+
+    // 颜色
+    ImGui::ColorEdit3("颜色", glm::value_ptr(light->Color));
+
+    ImGui::Separator();
+    ImGui::Text("环境光");
+    ImGui::ColorEdit3("环境光颜色", glm::value_ptr(light->AmbientColor));
+    ImGui::DragFloat("环境光强度", &light->AmbientIntensity, 0.01f, 0.0f, 10.0f);
+
+    ImGui::Separator();
+    ImGui::Text("漫反射");
+    ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(light->DiffuseColor));
+    ImGui::DragFloat("漫反射强度", &light->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
+
+    ImGui::Separator();
+    ImGui::Text("镜面反射");
+    ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(light->SpecularColor));
+    ImGui::DragFloat("镜面反射强度", &light->SpecularIntensity, 0.01f, 0.0f, 10.0f);
+
+    ImGui::Separator();
+    ImGui::Text("衰减");
+    ImGui::DragFloat("常数项", &light->Attenuation.Constant, 0.01f, 0.0f, 10.0f);
+    ImGui::DragFloat("线性项", &light->Attenuation.Linear, 0.001f, 0.0f, 1.0f);
+    ImGui::DragFloat("指数项", &light->Attenuation.Exp, 0.0001f, 0.0f, 0.1f);
+}
+
+// ---- 相机属性编辑器 ----
+// 可编辑：名称（只读）、位置、目标点、上方向
+void ToyEngineMainWindow::ShowCameraProperties() {
+    Camera* camera = static_cast<Camera*>(m_selectedObject);
+
+    ImGui::Text("类型: 摄像机");
+    ImGui::Separator();
+    ImGui::Text("名称: %s", camera->GetName().c_str());
+    ImGui::Separator();
+
+    glm::vec3 position = camera->GetPosition();
+    if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
+        camera->SetPosition(position);
+    }
+
+    glm::vec3 target = camera->m_target;
+    if (ImGui::DragFloat3("目标点", glm::value_ptr(target), 0.1f)) {
+        camera->m_target = target;
+    }
+
+    glm::vec3 up = camera->m_world_up;
+    if (ImGui::DragFloat3("上方向", glm::value_ptr(up), 0.01f)) {
+        camera->m_world_up = up;
+    }
+
+    ImGui::Separator();
+    ImGui::DragFloat("移动速度", &camera->m_move_speed, 0.1f, 0.1f, 100.0f);
+    ImGui::DragFloat("鼠标灵敏度", &camera->m_mouse_sensitivity, 0.01f, 0.01f, 10.0f);
+    ImGui::DragFloat("缩放", &camera->m_zoom, 0.1f, 1.0f, 90.0f);
+}
+
+// ---- 地形属性编辑器 ----
+// 显示只读统计信息和配置参数（chunk大小、分辨率、渲染距离等）
+void ToyEngineMainWindow::ShowTerrainProperties() {
+    TerrainManager* terrain = static_cast<TerrainManager*>(m_selectedObject);
+
+    ImGui::Text("类型: 地形");
+    ImGui::Separator();
+
+    // 只读统计信息
+    ImGui::Text("活跃 Chunk 数: %d", terrain->GetActiveChunkCount());
+    ImGui::Text("总三角形数: %d", terrain->GetTotalTriangleCount());
+    ImGui::Separator();
+
+    // 配置参数（只读展示，运行时修改需要重新生成地形）
+    const TerrainConfig& cfg = terrain->GetConfig();
+    float chunkSize = cfg.chunkSize;
+    ImGui::DragFloat("Chunk 大小", &chunkSize, 1.0f, 10.0f, 500.0f);
+
+    int baseRes = cfg.baseResolution;
+    ImGui::DragInt("基础分辨率", &baseRes, 1, 8, 256);
+
+    int renderDist = cfg.renderDistance;
+    ImGui::DragInt("渲染距离", &renderDist, 1, 1, 50);
+
+    int unloadDist = cfg.unloadDistance;
+    ImGui::DragInt("卸载距离", &unloadDist, 1, 1, 100);
+
+    float heightScale = cfg.heightScale;
+    ImGui::DragFloat("高度缩放", &heightScale, 0.1f, 0.0f, 100.0f);
+
+    ImGui::Text("噪声种子: %u", cfg.noiseSeed);
+}
+
+// ---- 天空穹属性编辑器 ----
+// 可编辑：地平线颜色、天顶颜色；只读：半径、分段数
+void ToyEngineMainWindow::ShowSkyDomeProperties() {
+    SkyDome* sky = static_cast<SkyDome*>(m_selectedObject);
+
+    ImGui::Text("类型: 天空穹");
+    ImGui::Separator();
+
+    // 只读参数
+    ImGui::Text("半径: %.1f", sky->GetRadius());
+    ImGui::Text("水平分段: %d", sky->GetSectors());
+    ImGui::Text("垂直分段: %d", sky->GetStacks());
+    ImGui::Separator();
+
+    // 可编辑颜色
+    glm::vec3 horizonColor = sky->GetHorizonColor();
+    if (ImGui::ColorEdit3("地平线颜色", glm::value_ptr(horizonColor))) {
+        sky->SetHorizonColor(horizonColor);
+    }
+
+    glm::vec3 zenithColor = sky->GetZenithColor();
+    if (ImGui::ColorEdit3("天顶颜色", glm::value_ptr(zenithColor))) {
+        sky->SetZenithColor(zenithColor);
+    }
+}
+
+// ---- 粒子系统属性编辑器 ----
+// 可编辑：发射器位置、发射速率、最大粒子数、生命周期、大小、速度、颜色、重力、阻力
+void ToyEngineMainWindow::ShowParticleProperties() {
+    if (m_selectedParticleIndex < 0
+        || m_selectedParticleIndex >= static_cast<int>(m_renderer->GetParticleSystems().size())) {
+        ImGui::Text("无效的粒子系统选择");
+        return;
+    }
+
+    ParticleSystem* ps = m_renderer->GetParticleSystems()[m_selectedParticleIndex];
+    ParticleEmitter* emitter = ps->GetEmitter();
+    if (emitter == nullptr) {
+        ImGui::Text("粒子发射器未初始化");
+        return;
+    }
+
+    ImGui::Text("类型: 粒子系统");
+    ImGui::Text("索引: %d", m_selectedParticleIndex);
+    ImGui::Separator();
+
+    // 位置
+    ImGui::DragFloat3("位置", glm::value_ptr(emitter->Position), 0.1f);
+
+    // 发射参数
+    ImGui::Separator();
+    ImGui::Text("发射参数");
+    ImGui::DragFloat("发射速率", &emitter->EmitRate, 1.0f, 0.0f, 10000.0f);
+    ImGui::DragInt("最大粒子数", &emitter->MaxParticles, 10, 1, 50000);
+
+    // 生命周期
+    ImGui::Separator();
+    ImGui::Text("生命周期");
+    ImGui::DragFloat("最小寿命", &emitter->MinLife, 0.1f, 0.0f, 60.0f);
+    ImGui::DragFloat("最大寿命", &emitter->MaxLife, 0.1f, 0.0f, 60.0f);
+
+    // 大小
+    ImGui::Separator();
+    ImGui::Text("大小");
+    ImGui::DragFloat("初始最小", &emitter->MinSize, 0.1f, 0.0f, 100.0f);
+    ImGui::DragFloat("初始最大", &emitter->MaxSize, 0.1f, 0.0f, 100.0f);
+    ImGui::DragFloat("结束最小", &emitter->MinSizeEnd, 0.1f, 0.0f, 100.0f);
+    ImGui::DragFloat("结束最大", &emitter->MaxSizeEnd, 0.1f, 0.0f, 100.0f);
+
+    // 速度
+    ImGui::Separator();
+    ImGui::Text("速度");
+    ImGui::DragFloat3("最小速度", glm::value_ptr(emitter->MinVelocity), 0.1f);
+    ImGui::DragFloat3("最大速度", glm::value_ptr(emitter->MaxVelocity), 0.1f);
+
+    // 颜色
+    ImGui::Separator();
+    ImGui::Text("初始颜色");
+    ImGui::ColorEdit3("最小颜色", glm::value_ptr(emitter->MinColor));
+    ImGui::ColorEdit3("最大颜色", glm::value_ptr(emitter->MaxColor));
+
+    ImGui::Text("结束颜色");
+    ImGui::ColorEdit3("最小结束颜色", glm::value_ptr(emitter->MinColorEnd));
+    ImGui::ColorEdit3("最大结束颜色", glm::value_ptr(emitter->MaxColorEnd));
+
+    // 物理
+    ImGui::Separator();
+    ImGui::Text("物理");
+    ImGui::DragFloat3("重力", glm::value_ptr(emitter->Gravity), 0.1f);
+    ImGui::DragFloat("阻力", &emitter->Drag, 0.01f, 0.0f, 1.0f);
+}
+
+// ---- 中格视口底部状态条 ----
+// 以悬浮条覆盖在中间 3D 视口底部，不占用独立网格行，保持 3x1 网格布局
+void ToyEngineMainWindow::ShowViewportStatusBar() {
+    const float barHeight = ImGui::GetFrameHeight() + 8.0f;
+    ImGui::SetNextWindowPos(ImVec2(m_leftPanelWidth, m_windowHeight - barHeight), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(m_windowWidth - m_leftPanelWidth - m_rightPanelWidth, barHeight), ImGuiCond_Always);
+
+    ImGui::Begin("##ViewportStatusBar", &m_showViewportStatusBar,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground);
+
+    ImGui::Text("FPS: %.1f  |  %dx%d", m_renderer->GetFPS(), m_windowWidth, m_windowHeight);
     ImGui::SameLine();
-    // ImGui::SeparatorVertical(); // 可能不支持
-    ImGui::SameLine();
-    
-    // 显示窗口尺寸
-    ImGui::Text("尺寸: %dx%d", m_windowWidth, m_windowHeight);
-    ImGui::SameLine();
-    // ImGui::SeparatorVertical(); // 可能不支持
-    ImGui::SameLine();
-    
-    // 显示投影模式
+
     const char* projTypes[] = { "透视", "正交" };
     int projType = static_cast<int>(m_renderer->GetProjectionType());
-    if (ImGui::Combo("投影", &projType, projTypes, IM_ARRAYSIZE(projTypes))) {
+    ImGui::SameLine();
+    if (ImGui::Combo("##proj", &projType, projTypes, IM_ARRAYSIZE(projTypes))) {
         m_renderer->SerProjectionType(static_cast<ProjectionType>(projType));
     }
-    
+
     ImGui::End();
 }
 
-void ToyEngineMainWindow::SelectObject(void* obj) {
+// ---- 选择管理 ----
+void ToyEngineMainWindow::SelectObject(void* obj, const std::string& type) {
     m_selectedObject = obj;
+    m_selectedObjectType = type;
 }
 
-void ToyEngineMainWindow::UpdateSelectedObjectProperties() {
-    if (m_selectedObjectType == "Model") {
-        Model* model = static_cast<Model*>(m_selectedObject);
-        ImGui::Text("模型名称: %s", model->GetName().c_str());
-        
-        // 位置属性
-        glm::vec3 position = model->GetPosition();
-        if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
-            model->SetTranslate(position);
-        }
-        
-        // 缩放属性
-        glm::vec3 scale = model->GetScale();
-        if (ImGui::DragFloat3("缩放", glm::value_ptr(scale), 0.1f)) {
-            model->SetScale(scale);
-        }
-        
-        // 旋转属性
-        float rotation = model->GetRotation();
-        if (ImGui::DragFloat("旋转", &rotation, 1.0f)) {
-            model->SetRotate(rotation);
-        }
-        
-    } else if (m_selectedObjectType == "Light") {
-        auto light = static_cast<PointLight*>(m_selectedObject);
-        ImGui::Text("光源名称: %s", light->GetName().c_str());
-        
-        // 光源颜色 - 使用ColorEdit3替代
-        glm::vec3 color = light->Color;
-        if (ImGui::ColorEdit3("颜色", glm::value_ptr(color))) {
-            light->Color = color;
-        }
-        
-        // 光源位置
-        glm::vec3 position = light->Position;
-        if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
-            light->Position = position;
-        }
-        
-    } else if (m_selectedObjectType == "Camera") {
-        Camera* camera = static_cast<Camera*>(m_selectedObject);
-        ImGui::Text("相机");
-        
-        // 相机位置
-        glm::vec3 position = camera->GetEyePosition();
-        if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
-            // 更新相机位置
-        }
-    }
+void ToyEngineMainWindow::ClearSelection() {
+    m_selectedObject = nullptr;
+    m_selectedObjectType.clear();
+    m_selectedParticleIndex = -1;
 }
 
+// ---- 鼠标事件 ----
+// 所有 ImGui 捕获判断已在 GLFW 回调（MouseButtonCallback / CursorPosCallback / ScrollCallback）中完成
 void ToyEngineMainWindow::OnMouseLeftButtonDown() {
-    // 检查是否在ImGui区域内点击
-    if (ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
-        return; // ImGui正在处理点击，不传递给3D场景
-    }
-    
-    std::cout << "鼠标左键按下 - 位置: (" << m_currentMouseX << ", " << m_currentMouseY << ")" << std::endl;
-    // 这里可以添加3D场景中的对象拾取逻辑
 }
 
 void ToyEngineMainWindow::OnMouseLeftButtonUp() {
-    std::cout << "鼠标左键释放" << std::endl;
 }
 
 void ToyEngineMainWindow::OnMouseRightButtonDown() {
-    if (ImGui::IsAnyItemHovered() || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow)) {
-        return;
-    }
-    
     m_cameraPanning = true;
-    std::cout << "开始相机平移" << std::endl;
 }
 
 void ToyEngineMainWindow::OnMouseRightButtonUp() {
     m_cameraPanning = false;
-    std::cout << "结束相机平移" << std::endl;
 }
 
 void ToyEngineMainWindow::OnMouseMove(double deltaX, double deltaY) {
-    // 相机绕世界原点旋转控制（鼠标左键拖动）
-    if (m_mouseLeftPressed && m_renderer) {
+    if (!m_renderer) return;
+
+    // 相机绕世界原点旋转（鼠标左键拖动）
+    if (m_mouseLeftPressed) {
         auto camera = m_renderer->GetCamera();
         if (camera) {
-            // 根据鼠标移动调整相机角度
             float sensitivity = 0.5f;
-            camera->OrbitAroundOrigin(static_cast<float>(-deltaX * sensitivity), 
-                                     static_cast<float>(-deltaY * sensitivity));
-            std::cout << "相机旋转 - deltaX: " << deltaX << ", deltaY: " << deltaY << std::endl;
+            camera->OrbitAroundOrigin(
+                static_cast<float>(-deltaX * sensitivity),
+                static_cast<float>(-deltaY * sensitivity));
         }
     }
-    
-    // 相机平移控制（鼠标右键拖动）
-    if (m_cameraPanning && m_renderer) {
+
+    // 相机平移（鼠标右键拖动）
+    if (m_cameraPanning) {
         auto camera = m_renderer->GetCamera();
         if (camera) {
             float panSpeed = 0.01f;
-            camera->Pan(static_cast<float>(deltaX * panSpeed), static_cast<float>(-deltaY * panSpeed));
-            std::cout << "相机平移 - deltaX: " << deltaX << ", deltaY: " << deltaY << std::endl;
+            camera->Pan(
+                static_cast<float>(deltaX * panSpeed),
+                static_cast<float>(-deltaY * panSpeed));
         }
     }
 }
@@ -578,24 +789,13 @@ void ToyEngineMainWindow::OnMouseWheel(double delta) {
     if (m_renderer) {
         auto camera = m_renderer->GetCamera();
         if (camera) {
-            // 相机缩放
             float zoomSpeed = 0.1f;
             camera->Zoom(static_cast<float>(delta * zoomSpeed));
-            std::cout << "相机缩放 - delta: " << delta << std::endl;
         }
     }
 }
 
-// 静态回调函数实现
-void ToyEngineMainWindow::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    // 注意：由于这是静态函数，我们需要某种方式获取MainWindow实例
-    // 这里简化处理，实际项目中可能需要使用glfwSetWindowUserPointer
-    std::cout << "鼠标滚轮 - xoffset: " << xoffset << ", yoffset: " << yoffset << std::endl;
-    // 在实际应用中，这里应该调用对应的MainWindow实例的方法
-}
-
 void ToyEngineMainWindow::Cleanup() {
-    // 清理ImGui
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

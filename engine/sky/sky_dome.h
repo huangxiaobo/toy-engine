@@ -48,6 +48,13 @@ public:
     /* 设置天顶颜色（半球顶部） */
     void SetZenithColor(const glm::vec3 &color);
 
+    /* 获取天空穹属性（供 ImGui 属性面板使用） */
+    float GetRadius() const { return m_radius; }
+    int GetSectors() const { return m_sectors; }
+    int GetStacks() const { return m_stacks; }
+    glm::vec3 GetHorizonColor() const { return m_horizonColor; }
+    glm::vec3 GetZenithColor() const { return m_zenithColor; }
+
 private:
     /* 半球体网格数据 */
     unsigned int m_VAO = 0;
@@ -64,6 +71,11 @@ private:
 
     /* 生成半球体网格 */
     void GenerateHemisphere(float radius, int sectors, int stacks);
+
+    /* 缓存初始化参数，供 getter 使用 */
+    float m_radius = 0.0f;
+    int m_sectors = 0;
+    int m_stacks = 0;
 };
 
 #endif // __SKY_DOME_H__

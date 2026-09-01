@@ -31,14 +31,16 @@ SkyDome::~SkyDome() {
 }
 
 void SkyDome::Init(float radius, int sectors, int stacks) {
-    // 创建天空穹着色器
+    m_radius = radius;
+    m_sectors = sectors;
+    m_stacks = stacks;
+
     m_effect = new Technique(
         "sky",
         "./resource/shader/sky.vert",
         "./resource/shader/sky.frag"
     );
 
-    // 生成半球体网格
     GenerateHemisphere(radius, sectors, stacks);
 }
 

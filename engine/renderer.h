@@ -57,6 +57,15 @@ public:
     // 通过uuid获取灯光
     Light *GetLightByUUID(const std::string &uuid) const;
 
+    // 获取地形管理器（供 ImGui 属性面板访问配置和统计信息）
+    TerrainManager *GetTerrainManager() const { return m_terrain_manager; }
+
+    // 获取天空穹（供 ImGui 属性面板编辑颜色等属性）
+    SkyDome *GetSkyDome() const { return m_sky_dome; }
+
+    // 获取全部粒子系统（引用返回，避免每帧拷贝）
+    const std::vector<ParticleSystem *> &GetParticleSystems() const { return m_particle_systems; }
+
     // 获取帧率
     float GetFPS() const;
 
