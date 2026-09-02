@@ -240,8 +240,40 @@ void Renderer::init(int w, int h) {
     m_camera = m_cameras[0];
 
     int i = 0;
-    for (auto lightConfig: gConfig->PointLights) {
-        auto light = new PointLight(std::format("light-{}", i + 1));
+    // 创建方向光（平行光）
+    for (const auto &lightConfig: gConfig->DirectionLights) {
+        // 名称优先使用 world.yaml 中的 name，未配置时回退为自动生成的索引名
+        std::string dirName = lightConfig.Name.empty() ? std::format("dir-light-{}", i + 1) : lightConfig.Name;
+        auto light = new DirectionLight(dirName);
+        // 若配置了 id，则覆盖默认自动生成的 UUID 用于稳定标识
+        if (!lightConfig.Id.empty()) {
+            light->SetUUID(lightConfig.Id);
+        }
+        // 应用 world.yaml 中的 enabled 配置（默认启用）
+        light->SetEnabled(lightConfig.Enabled);
+        light->Direction = lightConfig.Direction;
+        light->Color = lightConfig.Color;
+        light->AmbientColor = lightConfig.AmbientColor;
+        light->DiffuseColor = lightConfig.DiffuseColor;
+        light->SpecularColor = lightConfig.SpecularColor;
+        light->AmbientIntensity = lightConfig.AmbientIntensity;
+        light->DiffuseIntensity = lightConfig.DiffuseIntensity;
+        light->SpecularIntensity = lightConfig.SpecularIntensity;
+        m_lights.push_back(light);
+        i++;
+    }
+
+    // 创建点光源
+    for (const auto &lightConfig: gConfig->PointLights) {
+        // 名称优先使用 world.yaml 中的 name，未配置时回退为自动生成的索引名
+        std::string pointName = lightConfig.Name.empty() ? std::format("light-{}", i + 1) : lightConfig.Name;
+        auto light = new PointLight(pointName);
+        // 若配置了 id，则覆盖默认自动生成的 UUID 用于稳定标识
+        if (!lightConfig.Id.empty()) {
+            light->SetUUID(lightConfig.Id);
+        }
+        // 应用 world.yaml 中的 enabled 配置（默认启用）
+        light->SetEnabled(lightConfig.Enabled);
         light->Color = lightConfig.Color;
         light->Position = lightConfig.Position;
         light->AmbientColor = lightConfig.AmbientColor;
@@ -270,6 +302,52 @@ void Renderer::init(int w, int h) {
         //
         m_light_models[light->GetUUID()] = model;
         std::cout << "Setup light finish" << std::endl;
+        i++;
+    }
+
+    // 创建聚光灯
+    for (const auto &lightConfig: gConfig->SpotLights) {
+        // 名称优先使用 world.yaml 中的 name，未配置时回退为自动生成的索引名
+        std::string spotName = lightConfig.Name.empty() ? std::format("spot-light-{}", i + 1) : lightConfig.Name;
+        auto light = new SpotLight(spotName);
+        // 若配置了 id，则覆盖默认自动生成的 UUID 用于稳定标识
+        if (!lightConfig.Id.empty()) {
+            light->SetUUID(lightConfig.Id);
+        }
+        // 应用 world.yaml 中的 enabled 配置（默认启用）
+        light->SetEnabled(lightConfig.Enabled);
+        light->Position = lightConfig.Position;
+        light->Direction = lightConfig.Direction;
+        light->Color = lightConfig.Color;
+        light->AmbientColor = lightConfig.AmbientColor;
+        light->DiffuseColor = lightConfig.DiffuseColor;
+        light->SpecularColor = lightConfig.SpecularColor;
+        light->AmbientIntensity = lightConfig.AmbientIntensity;
+        light->DiffuseIntensity = lightConfig.DiffuseIntensity;
+        light->SpecularIntensity = lightConfig.SpecularIntensity;
+        light->Attenuation.Constant = lightConfig.Attenuation.Constant;
+        light->Attenuation.Linear = lightConfig.Attenuation.Linear;
+        light->Attenuation.Exp = lightConfig.Attenuation.Exp;
+        light->Cutoff = lightConfig.Cutoff;
+        light->OuterCutoff = lightConfig.OuterCutoff;
+        m_lights.push_back(light);
+
+        // 为聚光灯创建光源模型（复用点光源模型，仅用于可视化位置）
+        auto model = Model::CreatePointLightModelV2();
+        model->SetPosition(light->Position);
+        light->SetModel(model);
+
+        for (const auto &mesh: model->GetMeshes()) {
+            auto effect = mesh->GetEffect();
+            if (effect != nullptr &&
+                std::find(m_techniques.begin(), m_techniques.end(), effect) == m_techniques.end()) {
+                m_techniques.push_back(effect);
+            }
+        }
+
+        m_light_models[light->GetUUID()] = model;
+        std::cout << "Setup spot light finish" << std::endl;
+        i++;
     }
     std::cout << "Setup lights finish" << std::endl;
 

@@ -133,3 +133,38 @@ void PointLight::SetDiffuseColor(glm::vec3 color) {
 void PointLight::SetSpecularColor(glm::vec3 color) {
     SpecularColor = color;
 }
+
+// ---- 方向光 DirectionLight ----
+
+DirectionLight::DirectionLight(const std::string &name) : Light(name, LightTypeDirection),
+                                               Direction(0, -1, 0),
+                                               Color(0, 0, 0),
+                                               AmbientColor(0, 0, 0),
+                                               DiffuseColor(0, 0, 0),
+                                               SpecularColor(0, 0, 0),
+                                               AmbientIntensity(0),
+                                               DiffuseIntensity(0),
+                                               SpecularIntensity(0) {
+}
+
+DirectionLight::~DirectionLight() {
+}
+
+// ---- 聚光灯 SpotLight ----
+
+SpotLight::SpotLight(const std::string &name) : Light(name, LightTypeSpot),
+                                        Position(0, 0, 0),
+                                        Direction(0, -1, 0),
+                                        Color(0, 0, 0),
+                                        AmbientColor(0, 0, 0),
+                                        DiffuseColor(0, 0, 0),
+                                        SpecularColor(0, 0, 0),
+                                        AmbientIntensity(0),
+                                        DiffuseIntensity(0),
+                                        SpecularIntensity(0),
+                                        Cutoff(12.5f),
+                                        OuterCutoff(17.5f) {
+}
+
+SpotLight::~SpotLight() {
+}

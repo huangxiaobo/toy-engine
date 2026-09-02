@@ -5,6 +5,7 @@
 
 class DirectionLight;
 class PointLight;
+class SpotLight;
 class Shader;
 class Material;
 
@@ -26,6 +27,34 @@ struct UniformPointLight
     GLuint DiffuseColor;
     GLuint SpecularColor;
     UniformAttenuation Atten;
+};
+
+struct UniformDirectionLight
+{
+    GLuint Direction;
+    GLuint Color;
+    GLuint AmbientIntensity;
+    GLuint DiffuseIntensity;
+    GLuint SpecularIntensity;
+    GLuint AmbientColor;
+    GLuint DiffuseColor;
+    GLuint SpecularColor;
+};
+
+struct UniformSpotLight
+{
+    GLuint Position;
+    GLuint Direction;
+    GLuint Color;
+    GLuint AmbientIntensity;
+    GLuint DiffuseIntensity;
+    GLuint SpecularIntensity;
+    GLuint AmbientColor;
+    GLuint DiffuseColor;
+    GLuint SpecularColor;
+    UniformAttenuation Atten;
+    GLuint Cutoff;
+    GLuint OuterCutoff;
 };
 
 class MaterialUniform
@@ -55,9 +84,13 @@ public:
     ~TechniqueLight();
     virtual void SetLights(const vector<Light *> &lights);
     void SetDirectionLight(DirectionLight *light);
+    void InitDirectionLightUniform();
     void InitPointLightUniform(int num);
     void SetPointLights(vector<PointLight *> lights);
     void SetPointLight(int index, PointLight *light);
+    void SetSpotLight(int index, SpotLight *light);
+    void InitSpotLightUniform(int num);
+    void SetSpotLights(vector<SpotLight *> lights);
     virtual void SetMaterial(const Material *material);
 
     /* 获取当前材质指针（用于属性面板显示/编辑） */
@@ -70,18 +103,16 @@ private:
     // 材质
     MaterialUniform MaterialUniform;
 
-    // 光源类型
-    GLuint LightTypeUniform;
-
-    // 光源颜色
-    GLuint LightColorUniform;
-    GLuint LightAmbientUniform;
-    GLuint LightDiffuseUniform;
-    GLuint LightSpecularUniform;
+    // 方向光
+    UniformDirectionLight DirectionLightUniform;
 
     // 点光源
     vector<UniformPointLight> PointLightUniforms;
     GLuint PointLightCountUniform;
+
+    // 聚光灯
+    vector<UniformSpotLight> SpotLightUniforms;
+    GLuint SpotLightCountUniform;
 };
 
 #endif // __TECHNIQUE_LIGHT_H__

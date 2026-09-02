@@ -32,6 +32,9 @@ public:
 
 class PointLightConfig {
 public:
+    std::string Name;
+    std::string Id;
+    bool Enabled = true;
     glm::vec3 Position;
     glm::vec3 Color;
 
@@ -48,6 +51,50 @@ public:
         float Linear;
         float Exp;
     } Attenuation;
+};
+
+class DirectionLightConfig {
+public:
+    std::string Name;
+    std::string Id;
+    bool Enabled = true;
+    glm::vec3 Direction;
+    glm::vec3 Color;
+
+    glm::vec3 AmbientColor;
+    glm::vec3 DiffuseColor;
+    glm::vec3 SpecularColor;
+
+    float AmbientIntensity;
+    float DiffuseIntensity;
+    float SpecularIntensity;
+};
+
+class SpotLightConfig {
+public:
+    std::string Name;
+    std::string Id;
+    bool Enabled = true;
+    glm::vec3 Position;
+    glm::vec3 Direction;
+    glm::vec3 Color;
+
+    glm::vec3 AmbientColor;
+    glm::vec3 DiffuseColor;
+    glm::vec3 SpecularColor;
+
+    float AmbientIntensity;
+    float DiffuseIntensity;
+    float SpecularIntensity;
+
+    struct {
+        float Constant;
+        float Linear;
+        float Exp;
+    } Attenuation;
+
+    float Cutoff;
+    float OuterCutoff;
 };
 
 /*
@@ -152,6 +199,8 @@ public:
     ClipConfig Clip;
     std::vector<CameraConfig> Cameras;  // 支持多个摄像机
     std::vector<PointLightConfig> PointLights;
+    std::vector<DirectionLightConfig> DirectionLights;
+    std::vector<SpotLightConfig> SpotLights;
     std::vector<ParticleConfig> Particles;
     SkyDomeConfig SkyDome;
     std::vector<ModelCoinfig> Models;

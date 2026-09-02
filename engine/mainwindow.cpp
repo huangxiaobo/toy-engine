@@ -625,45 +625,125 @@ void ToyEngineMainWindow::ShowModelProperties() {
 
 // ---- 灯光属性编辑器 ----
 // 可编辑：名称（只读）、位置、颜色、环境光、漫反射、镜面反射、衰减参数
+// 根据灯光实际类型显示对应的可编辑属性
 void ToyEngineMainWindow::ShowLightProperties() {
-    PointLight* light = static_cast<PointLight*>(m_selectedObject);
+    Light* light = static_cast<Light*>(m_selectedObject);
 
-    ImGui::Text("类型: 点光源");
+    ImGui::Text("类型: %s", light->GetLightTypeName().c_str());
     ImGui::Separator();
     ImGui::Text("名称: %s", light->GetName().c_str());
     ImGui::Separator();
 
+    // 开启/关闭开关：切换后实时影响该灯光是否参与光照计算
+    bool enabled = light->IsEnabled();
+    if (ImGui::Checkbox("启用##light", &enabled)) {
+        light->SetEnabled(enabled);
+    }
+    ImGui::Separator();
+
+    // ---- 方向光 ----
+    if (light->GetLightType() == LightTypeDirection) {
+        DirectionLight* dirLight = static_cast<DirectionLight*>(light);
+
+        // 方向（无位置）
+        ImGui::DragFloat3("方向", glm::value_ptr(dirLight->Direction), 0.1f);
+
+        ImGui::ColorEdit3("颜色", glm::value_ptr(dirLight->Color));
+
+        ImGui::Separator();
+        ImGui::Text("环境光");
+        ImGui::ColorEdit3("环境光颜色", glm::value_ptr(dirLight->AmbientColor));
+        ImGui::DragFloat("环境光强度", &dirLight->AmbientIntensity, 0.01f, 0.0f, 10.0f);
+
+        ImGui::Separator();
+        ImGui::Text("漫反射");
+        ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(dirLight->DiffuseColor));
+        ImGui::DragFloat("漫反射强度", &dirLight->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
+
+        ImGui::Separator();
+        ImGui::Text("镜面反射");
+        ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(dirLight->SpecularColor));
+        ImGui::DragFloat("镜面反射强度", &dirLight->SpecularIntensity, 0.01f, 0.0f, 10.0f);
+        return;
+    }
+
+    // ---- 聚光灯 ----
+    if (light->GetLightType() == LightTypeSpot) {
+        SpotLight* spotLight = static_cast<SpotLight*>(light);
+
+        // 位置
+        if (ImGui::DragFloat3("位置", glm::value_ptr(spotLight->Position), 0.1f)) {
+            if (spotLight->GetModel()) {
+                spotLight->GetModel()->SetPosition(spotLight->Position);
+            }
+        }
+        // 方向
+        ImGui::DragFloat3("方向", glm::value_ptr(spotLight->Direction), 0.1f);
+
+        ImGui::ColorEdit3("颜色", glm::value_ptr(spotLight->Color));
+
+        ImGui::Separator();
+        ImGui::Text("环境光");
+        ImGui::ColorEdit3("环境光颜色", glm::value_ptr(spotLight->AmbientColor));
+        ImGui::DragFloat("环境光强度", &spotLight->AmbientIntensity, 0.01f, 0.0f, 10.0f);
+
+        ImGui::Separator();
+        ImGui::Text("漫反射");
+        ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(spotLight->DiffuseColor));
+        ImGui::DragFloat("漫反射强度", &spotLight->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
+
+        ImGui::Separator();
+        ImGui::Text("镜面反射");
+        ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(spotLight->SpecularColor));
+        ImGui::DragFloat("镜面反射强度", &spotLight->SpecularIntensity, 0.01f, 0.0f, 10.0f);
+
+        ImGui::Separator();
+        ImGui::Text("衰减");
+        ImGui::DragFloat("常数项", &spotLight->Attenuation.Constant, 0.01f, 0.0f, 10.0f);
+        ImGui::DragFloat("线性项", &spotLight->Attenuation.Linear, 0.001f, 0.0f, 1.0f);
+        ImGui::DragFloat("指数项", &spotLight->Attenuation.Exp, 0.0001f, 0.0f, 0.1f);
+
+        ImGui::Separator();
+        ImGui::Text("聚光锥角");
+        ImGui::DragFloat("内锥角", &spotLight->Cutoff, 0.5f, 0.0f, 90.0f);
+        ImGui::DragFloat("外锥角", &spotLight->OuterCutoff, 0.5f, 0.0f, 90.0f);
+        return;
+    }
+
+    // ---- 点光源（默认） ----
+    PointLight* pointLight = static_cast<PointLight*>(light);
+
     // 位置
-    if (ImGui::DragFloat3("位置", glm::value_ptr(light->Position), 0.1f)) {
+    if (ImGui::DragFloat3("位置", glm::value_ptr(pointLight->Position), 0.1f)) {
         // 同步更新光源模型位置
-        if (light->GetModel()) {
-            light->GetModel()->SetPosition(light->Position);
+        if (pointLight->GetModel()) {
+            pointLight->GetModel()->SetPosition(pointLight->Position);
         }
     }
 
     // 颜色
-    ImGui::ColorEdit3("颜色", glm::value_ptr(light->Color));
+    ImGui::ColorEdit3("颜色", glm::value_ptr(pointLight->Color));
 
     ImGui::Separator();
     ImGui::Text("环境光");
-    ImGui::ColorEdit3("环境光颜色", glm::value_ptr(light->AmbientColor));
-    ImGui::DragFloat("环境光强度", &light->AmbientIntensity, 0.01f, 0.0f, 10.0f);
+    ImGui::ColorEdit3("环境光颜色", glm::value_ptr(pointLight->AmbientColor));
+    ImGui::DragFloat("环境光强度", &pointLight->AmbientIntensity, 0.01f, 0.0f, 10.0f);
 
     ImGui::Separator();
     ImGui::Text("漫反射");
-    ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(light->DiffuseColor));
-    ImGui::DragFloat("漫反射强度", &light->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
+    ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(pointLight->DiffuseColor));
+    ImGui::DragFloat("漫反射强度", &pointLight->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
 
     ImGui::Separator();
     ImGui::Text("镜面反射");
-    ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(light->SpecularColor));
-    ImGui::DragFloat("镜面反射强度", &light->SpecularIntensity, 0.01f, 0.0f, 10.0f);
+    ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(pointLight->SpecularColor));
+    ImGui::DragFloat("镜面反射强度", &pointLight->SpecularIntensity, 0.01f, 0.0f, 10.0f);
 
     ImGui::Separator();
     ImGui::Text("衰减");
-    ImGui::DragFloat("常数项", &light->Attenuation.Constant, 0.01f, 0.0f, 10.0f);
-    ImGui::DragFloat("线性项", &light->Attenuation.Linear, 0.001f, 0.0f, 1.0f);
-    ImGui::DragFloat("指数项", &light->Attenuation.Exp, 0.0001f, 0.0f, 0.1f);
+    ImGui::DragFloat("常数项", &pointLight->Attenuation.Constant, 0.01f, 0.0f, 10.0f);
+    ImGui::DragFloat("线性项", &pointLight->Attenuation.Linear, 0.001f, 0.0f, 1.0f);
+    ImGui::DragFloat("指数项", &pointLight->Attenuation.Exp, 0.0001f, 0.0f, 0.1f);
 }
 
 // ---- 相机属性编辑器 ----

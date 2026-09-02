@@ -88,38 +88,120 @@ Config *Config::LoadFromYaml(const std::string &filename) {
         const YAML::Node &ligth_nodes = world_config["lights"];
         for (auto &i: ligth_nodes) {
             const YAML::Node &light_node = i;
-            PointLightConfig lightConfig;
-            lightConfig.Color = glm::vec3(
-                light_node["color"]["r"].as<float>(),
-                light_node["color"]["g"].as<float>(),
-                light_node["color"]["b"].as<float>()
-            );
-            lightConfig.Position = glm::vec3(
-                light_node["position"]["x"].as<float>(),
-                light_node["position"]["y"].as<float>(),
-                light_node["position"]["z"].as<float>()
-            );
-            lightConfig.AmbientColor = glm::vec3(
-                light_node["ambient"]["color"]["r"].as<float>(),
-                light_node["ambient"]["color"]["g"].as<float>(),
-                light_node["ambient"]["color"]["b"].as<float>()
-            );
-            lightConfig.DiffuseColor = glm::vec3(
-                light_node["diffuse"]["color"]["r"].as<float>(),
-                light_node["diffuse"]["color"]["g"].as<float>(),
-                light_node["diffuse"]["color"]["b"].as<float>()
-            );
-            lightConfig.SpecularColor = glm::vec3(
-                light_node["specular"]["color"]["r"].as<float>(),
-                light_node["specular"]["color"]["g"].as<float>(),
-                light_node["specular"]["color"]["b"].as<float>()
-            );
 
-            lightConfig.Attenuation.Constant = light_node["attenuation"]["constant"].as<float>();
-            lightConfig.Attenuation.Linear = light_node["attenuation"]["linear"].as<float>();
-            lightConfig.Attenuation.Exp = light_node["attenuation"]["exp"].as<float>();
+            // 根据 type 字段区分光源类型：0=方向光, 1=点光源, 2=聚光灯
+            int lightType = light_node["type"] ? light_node["type"].as<int>() : 1;
 
-            config->PointLights.push_back(lightConfig);
+            if (lightType == 0) {
+                // 方向光（平行光）
+                DirectionLightConfig lightConfig;
+                lightConfig.Name = light_node["name"] ? light_node["name"].as<std::string>() : "";
+                lightConfig.Id = light_node["id"] ? light_node["id"].as<std::string>() : "";
+                lightConfig.Enabled = light_node["enabled"] ? light_node["enabled"].as<bool>() : true;
+                lightConfig.Direction = glm::vec3(
+                    light_node["direction"]["x"].as<float>(),
+                    light_node["direction"]["y"].as<float>(),
+                    light_node["direction"]["z"].as<float>()
+                );
+                lightConfig.Color = glm::vec3(
+                    light_node["color"]["r"].as<float>(),
+                    light_node["color"]["g"].as<float>(),
+                    light_node["color"]["b"].as<float>()
+                );
+                lightConfig.AmbientColor = glm::vec3(
+                    light_node["ambient"]["color"]["r"].as<float>(),
+                    light_node["ambient"]["color"]["g"].as<float>(),
+                    light_node["ambient"]["color"]["b"].as<float>()
+                );
+                lightConfig.DiffuseColor = glm::vec3(
+                    light_node["diffuse"]["color"]["r"].as<float>(),
+                    light_node["diffuse"]["color"]["g"].as<float>(),
+                    light_node["diffuse"]["color"]["b"].as<float>()
+                );
+                lightConfig.SpecularColor = glm::vec3(
+                    light_node["specular"]["color"]["r"].as<float>(),
+                    light_node["specular"]["color"]["g"].as<float>(),
+                    light_node["specular"]["color"]["b"].as<float>()
+                );
+                config->DirectionLights.push_back(lightConfig);
+            } else if (lightType == 2) {
+                // 聚光灯
+                SpotLightConfig lightConfig;
+                lightConfig.Name = light_node["name"] ? light_node["name"].as<std::string>() : "";
+                lightConfig.Id = light_node["id"] ? light_node["id"].as<std::string>() : "";
+                lightConfig.Enabled = light_node["enabled"] ? light_node["enabled"].as<bool>() : true;
+                lightConfig.Position = glm::vec3(
+                    light_node["position"]["x"].as<float>(),
+                    light_node["position"]["y"].as<float>(),
+                    light_node["position"]["z"].as<float>()
+                );
+                lightConfig.Direction = glm::vec3(
+                    light_node["direction"]["x"].as<float>(),
+                    light_node["direction"]["y"].as<float>(),
+                    light_node["direction"]["z"].as<float>()
+                );
+                lightConfig.Color = glm::vec3(
+                    light_node["color"]["r"].as<float>(),
+                    light_node["color"]["g"].as<float>(),
+                    light_node["color"]["b"].as<float>()
+                );
+                lightConfig.AmbientColor = glm::vec3(
+                    light_node["ambient"]["color"]["r"].as<float>(),
+                    light_node["ambient"]["color"]["g"].as<float>(),
+                    light_node["ambient"]["color"]["b"].as<float>()
+                );
+                lightConfig.DiffuseColor = glm::vec3(
+                    light_node["diffuse"]["color"]["r"].as<float>(),
+                    light_node["diffuse"]["color"]["g"].as<float>(),
+                    light_node["diffuse"]["color"]["b"].as<float>()
+                );
+                lightConfig.SpecularColor = glm::vec3(
+                    light_node["specular"]["color"]["r"].as<float>(),
+                    light_node["specular"]["color"]["g"].as<float>(),
+                    light_node["specular"]["color"]["b"].as<float>()
+                );
+                lightConfig.Attenuation.Constant = light_node["attenuation"]["constant"].as<float>();
+                lightConfig.Attenuation.Linear = light_node["attenuation"]["linear"].as<float>();
+                lightConfig.Attenuation.Exp = light_node["attenuation"]["exp"].as<float>();
+                lightConfig.Cutoff = light_node["cutoff"].as<float>();
+                lightConfig.OuterCutoff = light_node["outer_cutoff"].as<float>();
+                config->SpotLights.push_back(lightConfig);
+            } else {
+                // 默认：点光源（兼容旧格式）
+                PointLightConfig lightConfig;
+                lightConfig.Name = light_node["name"] ? light_node["name"].as<std::string>() : "";
+                lightConfig.Id = light_node["id"] ? light_node["id"].as<std::string>() : "";
+                lightConfig.Enabled = light_node["enabled"] ? light_node["enabled"].as<bool>() : true;
+                lightConfig.Color = glm::vec3(
+                    light_node["color"]["r"].as<float>(),
+                    light_node["color"]["g"].as<float>(),
+                    light_node["color"]["b"].as<float>()
+                );
+                lightConfig.Position = glm::vec3(
+                    light_node["position"]["x"].as<float>(),
+                    light_node["position"]["y"].as<float>(),
+                    light_node["position"]["z"].as<float>()
+                );
+                lightConfig.AmbientColor = glm::vec3(
+                    light_node["ambient"]["color"]["r"].as<float>(),
+                    light_node["ambient"]["color"]["g"].as<float>(),
+                    light_node["ambient"]["color"]["b"].as<float>()
+                );
+                lightConfig.DiffuseColor = glm::vec3(
+                    light_node["diffuse"]["color"]["r"].as<float>(),
+                    light_node["diffuse"]["color"]["g"].as<float>(),
+                    light_node["diffuse"]["color"]["b"].as<float>()
+                );
+                lightConfig.SpecularColor = glm::vec3(
+                    light_node["specular"]["color"]["r"].as<float>(),
+                    light_node["specular"]["color"]["g"].as<float>(),
+                    light_node["specular"]["color"]["b"].as<float>()
+                );
+                lightConfig.Attenuation.Constant = light_node["attenuation"]["constant"].as<float>();
+                lightConfig.Attenuation.Linear = light_node["attenuation"]["linear"].as<float>();
+                lightConfig.Attenuation.Exp = light_node["attenuation"]["exp"].as<float>();
+                config->PointLights.push_back(lightConfig);
+            }
         }
 
         // particles
