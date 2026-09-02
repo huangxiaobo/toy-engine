@@ -116,9 +116,9 @@ world:
     - name: firework
       id: "9128d629-c651-4688-85ad-11bc3e6c2293"
       position:
-          x: 5
-          y: 0
-          z: -5
+          x: 15
+          y: 20
+          z: 15
       emit_rate: 150.0
       max_particles: 5000
       min_life: 7.5
@@ -153,9 +153,9 @@ world:
       max_size_end: 0.5
       gravity:
         x: 0.0
-        y: -3.0
+        y: -10.0
         z: 0.0
-      drag: 0.97
+      drag: 0.99
   sky_dome:
     radius: 100.0
     sectors: 32
@@ -169,10 +169,8 @@ world:
       g: 0.2
       b: 0.5
   terrain:
-    chunk-size: 100.0
-    base-resolution: 64
-    render-distance: 25
-    unload-distance: 30
+    plane-size: 200.0
+    resolution: 128
     height-scale: 0.0
     noise-seed: 12345
   models:

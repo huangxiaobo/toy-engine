@@ -71,6 +71,9 @@ public:
 
     // 获取相机
     Camera *GetCamera() const { return m_camera; }
+
+    // 获取屏幕空间坐标轴 gizmo（供 mainwindow 在 ImGui 绘制阶段叠加到视口角落）
+    Axis *GetAxis() const { return m_axis; }
     
     // 获取所有摄像机配置
     const std::vector<Camera*>& GetCameras() const { return m_cameras; }

@@ -49,6 +49,7 @@ private:
     void CreateResourceListPanel();
     void CreatePropertiesPanel();
     void ShowViewportStatusBar();
+    void DrawViewportAxisGizmo();            // 在视口左下角叠加屏幕空间坐标轴 gizmo（三色六轴 + X/Y/Z 标签）
 
     // ---- 各资源类型的属性编辑器 ----
     void ShowModelProperties();

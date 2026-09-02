@@ -156,6 +156,11 @@ void TechniqueLight::SetMaterial(const Material *m) {
     if (m == nullptr) {
         return;
     }
+    // 保存材质指针，供属性面板通过 GetMaterial() 读取并显示
+    m_material = m;
+    // 必须先激活本 technique 的 shader program，否则 glUniform* 会写入
+    // 当前绑定的其他 program（如属性面板编辑时，活跃 program 是上一帧最后绘制的模型）
+    this->m_shader->Use();
     MaterialUniform.SetAmbientColor(this->m_shader, m->AmbientColor);
     MaterialUniform.SetDiffuseColor(this->m_shader, m->DiffuseColor);
     MaterialUniform.SetSpecularColor(this->m_shader, m->SpecularColor);

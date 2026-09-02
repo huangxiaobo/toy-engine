@@ -140,24 +140,9 @@ void Renderer::init(int w, int h) {
     m_eye_pos = glm::vec3(0, 0, 0);
     calculateProjectMatrix(w, h);
 
-    // 创建坐标系模型
-    auto axis_model = new Model("axis");
-    auto axis_mesh = Mesh::CreateAxisMesh();
-    axis_model->SetMeshes(axis_mesh);
-
-    auto *axis_effect = new Technique("axis",
-                                      "./resource/shader/axis.vert",
-                                      "./resource/shader/axis.frag");
-
-    for (auto m: axis_mesh) {
-        m->SetEffect(axis_effect);
-    }
-    // 坐标轴着色器交由渲染器统一管理释放
-    m_techniques.push_back(axis_effect);
-
-    axis_model->SetTranslate(glm::vec3(0, 0.01, 0));
+    // 创建屏幕空间坐标轴 gizmo（视口角落叠加的 ImGui 绘制，非 3D 网格）
+    // 具体绘制见 mainwindow.cpp RenderFrame 中的 ApplyViewportAxisGizmo 调用
     m_axis = new Axis();
-    m_axis->SetModel(axis_model);
 
     // Create Plane
     vector<Mesh *> plane_mesh = Mesh::CreatePlaneMesh();
@@ -176,16 +161,14 @@ void Renderer::init(int w, int h) {
 
     m_models.push_back(plane);
 
-    // 创建地形管理器（LOD无穷地形）
+    // 创建地形管理器（固定尺寸网格平面，无 LOD）
     m_terrain_manager = new TerrainManager();
     TerrainConfig terrainConfig;
-    terrainConfig.chunkSize = gConfig->Terrain.ChunkSize;           // 每个chunk 100×100单位
-    terrainConfig.baseResolution = gConfig->Terrain.BaseResolution; // 基础网格分辨率
-    terrainConfig.renderDistance = gConfig->Terrain.RenderDistance; // 渲染距离5个chunk
-    terrainConfig.unloadDistance = gConfig->Terrain.UnloadDistance; // 卸载距离7个chunk
-    terrainConfig.heightScale = gConfig->Terrain.HeightScale;       // 最大高度20单位
-    terrainConfig.noiseSeed = gConfig->Terrain.NoiseSeed;           // 噪声种子
-    m_terrain_manager->Init(m_eye_pos, terrainConfig);
+    terrainConfig.planeSize = gConfig->Terrain.PlaneSize;    // 平面尺寸 200×200 单位
+    terrainConfig.resolution = gConfig->Terrain.Resolution;  // 网格分辨率
+    terrainConfig.heightScale = gConfig->Terrain.HeightScale; // 最大高度（0 = 平坦）
+    terrainConfig.noiseSeed = gConfig->Terrain.NoiseSeed;     // 噪声种子
+    m_terrain_manager->Init(terrainConfig);
 
     // 创建地形着色器和材质
     auto *terrainEffect = new TechniqueLight("terrain",
@@ -359,9 +342,8 @@ void Renderer::draw(long long elapsed) {
     m_sky_dome->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos);
     glDepthMask(GL_TRUE);
 
-    // 绘制坐标轴
-    m_axis->GetModel()->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
-
+    // 坐标轴 gizmo 不在 3D 场景中绘制：由 mainwindow 在 ImGui 绘制阶段
+    // 以屏幕空间叠加方式渲染于视口角落（见 mainwindow.cpp 的 RenderFrame）
     // 绘制地形
     m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, m_lights);
 
@@ -409,8 +391,7 @@ void Renderer::resize(int w, int h) {
 void Renderer::update(long long elapsed) {
     m_eye_pos = m_camera->GetEyePosition();
     
-    // 更新地形管理器（动态加载/卸载chunk）
-    m_terrain_manager->Update(m_eye_pos, elapsed);
+    // 地形为静态网格平面（无 LOD/无动态 chunk），无需每帧更新
     
     // 更新配置的粒子系统
     for (auto ps: m_particle_systems) {

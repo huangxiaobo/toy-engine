@@ -46,6 +46,8 @@ public:
 
     virtual ~Technique();
 
+    std::string Id; // Technique 唯一标识符（UUID，构造时自动生成）
+
     virtual TechniqueType GetType() const { return m_type; };
 
     Shader *GetShader() const;

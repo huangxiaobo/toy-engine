@@ -60,7 +60,13 @@ public:
     void SetPointLight(int index, PointLight *light);
     virtual void SetMaterial(const Material *material);
 
+    /* 获取当前材质指针（用于属性面板显示/编辑） */
+    const Material *GetMaterial() const { return m_material; }
+
 private:
+    // 当前材质指针（由 SetMaterial 设置，仅引用不拥有生命周期）
+    const Material *m_material = nullptr;
+
     // 材质
     MaterialUniform MaterialUniform;
 

@@ -5,11 +5,14 @@
 #include "renderer.h"
 #include "model/model.h"
 #include "light/light.h"
+#include "technique/technique_light.h"
+#include "material/material.h"
 #include "camera/camera.h"
 #include "terrain/terrain_manager.h"
 #include "sky/sky_dome.h"
 #include "particle/particle_system.h"
 #include "particle/particle_emitter.h"
+#include "axis/axis.h"
 
 // OpenGL函数由renderer.cpp提供
 
@@ -266,6 +269,11 @@ void ToyEngineMainWindow::RenderFrame() {
 
     // 绘制面板（资源列表/属性面板停靠于 DockSpace 左右节点，状态条浮动于视口底部）
     CreateUI();
+
+    // 在视口左下角叠加屏幕空间坐标轴 gizmo：
+    // 位于 CreateUI() 之后、ImGui::Render() 之前，确保背景绘制列表已建立；
+    // 用相机视图矩阵驱动三轴朝向（随相机旋转变化）
+    DrawViewportAxisGizmo();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -543,7 +551,7 @@ void ToyEngineMainWindow::CreatePropertiesPanel() {
 }
 
 // ---- 模型属性编辑器 ----
-// 可编辑：名称（只读）、位置、缩放、旋转
+// 可编辑：名称（只读）、位置、缩放、旋转；以及材质属性（环境光、漫反射、镜面反射、光泽度）
 void ToyEngineMainWindow::ShowModelProperties() {
     Model* model = static_cast<Model*>(m_selectedObject);
 
@@ -565,6 +573,53 @@ void ToyEngineMainWindow::ShowModelProperties() {
     float rotation = model->GetRotation();
     if (ImGui::DragFloat("旋转 (度)", &rotation, 1.0f)) {
         model->SetRotate(rotation);
+    }
+
+    // ---- 材质属性 ----
+    // 从模型的第一个网格获取材质；若使用 TechniqueLight 则显示并可编辑材质参数
+    const auto meshes = model->GetMeshes();
+    if (!meshes.empty()) {
+        Technique* effect = meshes[0]->GetEffect();
+        if (effect != nullptr && effect->GetType() == TechniqueTypeLight) {
+            auto* lightEffect = dynamic_cast<TechniqueLight*>(effect);
+            const Material* material = lightEffect->GetMaterial();
+            if (material != nullptr) {
+                ImGui::Separator();
+                ImGui::Text("材质");
+                if (!material->Name.empty()) {
+                    ImGui::Text("材质名称: %s", material->Name.c_str());
+                }
+
+                // 注意：Material 成员为 public，此处直接修改以实现实时预览；
+                // TechnqiueLight::SetMaterial() 仅在初始化时调用，编辑后需
+                // 重新调用以同步到 GPU uniform。
+                auto* mat = const_cast<Material*>(material);
+
+                glm::vec3 ambient = mat->AmbientColor;
+                if (ImGui::ColorEdit3("环境光颜色", glm::value_ptr(ambient))) {
+                    mat->AmbientColor = ambient;
+                    lightEffect->SetMaterial(mat);
+                }
+
+                glm::vec3 diffuse = mat->DiffuseColor;
+                if (ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(diffuse))) {
+                    mat->DiffuseColor = diffuse;
+                    lightEffect->SetMaterial(mat);
+                }
+
+                glm::vec3 specular = mat->SpecularColor;
+                if (ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(specular))) {
+                    mat->SpecularColor = specular;
+                    lightEffect->SetMaterial(mat);
+                }
+
+                float shininess = mat->Shininess;
+                if (ImGui::DragFloat("光泽度", &shininess, 0.5f, 0.0f, 256.0f)) {
+                    mat->Shininess = shininess;
+                    lightEffect->SetMaterial(mat);
+                }
+            }
+        }
     }
 }
 
@@ -643,7 +698,7 @@ void ToyEngineMainWindow::ShowCameraProperties() {
 }
 
 // ---- 地形属性编辑器 ----
-// 显示只读统计信息和配置参数（chunk大小、分辨率、渲染距离等）
+// 显示只读统计信息和配置参数（平面尺寸、网格分辨率、高度缩放等）
 void ToyEngineMainWindow::ShowTerrainProperties() {
     TerrainManager* terrain = static_cast<TerrainManager*>(m_selectedObject);
 
@@ -651,27 +706,14 @@ void ToyEngineMainWindow::ShowTerrainProperties() {
     ImGui::Separator();
 
     // 只读统计信息
-    ImGui::Text("活跃 Chunk 数: %d", terrain->GetActiveChunkCount());
     ImGui::Text("总三角形数: %d", terrain->GetTotalTriangleCount());
     ImGui::Separator();
 
     // 配置参数（只读展示，运行时修改需要重新生成地形）
     const TerrainConfig& cfg = terrain->GetConfig();
-    float chunkSize = cfg.chunkSize;
-    ImGui::DragFloat("Chunk 大小", &chunkSize, 1.0f, 10.0f, 500.0f);
-
-    int baseRes = cfg.baseResolution;
-    ImGui::DragInt("基础分辨率", &baseRes, 1, 8, 256);
-
-    int renderDist = cfg.renderDistance;
-    ImGui::DragInt("渲染距离", &renderDist, 1, 1, 50);
-
-    int unloadDist = cfg.unloadDistance;
-    ImGui::DragInt("卸载距离", &unloadDist, 1, 1, 100);
-
-    float heightScale = cfg.heightScale;
-    ImGui::DragFloat("高度缩放", &heightScale, 0.1f, 0.0f, 100.0f);
-
+    ImGui::Text("平面尺寸: %.0f × %.0f", cfg.planeSize, cfg.planeSize);
+    ImGui::Text("网格分辨率: %d × %d", cfg.resolution, cfg.resolution);
+    ImGui::Text("高度缩放: %.1f", cfg.heightScale);
     ImGui::Text("噪声种子: %u", cfg.noiseSeed);
 }
 
@@ -790,6 +832,35 @@ void ToyEngineMainWindow::ShowViewportStatusBar() {
     }
 
     ImGui::End();
+}
+
+// ---- 视口角落的屏幕空间坐标轴 gizmo ----
+// 参照 erhe（ImViewGuizmo）在视口角落叠加世界坐标系指示器：
+// 用相机视图矩阵的旋转部分将三色六轴（X 红 / Y 绿 / Z 蓝）投影到屏幕，
+// 各轴按视图深度排序并淡化远处轴，末端带圆点把手与 X/Y/Z 标签。
+// 位置固定在视口右上角，避开属性面板与边缘。
+void ToyEngineMainWindow::DrawViewportAxisGizmo() {
+    // 首帧 DockSpace 布局未完成时视口尺寸无效，跳过绘制
+    if (m_viewportWidth <= 0.0f || m_viewportHeight <= 0.0f) {
+        return;
+    }
+
+    Axis* axis = m_renderer->GetAxis();
+    Camera* camera = m_renderer->GetCamera();
+    if (axis == nullptr || camera == nullptr) {
+        return;
+    }
+
+    // gizmo 直径 = 基准直径(256) × 缩放(0.6) ≈ 154px，半径约 77px
+    // 中心放置在视口右上角，向左/向下各留出足够边距避开面板与边缘
+    const float gizmoRadius = axis->GetScale() * 256.0f * 0.5f;
+    const float margin = gizmoRadius * 0.5f;
+    const ImVec2 center{
+        m_viewportX + m_viewportWidth - gizmoRadius - margin,
+        m_viewportY + gizmoRadius + margin
+    };
+
+    axis->Draw(camera->GetViewMatrix(), center);
 }
 
 // ---- 选择管理 ----

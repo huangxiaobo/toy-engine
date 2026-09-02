@@ -1,5 +1,6 @@
 #include "technique.h"
 #include "../shader/shader.h"
+#include "../utils/utils.h"
 
 #include <iostream>
 
@@ -15,6 +16,9 @@
  */
 Technique::Technique(string name, string vertex_shader, string fragment_shader) : m_type(
     TechniqueType::TechniqueTypeBase) {
+    // 构造时自动生成唯一 UUID
+    Id = Utils::GenerateUUID();
+
     this->m_shader = new Shader(
         vertex_shader.c_str(),
         fragment_shader.c_str());
