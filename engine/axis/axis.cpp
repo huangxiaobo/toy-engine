@@ -40,7 +40,8 @@ namespace {
         IM_COL32( 51, 128, 255, 255)   // Z
     };
     // 轴标签与配色
-    constexpr std::array<const char*, 3> axisLabels = {"X", "Y", "Z"};
+    // 6 个条目按 axis.id(0-5) 直接索引：+X -X +Y -Y +Z -Z
+    constexpr std::array<const char*, 6> axisLabels = {"+X", "-X", "+Y", "-Y", "+Z", "-Z"};
     const ImU32 labelColorPos = IM_COL32(255, 255, 255, 255); // 正半轴白字
     const ImU32 labelColorNeg = IM_COL32(  0,   0,   0, 255); // 负半轴黑字
     constexpr float labelSize = 1.0f;
@@ -140,7 +141,7 @@ void Axis::Draw(const glm::mat4& viewMatrix, const ImVec2& center)
             continue;
         }
         const ImVec2 textPos = worldToScreen(axis.direction * lineLength);
-        const char* label = axisLabels[axis.axisIndex];
+        const char* label = axisLabels[axis.id];
         const bool isPositive = (axis.id & 1) == 0; // 偶数 id 为正半轴
         const ImVec2 textSize = font->CalcTextSizeA(scaledFontSize, FLT_MAX, 0.0f, label);
         drawList->AddText(

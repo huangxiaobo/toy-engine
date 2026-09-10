@@ -40,6 +40,7 @@ protected:
     unsigned int m_uniform_model;
     unsigned int m_uniform_wvp; // 模型视图投影矩阵
     unsigned int m_uniform_viewpos; // 摄像机位置
+    unsigned int m_uniform_light_space = 0; // 光源空间矩阵(lightSpace) uniform 位置
 
 public:
     Technique(string name, string vertexShader, string fragmentShader);
@@ -76,9 +77,17 @@ public:
 
     void SetUniform(const char *name, int value);
 
+    void SetUniform(const char *name, const glm::mat4 &value);
+
     void SetUniform();
 
     void SetTextureUnit(unsigned int textureUnit);
+
+    // 设置光源空间矩阵（lightSpace），供顶点着色器把世界坐标转换到光源视角做阴影判定
+    void SetLightSpaceMatrix(const glm::mat4 &lightSpace);
+
+    // 通知着色器：阴影深度贴图采样器绑定到哪个纹理单元
+    void SetShadowMap(int unit);
 
 
     virtual void SetLights(const vector<Light *> &lights);

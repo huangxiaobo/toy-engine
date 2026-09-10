@@ -50,6 +50,9 @@ private:
     void CreatePropertiesPanel();
     void ShowViewportStatusBar();
     void DrawViewportAxisGizmo();            // 在视口左下角叠加屏幕空间坐标轴 gizmo（三色六轴 + X/Y/Z 标签）
+    void ShowShadowDepthMapPanel();          // 绘制阴影深度贴图可视化调试面板（把深度图作为纹理显示）
+    void ShowShadowPropertiesPanel();        // 绘制阴影属性面板（阴影开关、深度贴图预览等全局阴影设置）
+    void RebuildShadowDepthPreview(unsigned int srcTex); // 读回深度贴图并重建灰度预览纹理
 
     // ---- 各资源类型的属性编辑器 ----
     void ShowModelProperties();
@@ -99,6 +102,19 @@ private:
     bool m_showResourceList = true;
     bool m_showProperties = true;
     bool m_showViewportStatusBar = true;
+    // 阴影深度贴图可视化调试面板开关（把深度图作为纹理显示，辅助诊断阴影问题）
+    bool m_showShadowDepthMap = false;
+    // 阴影属性面板开关（阴影开关、光源摄像机参数、深度贴图预览等全局阴影设置）
+    // 默认显示：阴影参数属于常用调试信息，启动即展示，无需先通过菜单打开
+    bool m_showShadowProperties = true;
+
+    // 阴影深度贴图可视化面板的显示状态：
+    // 深度贴图是 GL_DEPTH_COMPONENT 只写格式，ImGui 颜色采样器难以可靠显示，
+    // 故每次面板打开时把深度读回 CPU、归一化为灰度并上传到一张 RGBA8 纹理再展示。
+    unsigned int m_shadowDepthPreviewTex = 0;   // 承载归一化灰度预览的 RGBA8 纹理（缓存复用）
+    int m_shadowDepthPreviewW = 0;              // 预览纹理宽度（读回分辨率）
+    int m_shadowDepthPreviewH = 0;              // 预览纹理高度（读回分辨率）
+    unsigned int m_lastDisplayedDepthTex = 0;   // 上次显示的源深度贴图 ID，用于缓存失效判断
 
     // 当前选中的资源（union 风格：指针 + 类型字符串）
     // 支持类型："Model", "Light", "Camera", "Terrain", "SkyDome", "Particle"

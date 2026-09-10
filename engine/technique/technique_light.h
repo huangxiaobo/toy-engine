@@ -1,4 +1,5 @@
 #ifndef __TECHNIQUE_LIGHT_H__
+#define __TECHNIQUE_LIGHT_H__
 #include <glad/gl.h> //  必须在所有库的顶部
 
 #include "technique.h"

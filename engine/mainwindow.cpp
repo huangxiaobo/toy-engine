@@ -24,6 +24,9 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 
+#include <cstdio>
+#include <vector>
+
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -314,8 +317,12 @@ void ToyEngineMainWindow::CreateDockSpace() {
             mainNode, ImGuiDir_Right, 0.30f, nullptr, &mainNode);
 
         // 将面板窗口按标题绑定到对应节点（窗口标题必须与停靠目标一致）
+        // 阴影属性面板停靠于右节点下方（与属性面板同栏，垂直排列）
+        ImGuiID rightBottomNode = ImGui::DockBuilderSplitNode(
+            rightNode, ImGuiDir_Down, 0.35f, nullptr, &rightNode);
         ImGui::DockBuilderDockWindow("资源列表", leftNode);
         ImGui::DockBuilderDockWindow("属性", rightNode);
+        ImGui::DockBuilderDockWindow("阴影属性", rightBottomNode);
 
         ImGui::DockBuilderFinish(dockspaceId);
     }
@@ -378,6 +385,8 @@ void ToyEngineMainWindow::CreateMenuBar() {
         if (ImGui::BeginMenu("面板")) {
             ImGui::MenuItem("资源", nullptr, &m_showResourceList);
             ImGui::MenuItem("属性", nullptr, &m_showProperties);
+            ImGui::MenuItem("阴影属性", nullptr, &m_showShadowProperties);
+            ImGui::MenuItem("阴影深度贴图", nullptr, &m_showShadowDepthMap);
             ImGui::EndMenu();
         }
 
@@ -403,9 +412,19 @@ void ToyEngineMainWindow::CreateUI() {
         CreatePropertiesPanel();
     }
 
+    // 阴影属性面板：停靠于右节点（属性面板下方）
+    if (m_showShadowProperties) {
+        ShowShadowPropertiesPanel();
+    }
+
     // 视口底部浮动状态条（FPS/投影方式）
     if (m_showViewportStatusBar) {
         ShowViewportStatusBar();
+    }
+
+    // 阴影深度贴图可视化调试面板（把深度图作为纹理显示）
+    if (m_showShadowDepthMap) {
+        ShowShadowDepthMapPanel();
     }
 }
 
@@ -912,6 +931,191 @@ void ToyEngineMainWindow::ShowViewportStatusBar() {
     }
 
     ImGui::End();
+}
+
+/*
+ * 阴影属性面板
+ *
+ * 全局阴影设置：开关、深度贴图预览入口。
+ * 停靠于右节点（属性面板下方），通过菜单「面板 → 阴影属性」控制显示。
+ */
+void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
+    ImGui::Begin("阴影属性", &m_showShadowProperties, ImGuiWindowFlags_NoCollapse);
+
+    // 阴影开关：禁用时跳过深度 Pass，也不绑定阴影贴图
+    bool shadowsEnabled = m_renderer->IsShadowsEnabled();
+    if (ImGui::Checkbox("启用阴影", &shadowsEnabled)) {
+        m_renderer->SetShadowsEnabled(shadowsEnabled);
+    }
+
+    ImGui::Separator();
+    ImGui::Text("深度贴图");
+    const unsigned int srcTex = m_renderer->GetShadowDepthTexture();
+    const bool ready = m_renderer->IsShadowMapReady();
+    if (srcTex == 0) {
+        ImGui::TextWrapped("FBO 未创建（阴影未启用）。");
+    } else if (!ready) {
+        ImGui::TextWrapped("本帧未生成深度贴图（深度 Pass 未执行）。");
+    } else {
+        ImGui::TextWrapped("深度贴图已就绪。");
+        // 点击打开深度贴图可视化面板
+        if (ImGui::Button("查看深度贴图")) {
+            m_showShadowDepthMap = true;
+        }
+    }
+
+    ImGui::Separator();
+    ImGui::Text("光源摄像机");
+    // 方向光阴影在深度 Pass 中使用一个"光源视角的摄像机"，参数由 Renderer 每帧计算
+    const ShadowCameraParams &shadowCam = m_renderer->GetShadowCameraParams();
+    if (!shadowCam.available) {
+        ImGui::TextWrapped("无已启用的方向光，本帧未生成光源摄像机。");
+    } else {
+        if (ImGui::CollapsingHeader("位置 / 朝向")) {
+            ImGui::Text("位置  (%.2f, %.2f, %.2f)", shadowCam.position.x, shadowCam.position.y, shadowCam.position.z);
+            ImGui::Text("方向  (%.2f, %.2f, %.2f)", shadowCam.direction.x, shadowCam.direction.y, shadowCam.direction.z);
+            ImGui::Text("注视  (%.2f, %.2f, %.2f)", shadowCam.lookAt.x, shadowCam.lookAt.y, shadowCam.lookAt.z);
+            ImGui::Text("Up    (%.2f, %.2f, %.2f)", shadowCam.up.x, shadowCam.up.y, shadowCam.up.z);
+        }
+        if (ImGui::CollapsingHeader("正交投影")) {
+            ImGui::Text("Left / Right : %.1f / %.1f", shadowCam.orthoLeft, shadowCam.orthoRight);
+            ImGui::Text("Bottom / Top : %.1f / %.1f", shadowCam.orthoBottom, shadowCam.orthoTop);
+            ImGui::Text("Near / Far   : %.1f / %.1f", shadowCam.nearPlane, shadowCam.farPlane);
+        }
+        if (ImGui::CollapsingHeader("矩阵")) {
+            // 按行打印 4×4 矩阵（glm 列主序，m[col][row] 输出第 row 行）
+            auto showMatrix = [](const char *label, const glm::mat4 &m) {
+                if (ImGui::TreeNode(label)) {
+                    for (int r = 0; r < 4; r++) {
+                        ImGui::Text("%7.3f  %7.3f  %7.3f  %7.3f",
+                                    m[0][r], m[1][r], m[2][r], m[3][r]);
+                    }
+                    ImGui::TreePop();
+                }
+            };
+            showMatrix("lightView", shadowCam.lightView);
+            showMatrix("lightProjection", shadowCam.lightProjection);
+        }
+    }
+
+    ImGui::End();
+}
+
+/*
+ * 阴影深度贴图可视化调试面板
+ *
+ * 把阴影深度贴图（GL_DEPTH_COMPONENT 只写格式）作为纹理显示出来，
+ * 用于诊断阴影问题（如"z>0 全黑"）。
+ *
+ * 为什么不能直接 ImGui::Image 原始深度纹理：
+ *   深度纹理是 GL_DEPTH_COMPONENT 格式、不含颜色附件，ImGui 的 OpenGL3
+ *   后端用颜色采样器（sampler2D）采样它时，不同驱动对 R 通道的返回值
+ *   行为不一致，可能整片黑/灰难以辨认。因此这里把深度读回 CPU、
+ *   归一化为灰度（近→黑，远→白）并上传到一张 RGBA8 纹理再展示，显示确定可靠。
+ *
+ * 性能：面板/渲染期间仅在首次显示和源深度贴图变化时读回一次，并复用
+ * 缓存纹理避免每帧重建。
+ */
+void ToyEngineMainWindow::ShowShadowDepthMapPanel() {
+    const unsigned int srcTex = m_renderer->GetShadowDepthTexture();
+    const bool ready = m_renderer->IsShadowMapReady();
+
+    ImGui::Begin("阴影深度贴图", &m_showShadowDepthMap, ImGuiWindowFlags_NoCollapse);
+
+    if (srcTex == 0) {
+        ImGui::TextWrapped("阴影 FBO 未创建（阴影可能未启用）。");
+    } else if (!ready) {
+        ImGui::TextWrapped("本帧未生成阴影深度贴图（深度 Pass 未执行）。");
+    } else {
+        // 显示宽度：预览纹理与源深度贴图同尺寸，这里仅决定 ImGui 显示多大
+        const int displayW = static_cast<int>(ImGui::GetContentRegionAvail().x);
+        // 仅当源纹理变化时才重新读回/重建缓存，避免每帧 CPU 拷贝
+        if (m_shadowDepthPreviewTex == 0 || srcTex != m_lastDisplayedDepthTex) {
+            RebuildShadowDepthPreview(srcTex);
+        }
+
+        if (m_shadowDepthPreviewTex != 0) {
+            // 用预览纹理的宽高比自适应缩放显示，保持内容不被拉伸
+            const float aspect = static_cast<float>(m_shadowDepthPreviewW) /
+                                static_cast<float>(m_shadowDepthPreviewH);
+            const float maxW = (float)displayW;
+            ImVec2 displaySize(maxW, maxW / aspect);
+            ImGui::Image((ImTextureID)(intptr_t)m_shadowDepthPreviewTex, displaySize);
+            ImGui::TextWrapped("近处=黑，远处=白。空白区域 = 无深度（未写入）或边界外被照亮。");
+        }
+    }
+
+    ImGui::End();
+}
+
+/*
+ * 重建阴影深度预览纹理
+ *
+ * 从源深度纹理读回深度数据，归一化为灰度（近→黑，远→白）后上传到
+ * 一张缓存复用（m_shadowDepthPreviewTex）的 RGBA8 纹理。深度纹理内部
+ * 格式为 GL_DEPTH_COMPONENT/GL_FLOAT，故用 GL_FLOAT 读回原始 [0,1] 深度。
+ */
+void ToyEngineMainWindow::RebuildShadowDepthPreview(unsigned int srcTex) {
+    // 查询源深度纹理的实际尺寸
+    int texW = 0, texH = 0;
+    glBindTexture(GL_TEXTURE_2D, srcTex);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &texW);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH);
+    if (texW <= 0 || texH <= 0) {
+        glBindTexture(GL_TEXTURE_2D, 0);
+        return;
+    }
+
+    // 读回原始 float 深度（匹配内部格式 GL_R32F / GL_RED 红色通道）
+    std::vector<float> depth(static_cast<size_t>(texW) * texH);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, depth.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // 归一化：遍历找到实际最小/最大深度（排除边界外 1.0 白底与未写入区），
+    // 将 [min,max] 线性映射到 [0,1] 灰度，避免整体偏黑看不清分布
+    float minD = 1.0f, maxD = 0.0f;
+    for (float d : depth) {
+        if (d < 1.0f) {          // 排除边界外的 1.0（被照亮区），集中归一化有效深度
+            if (d < minD) minD = d;
+            if (d > maxD) maxD = d;
+        }
+    }
+    const float range = (maxD > minD) ? (maxD - minD) : 1.0f;
+
+    // 生成灰度像素（R=G=B，A=255）
+    std::vector<unsigned char> pixels(static_cast<size_t>(texW) * texH * 4);
+    for (size_t i = 0; i < depth.size(); ++i) {
+        float g = (depth[i] >= 1.0f) ? 1.0f : (depth[i] - minD) / range;
+        unsigned char c = static_cast<unsigned char>(g * 255.0f);
+        pixels[i * 4 + 0] = c;
+        pixels[i * 4 + 1] = c;
+        pixels[i * 4 + 2] = c;
+        pixels[i * 4 + 3] = 255;
+    }
+
+    // 复用缓存纹理：预览纹理尺寸应等于源深度贴图尺寸（texW×texH）。
+    // 之前曾误用「面板可用宽度」作为预览纹理尺寸，导致向更小的纹理上传
+    // 完整的 2048×2048 子图触发 GL_INVALID_VALUE、上传失败，预览恒为全黑。
+    // 现在预览纹理与源同尺寸，显示时再由 ImGui::Image 按面板宽度缩放。
+    if (m_shadowDepthPreviewTex == 0 ||
+        m_shadowDepthPreviewW != texW || m_shadowDepthPreviewH != texH) {
+        if (m_shadowDepthPreviewTex != 0) {
+            glDeleteTextures(1, &m_shadowDepthPreviewTex);
+        }
+        glGenTextures(1, &m_shadowDepthPreviewTex);
+        glBindTexture(GL_TEXTURE_2D, m_shadowDepthPreviewTex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texW, texH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    }
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texW, texH, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    m_shadowDepthPreviewW = texW;
+    m_shadowDepthPreviewH = texH;
+    m_lastDisplayedDepthTex = srcTex;
 }
 
 // ---- 视口角落的屏幕空间坐标轴 gizmo ----

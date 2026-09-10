@@ -34,6 +34,8 @@ Technique::Technique(string name, string vertex_shader, string fragment_shader) 
     m_uniform_model = this->m_shader->GetUniformLocation("model"); // 获取顶点着色器中顶点属性 model 的位置
     m_uniform_wvp = this->m_shader->GetUniformLocation("gWVP"); // 获取顶点着色器中顶点属性 gWVP 的位置
     m_uniform_viewpos = this->m_shader->GetUniformLocation("gViewPos"); // 获取顶点着色器中顶点属性 gViewPos 的位置
+    // 预取光源空间矩阵 uniform 位置（阴影映射用）；无此 uniform 的着色器返回 -1，调用方按 0 处理沿用现状
+    m_uniform_light_space = this->m_shader->GetUniformLocation("lightSpace");
 }
 
 Technique::~Technique() {
@@ -95,12 +97,37 @@ void Technique::SetUniform(const char *name, int value) {
     this->m_shader->SetUniformValue(name, value);
 }
 
+void Technique::SetUniform(const char *name, const glm::mat4 &value) {
+    this->m_shader->SetUniformValue(name, value);
+}
+
 // 空实现预留
 void Technique::SetUniform() {
 }
 
 // 空实现预留：设置纹理单元绑定
 void Technique::SetTextureUnit(unsigned int textureUnit) {
+}
+
+/*
+ * 设置光源空间矩阵（lightSpace = 正交投影 * 光源视图）
+ *
+ * lightSpace 将世界坐标转换到光源视角的裁剪空间，
+ * 顶点着色器据此算出 FragPosLightSpace，片元着色器再把它变换到 [0,1]
+ * 采样阴影贴图，判断当前片元是否被其他物体遮挡（是否处于阴影中）。
+ */
+void Technique::SetLightSpaceMatrix(const glm::mat4 &lightSpace) {
+    this->m_shader->SetUniformValue(m_uniform_light_space, lightSpace);
+}
+
+/*
+ * 设置阴影贴图采样器绑定
+ *
+ * 通知着色器 "shadowMap" 采样器绑定到指定的纹理单元（约定为单元 2）。
+ * 没有该采样器的着色器（如纯色光源模型）会因 location 为 -1 而被忽略。
+ */
+void Technique::SetShadowMap(int unit) {
+    this->m_shader->SetUniformValue("shadowMap", unit);
 }
 
 // 基类不支持灯光：空实现，由 TechniqueLight 覆写

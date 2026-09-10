@@ -43,6 +43,10 @@ public:
 
     void SetTexture(unsigned int textureID);
 
+    // 转发每帧阴影状态（启用标志 + 深度贴图ID + 光源空间矩阵）到地形技术，
+    // 供 TechniqueTerrain 在绘制时自管阴影采样（见 TechniqueTerrain::ApplyShadowState）
+    void SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4& lightSpace);
+
     // 获取网格三角形数量（用于调试显示）
     int GetTriangleCount() const { return m_resolution * m_resolution * 2; }
 

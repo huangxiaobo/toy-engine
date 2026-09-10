@@ -68,16 +68,64 @@ uniform Material gMaterial;
 
 uniform sampler2D groundTexture;
 
+// 阴影贴图（深度贴图）：绑定到纹理单元2，存储从光源视角看到的最近深度
+uniform sampler2D shadowMap;
+// 是否启用阴影采样（Mesh::Draw 每帧同步：阴影可用为1，否则为0）
+uniform int gUseShadow;
+
 in VsOut {
     vec3 Color0;
     vec2 TexCoords;
     vec3 WorldPos0;
     vec3 Normal0;
+    vec4 FragPosLightSpace; // 顶点在光源裁剪空间的位置（阴影判定用）
 } v2f;
 
 out vec4 color;
 
-vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal) {
+/*
+ * 阴影判定
+ *
+ * 把片段在光源空间的裁剪坐标变换到 [0,1] 纹理坐标，用片段深度与阴影贴图中
+ * 存储的最近深度比较：若片段离光源更远(被遮挡)，则处于阴影中返回 1。
+ * bias 用来抵消自阴影痤疮（片元深度贴图深度数值相同造成的自身遮挡伪影）。
+ */
+float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal) {
+    // 透视除法转为 NDC，再映射到 [0,1] 的纹理坐标范围
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    // 最近深度 = 阴影贴图中该位置记录的最靠近光源的深度
+    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    float currentDepth = projCoords.z;
+
+    // 阴影深度比较的反自阴影偏置。
+    // 根据当前投影参数重新计算：
+    //   - 正交范围：±210 单位，深度范围 [1, 100]（99 单位）
+    //   - sphere 中心深度 ≈ 0.192，地形深度 ≈ 0.293，深度差 ≈ 0.1
+    //   - 阴影贴图分辨率：2048×2048
+    //
+    // bias 公式：baseBias + slopeFactor * (1.0 - dot(N,L))
+    //   - baseBias = 0.005：补偿量化误差和深度比较精度（深度范围99，2048分辨率下每像素约0.00005）
+    //   - slopeFactor = 0.01：表面越倾斜（与光源夹角越大），采样误差越大，需要更大 bias
+    //   - 对于垂直光照下的平坦地形（dot=1.0），bias = 0.005
+    //   - 对于45°斜面（dot≈0.707），bias ≈ 0.008
+    //   - 这个范围既能抑制自阴影痤疮，又不会让 sphere 阴影明显"漂移"
+    float bias = max(0.005 + 0.01 * (1.0 - dot(Normal, normalize(gDirectionLight.Direction))), 0.002);
+    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+
+    // 超出阴影贴图范围的片元当作"被照亮"(边界外无遮挡)，避免采样到 CLAMP_TO_BORDER=1.0
+    // 后因 compare 恒成立而被整片误判为阴影
+    return shadow;
+}
+
+vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal, float Shadow) {
+    // 归一化光照方向（从光源指向片段的单位向量）。
+    // 【重要】方向光的 gDirectionLight.Direction 来自 world.yaml 且未在上传前归一化
+    // （technique_light.cpp 直接上传原始值），只有恰好为单位向量时 dot 结果才正确。
+    // 这里统一归一化，保证任意配置下漫反射/镜面反射强度不受方向向量长度影响，
+    // 也确保下方 reflect() 的入射方向是单位向量。
+    LightDirection = normalize(LightDirection);
+
     vec4 AmbientColor = vec4(LightColor, 1.0f) * vec4(gMaterial.AmbientColor, 1.0) * 0.2;
     float DiffuseFactor = dot(Normal, -LightDirection);
 
@@ -85,8 +133,8 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal) {
     vec4 SpecularColor = vec4(0, 0, 0, 0);
 
     if (DiffuseFactor > 0) {
-        // 漫反射光照
-        DiffuseColor = vec4(LightColor * gMaterial.DiffuseColor * DiffuseFactor, 1.0f);
+        // 遮蔽区域阴影系数为1时完全不做漫反射/镜面反射，环境光不受阴影影响
+        DiffuseColor = vec4(LightColor * gMaterial.DiffuseColor * DiffuseFactor * (1.0 - Shadow), 1.0f);
 
         // 计算眼睛观察方向
         vec3 VertexToEye = normalize(gViewPos - v2f.WorldPos0);
@@ -97,15 +145,16 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal) {
         // 计算镜面反射强度
         if (SpecularFactor > 0) {
             SpecularFactor = pow(SpecularFactor, gMaterial.Shininess);
-            SpecularColor = vec4(LightColor * gMaterial.SpecularColor * gMaterial.Shininess * SpecularFactor, 1.0f);
+            SpecularColor = vec4(LightColor * gMaterial.SpecularColor * gMaterial.Shininess * SpecularFactor * (1.0 - Shadow), 1.0f);
         }
     }
 
     return (AmbientColor + DiffuseColor + SpecularColor);
 }
 
-vec4 CalcDirectionLight(vec3 Normal) {
-    return CalcLightInternal(gDirectionLight.Color, gDirectionLight.Direction, Normal);
+vec4 CalcDirectionLight(vec3 Normal, float Shadow) {
+    return CalcLightInternal(gDirectionLight.Color, gDirectionLight.Direction, Normal, Shadow);
+    // return CalcLightInternal(gDirectionLight.Color, sunDir, Normal, Shadow);
 }
 
 vec4 CalcPointLight(int Index, vec3 Normal)
@@ -114,7 +163,8 @@ vec4 CalcPointLight(int Index, vec3 Normal)
     float Distance = length(LightDirection);
     LightDirection = normalize(LightDirection);
 
-    vec4 Color = CalcLightInternal(gPointLights[Index].Color, LightDirection, Normal);
+    // 点光源暂不参与阴影，Shadow 传 0.0
+    vec4 Color = CalcLightInternal(gPointLights[Index].Color, LightDirection, Normal, 0.0);
     float Attenuation = gPointLights[Index].AttenuationConstant + gPointLights[Index].AttenuationLinear * Distance + gPointLights[Index].AttenuationExp * Distance * Distance;
 
     return Color / Attenuation;
@@ -130,7 +180,8 @@ vec4 CalcSpotLight(int Index, vec3 Normal) {
     float Distance = length(v2f.WorldPos0 - gSpotLights[Index].Position);
     float Attenuation = gSpotLights[Index].AttenuationConstant + gSpotLights[Index].AttenuationLinear * Distance + gSpotLights[Index].AttenuationExp * Distance * Distance;
 
-    vec4 Color = CalcLightInternal(gSpotLights[Index].Color, LightToPixel, Normal) / Attenuation;
+    // 聚光灯暂不参与阴影，Shadow 传 0.0
+    vec4 Color = CalcLightInternal(gSpotLights[Index].Color, LightToPixel, Normal, 0.0) / Attenuation;
 
     if (SpotFactor <= CosOuterCutoff) {
         return vec4(0, 0, 0, 0);
@@ -141,24 +192,31 @@ vec4 CalcSpotLight(int Index, vec3 Normal) {
 }
 
 void main() {
-    vec3 N = normalize(v2f.Normal0);
-    
-    // 采样纹理
-    vec4 texColor = texture(groundTexture, v2f.TexCoords);
+    // 地面漫反射采样：world.yaml 中 terrain.texture 若给出有效路径则为真实纹理，
+    // 否则替换为棋盘格纹理（两色交替，便于观察地形平面铺展）。
+    vec4 groundColor = texture(groundTexture, v2f.TexCoords);
 
-    // 计算方向光
-    vec4 totalColor = CalcDirectionLight(N);
+    // 结合法线与光照计算最终颜色
+    vec4 Color = vec4(0, 0, 0, 0);
 
-    // 累加多个点光源
+    // 仅在启用阴影时计算阴影系数（剖面函数已含自阴影 bias 抵消）
+    float Shadow = (gUseShadow == 1) ? ShadowCalculation(v2f.FragPosLightSpace, v2f.Normal0) : 0.0;
+
+    // 遍历所有已启用的点光源（暂未启用，保留供后续开启）
     for (int i = 0; i < gPointLightNum; i++) {
-        totalColor += CalcPointLight(i, N);
+        Color += CalcPointLight(i, v2f.Normal0);
     }
 
-    // 累加多个聚光灯
+    // 叠加所有聚光灯（暂未启用，保留供后续开启）
     for (int i = 0; i < gSpotLightNum; i++) {
-        totalColor += CalcSpotLight(i, N);
+        Color += CalcSpotLight(i, v2f.Normal0);
     }
-    
-    // 将光照颜色与纹理颜色相乘
-    color = texColor * vec4(totalColor.rgb, 1.0);
+
+    // 方向光（阴影只作用于方向光）
+    Color += CalcDirectionLight(v2f.Normal0, Shadow);
+
+    // 漫反射颜色由纹理控制（地面着色），叠加光照后的 Lambert 明暗，
+    // 使地形的起伏在光照下产生明暗对比，而整体颜色仍来自地面纹理。
+    // 阴影已在 CalcDirectionLight 内部按 (1.0 - Shadow) 调暗漫反射/镜面，此处不再重复处理
+    color = groundColor * Color;
 }

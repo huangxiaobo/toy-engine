@@ -11,6 +11,7 @@
 #include "mesh/mesh.h"
 #include "technique/technique.h"
 #include "technique/technique_light.h"
+#include "technique/technique_terrain.h"
 #include "model/model.h"
 #include "axis/axis.h"
 #include "terrain/terrain_manager.h"
@@ -23,6 +24,7 @@
 #include "material/mtl_parser.h"
 #include "camera/camera.h"
 #include "fps/fps.h"
+#include "shadow/shadow_framebuffer.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -100,6 +102,12 @@ Renderer::~Renderer() {
         m_textures.clear();
     }
 
+    // 释放阴影深度贴图 FBO（深度 Pass 着色器 m_shadow_depth_tech 已随 m_techniques 释放）
+    if (m_shadow_fbo != nullptr) {
+        delete m_shadow_fbo;
+        m_shadow_fbo = nullptr;
+    }
+
     if (m_fps_counter != nullptr) {
         delete m_fps_counter;
         m_fps_counter = nullptr;
@@ -171,9 +179,9 @@ void Renderer::init(int w, int h) {
     m_terrain_manager->Init(terrainConfig);
 
     // 创建地形着色器和材质
-    auto *terrainEffect = new TechniqueLight("terrain",
-                                             "./resource/shader/terrain.vert",
-                                             "./resource/shader/terrain.frag");
+    auto *terrainEffect = new TechniqueTerrain("terrain",
+                                               "./resource/shader/terrain.vert",
+                                               "./resource/shader/terrain.frag");
     Material *terrainMaterial = new Material();
     terrainMaterial->AmbientColor = glm::vec3(0.3f, 0.3f, 0.3f);
     terrainMaterial->DiffuseColor = glm::vec3(0.8f, 0.8f, 0.8f);
@@ -189,6 +197,16 @@ void Renderer::init(int w, int h) {
     // 创建并绑定地形纹理
     m_terrain_texture = Utils::CreateCheckerboardTexture(512, 512, 64);
     m_terrain_manager->SetTexture(m_terrain_texture);
+
+    // ---- 初始化方向光阴影映射资源 ----
+    // 阴影贴图分辨率 2048×2048：越高越清晰但越耗显存/带宽
+    m_shadow_fbo = new ShadowFramebuffer();
+    m_shadow_fbo->Init(2048, 2048);
+    // 深度 Pass 专用着色器，注册进 m_techniques 以便与其它技术统一释放
+    m_shadow_depth_tech = new Technique("shadow_depth",
+                                        "./resource/shader/depth.vert",
+                                        "./resource/shader/depth.frag");
+    m_techniques.push_back(m_shadow_depth_tech);
 
     m_sky_dome = new SkyDome();
     m_sky_dome->Init(
@@ -416,6 +434,103 @@ void Renderer::draw(long long elapsed) {
     m_view_matrix = m_camera->GetViewMatrix();
     m_eye_pos = m_camera->GetEyePosition();
 
+    // ---- 方向光阴影深度 Pass ----
+    // 先用光源视角把场景写进深度贴图，主渲染 Pass 再采样它判定阴影。
+    // 仅在启用阴影且存在已启用的方向光时执行；否则本帧不启用阴影采样。
+    m_shadow_map_ready = false;
+    // 每帧先重置光源摄像机参数的有效标志：仅当本帧存在已启用的方向光时才置为有效
+    m_shadow_camera.available = false;
+    if (m_shadows_enabled && m_shadow_fbo != nullptr && m_shadow_depth_tech != nullptr) {
+        DirectionLight *dirLight = nullptr;
+        for (auto light: m_lights) {
+            if (light->GetLightType() == LightTypeDirection && light->IsEnabled()) {
+                dirLight = static_cast<DirectionLight *>(light);
+                break;
+            }
+        }
+
+        if (dirLight != nullptr) {
+            // 保存当前主渲染视口（含 Dock 中央面板的偏移 origin），
+            // 阴影 Pass 会改写到 2048×2048，结束后必须原样恢复，否则场景会从(0,0)绘制导致画面偏移/被裁剪
+            GLint prevMainViewport[4];
+            glGetIntegerv(GL_VIEWPORT, prevMainViewport);
+
+            // 计算光源空间矩阵：平行光用正交投影（覆盖场景范围），保证阴影精度与覆盖平衡。
+            // 光照计算用 toLight = -Direction（光源在 -Direction 方向远处，即场景上方），
+            // 因此阴影深度 Pass 的光源"摄像机"也必须放在 -Direction 一侧并朝场景看，
+            // 否则深度贴图从相反方向生成，深度比较永远对不齐光照，阴影无法显示。
+            glm::vec3 lightDir = glm::normalize(dirLight->Direction);
+            // 光源摄像机参数统一存入 m_shadow_camera（供 ImGui 面板展示与矩阵计算共用同一来源），
+            // 后续 lightProjection/lightView 矩阵全部由这些字段构建，避免魔法数在计算处重复出现。
+            // 正交投影范围：±210 单位，覆盖全部地形（地形顶点范围 ±100 × 模型缩放 2.1 = ±210）。
+            // sphere 直径约 3 单位，在 420 单位宽的投影中仅占 ~0.7%，阴影会明显像素化，
+            // 但这是覆盖全部地形的代价。若需高质量 sphere 阴影，应使用 Cascaded Shadow Maps。
+            // 近/远平面：光源距场景约 30 单位，sphere 在 y=10（距光源 20 单位），
+            // 地形在 y=0（距光源 30 单位），故 near=1、far=100 足够覆盖。
+            // orthoLeft/Right/Bottom/Top、nearPlane/farPlane 使用 ShadowCameraParams 的默认值
+            // （±210 / 1 / 100），无需每帧重新赋值
+            m_shadow_camera.direction = lightDir;
+            m_shadow_camera.position = -lightDir * 30.0f; // 光源位于场景上方（-Direction 远处），向下照射
+            m_shadow_camera.lookAt = glm::vec3(0.0f);
+
+            // 当光源恰好垂直位于场景正上方（如太阳方向 (0,-1,0) 纯直下）时，
+            // lookAt 的 look 向量与默认 up=(0,1,0) 完全平行，cross 得零向量，
+            // normalize 产生 NaN 导致所有顶点深度无效、深度贴图为空。
+            // 此时改用 Z 轴（0,0,-1）作 up，避免退化。
+            // 【说明】若用 X 轴(1,0,0) 作 up，光源视图坐标系会发生 90° 旋转：
+            //   世界 z → 光源 x、世界 x → 光源 y，导致阴影贴图采样坐标轴互换，
+            //   表现为纯垂直光下球体出现"沿 z=0 经线"的红/黑异常分界（用户报告的问题）。
+            // 改用 Z 轴后，光源视图 x 轴 = 世界 x、y 轴 = 世界 z，深度仍沿 -y，
+            // 坐标轴不再异常互换，阴影分界恢复为正确的水平纬线（顶部亮/底部暗）。
+            glm::vec3 lookDir = glm::normalize(m_shadow_camera.lookAt - m_shadow_camera.position);
+            glm::vec3 safeUp = (fabs(lookDir.y) > 0.999f)
+                                 ? glm::vec3(0.0f, 0.0f, 1.0f)
+                                 : glm::vec3(0.0f, 1.0f, 0.0f);
+            m_shadow_camera.up = safeUp;
+
+            // 视图/投影矩阵统一由 m_shadow_camera 字段构建（字段是唯一参数来源）
+            m_shadow_camera.lightView = glm::lookAt(m_shadow_camera.position, m_shadow_camera.lookAt, m_shadow_camera.up);
+            m_shadow_camera.lightProjection = glm::ortho(m_shadow_camera.orthoLeft, m_shadow_camera.orthoRight,
+                                                         m_shadow_camera.orthoBottom, m_shadow_camera.orthoTop,
+                                                         m_shadow_camera.nearPlane, m_shadow_camera.farPlane);
+            m_shadow_camera.available = true;
+
+            m_light_space = m_shadow_camera.lightProjection * m_shadow_camera.lightView;
+
+            // 绑定阴影 FBO 并清空深度，随后以"只写深度"方式重画场景（地形 + 模型），
+            // 生成光源视角的深度贴图供主 Pass 阴影判断使用
+            m_shadow_fbo->BindForWrite();
+            Mesh::SetShadowDepthState(m_shadow_depth_tech, m_light_space, true);
+
+            // m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, m_lights);
+            for (const auto &m: m_models) {
+                m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+            }
+
+            Mesh::SetShadowDepthState(nullptr, glm::mat4(1.0f), false);
+            m_shadow_fbo->Unbind();
+            // 恢复之前保存的主渲染视口（阴影 Pass 改写过视口，不解绑/不恢复会残余错误大小与偏移）
+            glViewport(prevMainViewport[0], prevMainViewport[1], prevMainViewport[2], prevMainViewport[3]);
+
+
+            // 把阴影深度贴图绑定到纹理单元2（单元0/1 已被漫反射/法线贴图占用），
+            // 后续每个 Mesh::Draw 会通过 SetShadowMap(2) 通知着色器采样它
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, m_shadow_fbo->GetDepthTexture());
+            // 标记本帧已有阴影贴图，主 Pass 的 Mesh::Draw 才会启用阴影采样
+            m_shadow_map_ready = true;
+
+
+            // 把本帧阴影状态同步给地形管理器，最终存入 TechniqueTerrain，
+            // 主 Pass 绘制地形时由其自管阴影采样（见 TerrainChunk::SetShadowState / ApplyShadowState）
+            m_terrain_manager->SetShadowState(m_shadow_map_ready,
+                                              m_shadow_fbo->GetDepthTexture(),
+                                              m_light_space);
+        }
+    }
+    // 同步阴影贴图可用状态到 Mesh（供 Mesh::Draw 决定是否上传 lightSpace / 绑定 shadowMap）
+    Mesh::SetShadowMapAvailable(m_shadow_map_ready);
+
     glDepthMask(GL_FALSE);
     m_sky_dome->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos);
     glDepthMask(GL_TRUE);
@@ -529,6 +644,17 @@ void Renderer::SerProjectionType(ProjectionType type) {
 
 const ProjectionType Renderer::GetProjectionType() const {
     return m_projectionType;
+}
+
+unsigned int Renderer::GetShadowDepthTexture() const {
+    // 阴影 FBO 未创建（阴影禁用或初始化前）时返回 0，
+    // 供 ImGui 调试面板判断当前是否可显示深度贴图
+    return (m_shadow_fbo != nullptr) ? m_shadow_fbo->GetDepthTexture() : 0;
+}
+
+bool Renderer::IsShadowMapReady() const {
+    // 本帧阴影深度 Pass 是否已执行并生成有效深度贴图
+    return m_shadow_map_ready;
 }
 
 void Renderer::calculateProjectMatrix(const int w, const int h) {

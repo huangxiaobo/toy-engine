@@ -7,9 +7,62 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <cmath>
+#include <cstdlib>
 
 #include "../utils/utils.h"
 #include "../technique/technique.h"
+
+// ---- 阴影深度 Pass 的全局状态（文件内静态，由 Renderer 每帧通过 SetShadowDepthState 切换） ----
+// 采用"全局状态 + Mesh::Draw 短路"的方式，让所有会投阴影的几何体（地形、模型）
+// 无需逐个配置，即可在深度 Pass 中复用同一套绘制路径（几何与主渲染完全一致，阴影不会错位）。
+static Technique *s_shadowDepthTech = nullptr;      // 深度 Pass 专用着色器（depth.vert/depth.frag）
+static glm::mat4 s_shadowLightSpace = glm::mat4(1.0f); // 光源空间矩阵（正交投影 * 光源视图）
+static bool s_shadowPassActive = false;             // 当前是否处于阴影深度 Pass
+static bool s_shadowMapReady = false;               // 本帧是否存在已生成的阴影深度贴图
+
+/*
+ * 切换阴影深度 Pass 状态
+ *
+ * Renderer 在每帧深度 Pass 前调用 active=true 绑定深度着色器与 lightSpace，
+ * 完成后调用 active=false 恢复正常光照绘制。
+ * tech 为空时不启用深度 Pass（安全兜底，避免空指针）。
+ * 注意：s_shadowMapReady 由 SetShadowMapAvailable 单独控制，与 s_shadowPassActive
+ * 相互独立——前者表示"已有可采样的阴影贴图"，后者表示"正在写阴影贴图"。
+ */
+void Mesh::SetShadowDepthState(Technique *tech, const glm::mat4 &lightSpace, bool active) {
+    s_shadowDepthTech = tech;
+    // 仅在进入阴影深度 Pass 时更新 lightSpace 矩阵；
+    // 退出时（active=false）保留已有的正确值，供主 Pass 绘制地形/模型时采样阴影使用。
+    // 旧实现在退出时用单位矩阵覆盖，导致地形 FragPosLightSpace = I * WorldPos0，
+    // projCoords 范围 [-4.5, 5.5] 远超 [0,1]，阴影完全失效。
+    if (active) {
+        s_shadowLightSpace = lightSpace;
+    }
+    s_shadowPassActive = active && (tech != nullptr);
+
+    // 深度 Pass 渲染时开启面片深度偏移(GL_POLYGON_OFFSET_FILL)：
+    // 把写入阴影贴图的深度统一推远，保证与主绘制采样做比较时留出余量，
+    // 从根本上消除平坦地面在倾斜方向光下的自阴影痤疮(acne)，且不依赖着色器内超大 bias
+    // （超大 bias 会让 bunny 等模型的阴影"飘浮/peter-panning"）。
+    // 结束后必须关闭该 GL 状态，避免泄漏影响后续场景绘制（AGENTS.md 经验2）。
+    if (s_shadowPassActive) {
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.0f, 1.0f);
+    } else {
+        glDisable(GL_POLYGON_OFFSET_FILL);
+    }
+}
+
+/*
+ * 设置本帧是否已有可采样的阴影深度贴图
+ *
+ * 主渲染 Pass 的 Mesh::Draw 仅在 s_shadowMapReady 为 true 时才上传 lightSpace /
+ * 通知着色器绑定 shadowMap；若阴影被禁用（无方向光/开关关闭），则不采样，
+ * 避免采样到未绑定的纹理导致画面整体变暗。
+ */
+void Mesh::SetShadowMapAvailable(bool available) {
+    s_shadowMapReady = available;
+}
 
 Mesh::Mesh() : DrawMode(GL_TRIANGLES) {
     VAO = 0;
@@ -140,6 +193,22 @@ Technique *Mesh::GetEffect() const {
 
 void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
                 const glm::vec3 &camera, const std::vector<Light *> &lights) {
+    // 阴影深度 Pass：切换到光源视角后，本函数被再次调用以渲染阴影贴图。
+    // 此时只写深度、不做光照计算，绘制同样的几何但用 gDepthMVP(=lightSpace*model) 变换。
+    // 提前 return 防止走到下方的光照 Pass（会污染深度贴图或浪费性能）。
+    if (s_shadowPassActive) {
+        if (s_shadowDepthTech == nullptr) {
+            return;
+        }
+        s_shadowDepthTech->Enable();
+        s_shadowDepthTech->SetUniform("gDepthMVP", s_shadowLightSpace * model);
+        /* 重新绑定 VAO */
+        glBindVertexArray(VAO);
+        glDrawElements(DrawMode, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, (void *) 0);
+        glBindVertexArray(0);
+        return;
+    }
+
     this->m_effect->Enable();
     this->m_effect->SetProjectionMatrix(projection);
     this->m_effect->SetViewMatrix(view);
@@ -148,7 +217,31 @@ void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
     this->m_effect->SetCamera(camera);
 
     this->m_effect->SetLights(lights);
-    
+
+    // 阴影贴图相关 uniform：
+    //   - gUseShadow 始终设置：阴影可用时为1（着色器据此启用阴影计算），否则为0
+    //   - 仅当阴影贴图存在时才上传 lightSpace / 绑定 shadowMap，
+    //     避免在阴影被禁用时让着色器采样未绑定纹理导致画面整体变暗
+    this->m_effect->SetUniform("gUseShadow", s_shadowMapReady ? 1 : 0);
+    if (s_shadowMapReady) {
+        this->m_effect->SetShadowMap(2);
+        this->m_effect->SetLightSpaceMatrix(s_shadowLightSpace);
+    }
+
+    // 【调试用】ShadowCalculation 中间结果输出开关：
+    //   通过环境变量 TOY_DEBUG_SHADOW 控制（0~5，见 bunny/shader.frag 的 gDebugShadow 说明）。
+    //   0=正常阴影逻辑；1~5 分别把 projCoords.xy / currentDepth / closestDepth / bias / shadow
+    //   输出到颜色以便肉眼定位哪一步计算不符合预期。启动时读取一次即可。
+    //   没有该 uniform 的着色器（纯色光照模型）location 为 -1，SetUniform 内部会安全忽略。
+    static int s_debugShadow = -1;
+    if (s_debugShadow < 0) {
+        const char *e = getenv("TOY_DEBUG_SHADOW");
+        s_debugShadow = e ? atoi(e) : 0;
+    }
+    if (s_debugShadow > 0) {
+        this->m_effect->SetUniform("gDebugShadow", s_debugShadow);
+    }
+
     // 绑定纹理：漫反射贴图用第0纹理单元（gTexture），法线贴图用第1纹理单元（gNormalMap）
     if (m_textureID != 0) {
         glActiveTexture(GL_TEXTURE0);

@@ -94,6 +94,19 @@ void TerrainManager::SetTexture(unsigned int textureID) {
 }
 
 /*
+ * 转发每帧阴影状态到平面网格的地形技术
+ *
+ * 由 Renderer 在深度贴图生成后调用，把阴影启用标志、深度贴图纹理ID
+ * 与光源空间矩阵交给 TerrainChunk（最终存入 TechniqueTerrain），
+ * 供其绘制阶段自管阴影采样（见 TerrainChunk::SetShadowState）。
+ */
+void TerrainManager::SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4& lightSpace) {
+    if (m_plane) {
+        m_plane->SetShadowState(enabled, depthTexture, lightSpace);
+    }
+}
+
+/*
  * 绘制地形
  *
  * 单一网格平面直接绘制，无需遍历 chunk，

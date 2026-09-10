@@ -45,6 +45,9 @@ public:
     // 设置地形纹理
     void SetTexture(unsigned int textureID);
 
+    // 转发每帧阴影状态到地形技术（见 TerrainChunk::SetShadowState）
+    void SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4& lightSpace);
+
     // 绘制地形
     void Draw(long long elapsed,
               const glm::mat4& projection,
