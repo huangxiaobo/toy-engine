@@ -98,6 +98,10 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                 lightConfig.Name = light_node["name"] ? light_node["name"].as<std::string>() : "";
                 lightConfig.Id = light_node["id"] ? light_node["id"].as<std::string>() : "";
                 lightConfig.Enabled = light_node["enabled"] ? light_node["enabled"].as<bool>() : true;
+                // 读取漫反射/环境光/镜面反射三通道强度（world.yaml 中 ambient/diffuse/specular 的 intensity 字段）
+                lightConfig.AmbientIntensity = light_node["ambient"]["intensity"] ? light_node["ambient"]["intensity"].as<float>() : 1.0f;
+                lightConfig.DiffuseIntensity = light_node["diffuse"]["intensity"] ? light_node["diffuse"]["intensity"].as<float>() : 1.0f;
+                lightConfig.SpecularIntensity = light_node["specular"]["intensity"] ? light_node["specular"]["intensity"].as<float>() : 1.0f;
                 lightConfig.Direction = glm::vec3(
                     light_node["direction"]["x"].as<float>(),
                     light_node["direction"]["y"].as<float>(),
@@ -160,6 +164,10 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                     light_node["specular"]["color"]["g"].as<float>(),
                     light_node["specular"]["color"]["b"].as<float>()
                 );
+                // 读取三通道强度（缺省时默认 1.0，避免旧配置缺失字段时强度为垃圾值/0）
+                lightConfig.AmbientIntensity = light_node["ambient"]["intensity"] ? light_node["ambient"]["intensity"].as<float>() : 1.0f;
+                lightConfig.DiffuseIntensity = light_node["diffuse"]["intensity"] ? light_node["diffuse"]["intensity"].as<float>() : 1.0f;
+                lightConfig.SpecularIntensity = light_node["specular"]["intensity"] ? light_node["specular"]["intensity"].as<float>() : 1.0f;
                 lightConfig.Attenuation.Constant = light_node["attenuation"]["constant"].as<float>();
                 lightConfig.Attenuation.Linear = light_node["attenuation"]["linear"].as<float>();
                 lightConfig.Attenuation.Exp = light_node["attenuation"]["exp"].as<float>();
@@ -197,6 +205,10 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                     light_node["specular"]["color"]["g"].as<float>(),
                     light_node["specular"]["color"]["b"].as<float>()
                 );
+                // 读取三通道强度（缺省时默认 1.0，避免旧配置缺失字段时强度为垃圾值/0）
+                lightConfig.AmbientIntensity = light_node["ambient"]["intensity"] ? light_node["ambient"]["intensity"].as<float>() : 1.0f;
+                lightConfig.DiffuseIntensity = light_node["diffuse"]["intensity"] ? light_node["diffuse"]["intensity"].as<float>() : 1.0f;
+                lightConfig.SpecularIntensity = light_node["specular"]["intensity"] ? light_node["specular"]["intensity"].as<float>() : 1.0f;
                 lightConfig.Attenuation.Constant = light_node["attenuation"]["constant"].as<float>();
                 lightConfig.Attenuation.Linear = light_node["attenuation"]["linear"].as<float>();
                 lightConfig.Attenuation.Exp = light_node["attenuation"]["exp"].as<float>();

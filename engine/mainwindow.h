@@ -52,7 +52,9 @@ private:
     void DrawViewportAxisGizmo();            // 在视口左下角叠加屏幕空间坐标轴 gizmo（三色六轴 + X/Y/Z 标签）
     void ShowShadowDepthMapPanel();          // 绘制阴影深度贴图可视化调试面板（把深度图作为纹理显示）
     void ShowShadowPropertiesPanel();        // 绘制阴影属性面板（阴影开关、深度贴图预览等全局阴影设置）
+    void ShowDebugPropertiesPanel();         // 绘制调试属性面板（DebugDraw 光源线框开关等渲染调试项）
     void RebuildShadowDepthPreview(unsigned int srcTex); // 读回深度贴图并重建灰度预览纹理
+    void SaveScreenshot();                   // 截图：读取当前默认framebuffer并保存为 PNG 文件（含时间戳文件名）
 
     // ---- 各资源类型的属性编辑器 ----
     void ShowModelProperties();
@@ -107,6 +109,8 @@ private:
     // 阴影属性面板开关（阴影开关、光源摄像机参数、深度贴图预览等全局阴影设置）
     // 默认显示：阴影参数属于常用调试信息，启动即展示，无需先通过菜单打开
     bool m_showShadowProperties = true;
+    // 调试属性面板开关（DebugDraw 光源线框开关等渲染调试项）
+    bool m_showDebugProperties = true;
 
     // 阴影深度贴图可视化面板的显示状态：
     // 深度贴图是 GL_DEPTH_COMPONENT 只写格式，ImGui 颜色采样器难以可靠显示，
@@ -135,6 +139,10 @@ private:
     // 时间相关
     float m_lastTime = 0.0f;
     float m_deltaTime = 0.0f;
+
+    // 截图请求标志：菜单「工具 → 截图」置位，RenderFrame 在本帧渲染完成后、
+    // swapBuffers 之前执行一次截图并复位（保证截取的是完整一帧，含 UI 叠加）
+    bool m_screenshotPending = false;
 };
 
 #endif

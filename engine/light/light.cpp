@@ -1,6 +1,5 @@
 #include "light.h"
 #include "../utils/utils.h"
-#include "model/model.h"
 
 // ---- 基类 Light ----
 
@@ -8,7 +7,7 @@
  * 默认构造函数
  *
  * 创建未指定类型的灯光：自动生成 UUID，类型置为 LightTypeNone（无类型）。
- * UUID 用于在渲染器中唯一标识光源（例如 m_light_models 以 UUID 为 key 关联光源模型）。
+ * UUID 用于唯一标识光源实例（编辑器中配置 id 覆盖，作为资源稳定标识）。
  */
 Light::Light() {
     m_uuid = Utils::GenerateUUID();
@@ -112,14 +111,11 @@ void PointLight::SetAttenuation(glm::vec3 attenuation) {
 /*
  * 设置灯光位置
  *
- * 若该点光源关联了可视化模型（m_model，SceneNode 渲染用），
- * 同步更新模型位置，保证编辑器中拖动光源时视觉模型跟随。
+ * 位置直接写入 Position 成员（编辑器拖拽时由 ImGui 回调直接修改）。
+ * 光源 gizmo 的呈现由 DebugDraw 每帧直接读取 Position 生成，无需显式同步。
  */
 void PointLight::SetPosition(glm::vec3 position) {
     Position = position;
-    if (m_model != nullptr) {
-        m_model->SetPosition(position);
-    }
 }
 
 void PointLight::SetAmbientColor(glm::vec3 direction) {

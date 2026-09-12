@@ -5,8 +5,6 @@
 #include <memory>
 #include <string>
 
-class Model;
-
 enum LightType {
     LightTypeNone, // 未定义
     LightTypePoint, // 点光源
@@ -40,9 +38,6 @@ public:
     // 设置灯光 ID（供 world.yaml 配置 id 字段使用，用于稳定标识光源资源）
     void SetUUID(const std::string &uuid) { m_uuid = uuid; }
 
-    void SetModel(Model *model) { m_model = model; };
-    Model *GetModel() const { return m_model; }
-
     // 是否启用该灯光（false 时不参与光照计算，相当于关闭灯光）
     bool IsEnabled() const { return m_enabled; }
 
@@ -56,9 +51,6 @@ private:
     std::string m_name;
     std::string m_uuid;
     bool m_enabled = true;
-
-protected:
-    Model *m_model;
 };
 
 class DirectionLight : public Light {

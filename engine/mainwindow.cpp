@@ -25,9 +25,20 @@
 #include "backends/imgui_impl_opengl3.h"
 
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include <iostream>
+
+// stb_image_write：截图功能用于将 glReadPixels 读回的像素保存为 PNG 文件。
+// 定义 STB_IMAGE_WRITE_IMPLEMENTATION 生成实现（头文件仅此一处定义，
+// 若其他翻译单元再次包含需保持仅有本次定义，避免重复链接错误）。
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
+// 截图文件名时间戳格式化
+#include <ctime>
+#include <chrono>
 #include <glm/gtc/type_ptr.hpp>
 
 // GLFW错误回调
@@ -281,6 +292,13 @@ void ToyEngineMainWindow::RenderFrame() {
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
+    // 截图请求处理：等待本帧完整绘制（场景+后处理+ImGui+轴gizmo）之后、
+    // 缓冲交换之前执行，确保捕获的是用户看到的完整一帧
+    if (m_screenshotPending) {
+        m_screenshotPending = false;
+        SaveScreenshot();
+    }
+
     glfwSwapBuffers(m_window);
 }
 
@@ -316,11 +334,15 @@ void ToyEngineMainWindow::CreateDockSpace() {
         ImGuiID rightNode = ImGui::DockBuilderSplitNode(
             mainNode, ImGuiDir_Right, 0.30f, nullptr, &mainNode);
 
-        // 将面板窗口按标题绑定到对应节点（窗口标题必须与停靠目标一致）
+        // 面板窗口按标题绑定到对应节点（窗口标题必须与停靠目标一致）
+        // 调试属性面板停靠于左节点下方（与资源列表同栏，垂直排列）
+        ImGuiID leftBottomNode = ImGui::DockBuilderSplitNode(
+            leftNode, ImGuiDir_Down, 0.30f, nullptr, &leftNode);
         // 阴影属性面板停靠于右节点下方（与属性面板同栏，垂直排列）
         ImGuiID rightBottomNode = ImGui::DockBuilderSplitNode(
             rightNode, ImGuiDir_Down, 0.35f, nullptr, &rightNode);
         ImGui::DockBuilderDockWindow("资源列表", leftNode);
+        ImGui::DockBuilderDockWindow("调试属性", leftBottomNode);
         ImGui::DockBuilderDockWindow("属性", rightNode);
         ImGui::DockBuilderDockWindow("阴影属性", rightBottomNode);
 
@@ -386,7 +408,18 @@ void ToyEngineMainWindow::CreateMenuBar() {
             ImGui::MenuItem("资源", nullptr, &m_showResourceList);
             ImGui::MenuItem("属性", nullptr, &m_showProperties);
             ImGui::MenuItem("阴影属性", nullptr, &m_showShadowProperties);
+            ImGui::MenuItem("调试属性", nullptr, &m_showDebugProperties);
             ImGui::MenuItem("阴影深度贴图", nullptr, &m_showShadowDepthMap);
+            ImGui::EndMenu();
+        }
+
+        // 工具：收纳编辑器辅助功能；「截图」点击仅置位请求标志，
+        // 实际读取延迟到本帧渲染完成（RenderFrame 末尾）执行，
+        // 确保截取到包含全部 UI 叠加的完整一帧
+        if (ImGui::BeginMenu("工具")) {
+            if (ImGui::MenuItem("截图")) {
+                m_screenshotPending = true;
+            }
             ImGui::EndMenu();
         }
 
@@ -415,6 +448,11 @@ void ToyEngineMainWindow::CreateUI() {
     // 阴影属性面板：停靠于右节点（属性面板下方）
     if (m_showShadowProperties) {
         ShowShadowPropertiesPanel();
+    }
+
+    // 调试属性面板：停靠于左节点（资源列表下方），承载渲染调试开关
+    if (m_showDebugProperties) {
+        ShowDebugPropertiesPanel();
     }
 
     // 视口底部浮动状态条（FPS/投影方式）
@@ -690,12 +728,8 @@ void ToyEngineMainWindow::ShowLightProperties() {
     if (light->GetLightType() == LightTypeSpot) {
         SpotLight* spotLight = static_cast<SpotLight*>(light);
 
-        // 位置
-        if (ImGui::DragFloat3("位置", glm::value_ptr(spotLight->Position), 0.1f)) {
-            if (spotLight->GetModel()) {
-                spotLight->GetModel()->SetPosition(spotLight->Position);
-            }
-        }
+        // 位置（DebugDraw 每帧直读 Position，gizmo 自动跟随，无需手动同步）
+        ImGui::DragFloat3("位置", glm::value_ptr(spotLight->Position), 0.1f);
         // 方向
         ImGui::DragFloat3("方向", glm::value_ptr(spotLight->Direction), 0.1f);
 
@@ -732,13 +766,8 @@ void ToyEngineMainWindow::ShowLightProperties() {
     // ---- 点光源（默认） ----
     PointLight* pointLight = static_cast<PointLight*>(light);
 
-    // 位置
-    if (ImGui::DragFloat3("位置", glm::value_ptr(pointLight->Position), 0.1f)) {
-        // 同步更新光源模型位置
-        if (pointLight->GetModel()) {
-            pointLight->GetModel()->SetPosition(pointLight->Position);
-        }
-    }
+    // 位置（DebugDraw 每帧直读 Position，gizmo 自动跟随，无需手动同步）
+    ImGui::DragFloat3("位置", glm::value_ptr(pointLight->Position), 0.1f);
 
     // 颜色
     ImGui::ColorEdit3("颜色", glm::value_ptr(pointLight->Color));
@@ -948,6 +977,12 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
         m_renderer->SetShadowsEnabled(shadowsEnabled);
     }
 
+    // 后处理 tone mapping 开关（对比 Reinhard+gamma 与直通输出）
+    bool toneMapping = m_renderer->IsToneMappingEnabled();
+    if (ImGui::Checkbox("Tone Mapping", &toneMapping)) {
+        m_renderer->SetToneMappingEnabled(toneMapping);
+    }
+
     ImGui::Separator();
     ImGui::Text("深度贴图");
     const unsigned int srcTex = m_renderer->GetShadowDepthTexture();
@@ -999,6 +1034,76 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
     }
 
     ImGui::End();
+}
+
+/*
+ * 调试属性面板
+ *
+ * 集中放置渲染/编辑器调试相关的全局开关，与阴影属性面板相互独立：
+ *   - 光源调试线框（DebugDraw）：控制场景中光源位置/范围 gizmo 的显示
+ * 后续新增调试项（帧率图、GL 状态覆盖等）统一补充到这里。
+ */
+void ToyEngineMainWindow::ShowDebugPropertiesPanel() {
+    ImGui::Begin("调试属性", &m_showDebugProperties, ImGuiWindowFlags_NoCollapse);
+
+    // 光源调试可视化（DebugDraw gizmo）开关：关闭后隐藏场景中的光源位置/范围线框
+    bool debugDraw = m_renderer->IsDebugDrawEnabled();
+    if (ImGui::Checkbox("光源调试线框 (DebugDraw)", &debugDraw)) {
+        m_renderer->SetDebugDrawEnabled(debugDraw);
+    }
+
+    ImGui::End();
+}
+
+/*
+ * 截图：把当前默认 framebuffer 内容保存为 PNG 文件
+ *
+ * 调用时机：RenderFrame 末尾、glfwSwapBuffers 之前——此时场景、后处理、
+ * ImGui 界面均已绘制到默认 framebuffer，读回的正是用户看到的完整一帧。
+ *
+ * 实现要点：
+ *   - 按 framebuffer 实际像素尺寸读取（Retina 屏幕下像素尺寸通常为窗口尺寸的 2 倍）；
+ *   - 垂直翻转：OpenGL 行序自底向上（左下角为原点），PNG 期望自顶向下（左上角为原点），
+ *     故读回后逐行反转；
+ *   - 行对齐设为 1 字节（GL_PACK_ALIGNMENT = 1），避免行尾填充字节造成错位；
+ *   - 文件名带时间戳，避免重复截图相互覆盖。
+ */
+void ToyEngineMainWindow::SaveScreenshot() {
+    // 获取默认 framebuffer 的实际像素尺寸（Retina 下与窗口逻辑尺寸不同）
+    int fbWidth = 0, fbHeight = 0;
+    glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
+    if (fbWidth <= 0 || fbHeight <= 0) {
+        return;
+    }
+
+    // RGB 三通道像素缓冲（1 字节对齐，杜绝行尾 padding 干扰）
+    std::vector<unsigned char> pixels(static_cast<size_t>(fbWidth) * fbHeight * 3);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, fbWidth, fbHeight, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    // 垂直翻转行序（OpenGL 原点在左下，图片文件原点在左上）
+    std::vector<unsigned char> flipped(static_cast<size_t>(fbWidth) * fbHeight * 3);
+    const size_t rowBytes = static_cast<size_t>(fbWidth) * 3;
+    for (int y = 0; y < fbHeight; ++y) {
+        std::memcpy(&flipped[static_cast<size_t>(fbHeight - 1 - y) * rowBytes],
+                    &pixels[static_cast<size_t>(y) * rowBytes], rowBytes);
+    }
+
+    // 生成带时间戳的文件名：screenshot_YYYYMMDD_HHMMSS.png
+    std::time_t now = std::time(nullptr);
+    std::tm tm = *std::localtime(&now);
+    char filename[128];
+    std::snprintf(filename, sizeof(filename), "screenshot_%04d%02d%02d_%02d%02d%02d.png",
+                  tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                  tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    // 写入 PNG（3 通道、原始行字节数 = 宽 × 3）
+    if (stbi_write_png(filename, fbWidth, fbHeight, 3, flipped.data(),
+                       static_cast<int>(rowBytes)) != 0) {
+        printf("[Screenshot] saved: %s (%dx%d)\n", filename, fbWidth, fbHeight);
+    } else {
+        printf("[Screenshot] FAILED to write: %s\n", filename);
+    }
 }
 
 /*

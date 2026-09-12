@@ -42,9 +42,10 @@ public:
     glm::vec3 DiffuseColor;
     glm::vec3 SpecularColor;
 
-    float AmbientIntensity;
-    float DiffuseIntensity;
-    float SpecularIntensity;
+    // 三通道光照强度（world.yaml ambient/diffuse/specular 的 intensity 字段），默认 1.0
+    float AmbientIntensity = 1.0f;
+    float DiffuseIntensity = 1.0f;
+    float SpecularIntensity = 1.0f;
 
     struct {
         float Constant;
@@ -65,9 +66,10 @@ public:
     glm::vec3 DiffuseColor;
     glm::vec3 SpecularColor;
 
-    float AmbientIntensity;
-    float DiffuseIntensity;
-    float SpecularIntensity;
+    // 三通道光照强度（world.yaml ambient/diffuse/specular 的 intensity 字段），默认 1.0
+    float AmbientIntensity = 1.0f;
+    float DiffuseIntensity = 1.0f;
+    float SpecularIntensity = 1.0f;
 };
 
 class SpotLightConfig {
@@ -83,9 +85,10 @@ public:
     glm::vec3 DiffuseColor;
     glm::vec3 SpecularColor;
 
-    float AmbientIntensity;
-    float DiffuseIntensity;
-    float SpecularIntensity;
+    // 三通道光照强度（world.yaml ambient/diffuse/specular 的 intensity 字段），默认 1.0
+    float AmbientIntensity = 1.0f;
+    float DiffuseIntensity = 1.0f;
+    float SpecularIntensity = 1.0f;
 
     struct {
         float Constant;

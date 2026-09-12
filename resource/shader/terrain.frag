@@ -118,7 +118,21 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal) {
     return shadow;
 }
 
-vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal, float Shadow) {
+/*
+ * 统一的 Blinn-Phong 单光源光照计算
+ *
+ * 参数语义（手动光源：AmbientIntensity / DiffuseIntensity / SpecularIntensity）：
+ *   - AmbientIntensity：环境光权重，公式 LightColor * 材质Ambient * AmbientIntensity
+ *   - DiffuseIntensity：漫反射权重，公式 LightColor * 材质Diffuse * DiffuseIntensity * dot(N, -L)
+ *   - SpecularIntensity：镜面权重，公式 LightColor * 材质Specular * SpecularIntensity * pow(dot, Shininess)
+ *   - Shadow：阴影系数，1.0 完全遮蔽（漫反射/镜面反射乘 (1.0 - Shadow)，环境光不受阴影影响）
+ *
+ * 注意：gMaterial.Shininess 只作高光聚敛指数（pow 的幂次），绝不能再乘到颜色上，
+ * 否则高光强度会被错误放大到快门级数值，这是历史遗留 bug 的修复点。
+ */
+vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal,
+                       float AmbientIntensity, float DiffuseIntensity, float SpecularIntensity,
+                       float Shadow) {
     // 归一化光照方向（从光源指向片段的单位向量）。
     // 【重要】方向光的 gDirectionLight.Direction 来自 world.yaml 且未在上传前归一化
     // （technique_light.cpp 直接上传原始值），只有恰好为单位向量时 dot 结果才正确。
@@ -126,15 +140,16 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal, float 
     // 也确保下方 reflect() 的入射方向是单位向量。
     LightDirection = normalize(LightDirection);
 
-    vec4 AmbientColor = vec4(LightColor, 1.0f) * vec4(gMaterial.AmbientColor, 1.0) * 0.2;
+    // 环境光：与光源颜色、材质环境色、环境光强度三者线性相关，不受阴影遮蔽影响
+    vec4 AmbientColor = vec4(LightColor, 1.0f) * vec4(gMaterial.AmbientColor, 1.0) * AmbientIntensity;
     float DiffuseFactor = dot(Normal, -LightDirection);
 
     vec4 DiffuseColor = vec4(0, 0, 0, 0);
     vec4 SpecularColor = vec4(0, 0, 0, 0);
 
     if (DiffuseFactor > 0) {
-        // 遮蔽区域阴影系数为1时完全不做漫反射/镜面反射，环境光不受阴影影响
-        DiffuseColor = vec4(LightColor * gMaterial.DiffuseColor * DiffuseFactor * (1.0 - Shadow), 1.0f);
+        // 漫反射：遮蔽区域阴影系数为1时完全不做漫反射，环境光不受阴影影响
+        DiffuseColor = vec4(LightColor * gMaterial.DiffuseColor * DiffuseIntensity * DiffuseFactor * (1.0 - Shadow), 1.0f);
 
         // 计算眼睛观察方向
         vec3 VertexToEye = normalize(gViewPos - v2f.WorldPos0);
@@ -142,10 +157,10 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal, float 
         vec3 LightReflect = normalize(reflect(LightDirection, Normal));
         // 计算反射光与观测方向的夹角
         float SpecularFactor = dot(VertexToEye, LightReflect);
-        // 计算镜面反射强度
+        // 计算镜面反射强度（Shininess 仅作聚敛指数，不再乘入颜色）
         if (SpecularFactor > 0) {
             SpecularFactor = pow(SpecularFactor, gMaterial.Shininess);
-            SpecularColor = vec4(LightColor * gMaterial.SpecularColor * gMaterial.Shininess * SpecularFactor * (1.0 - Shadow), 1.0f);
+            SpecularColor = vec4(LightColor * gMaterial.SpecularColor * SpecularIntensity * SpecularFactor * (1.0 - Shadow), 1.0f);
         }
     }
 
@@ -153,8 +168,9 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal, float 
 }
 
 vec4 CalcDirectionLight(vec3 Normal, float Shadow) {
-    return CalcLightInternal(gDirectionLight.Color, gDirectionLight.Direction, Normal, Shadow);
-    // return CalcLightInternal(gDirectionLight.Color, sunDir, Normal, Shadow);
+    // 方向光：三个强度分量全部来自配置，可独立调节
+    return CalcLightInternal(gDirectionLight.Color, gDirectionLight.Direction, Normal,
+                             gDirectionLight.AmbientIntensity, gDirectionLight.DiffuseIntensity, gDirectionLight.SpecularIntensity, Shadow);
 }
 
 vec4 CalcPointLight(int Index, vec3 Normal)
@@ -163,8 +179,10 @@ vec4 CalcPointLight(int Index, vec3 Normal)
     float Distance = length(LightDirection);
     LightDirection = normalize(LightDirection);
 
+    // 点光源结构体没有 SpecularIntensity 字段，镜面强度固定取 1.0，由其颜色亮度天然控制镜面强弱；
     // 点光源暂不参与阴影，Shadow 传 0.0
-    vec4 Color = CalcLightInternal(gPointLights[Index].Color, LightDirection, Normal, 0.0);
+    vec4 Color = CalcLightInternal(gPointLights[Index].Color, LightDirection, Normal,
+                                   gPointLights[Index].AmbientIntensity, gPointLights[Index].DiffuseIntensity, 1.0, 0.0);
     float Attenuation = gPointLights[Index].AttenuationConstant + gPointLights[Index].AttenuationLinear * Distance + gPointLights[Index].AttenuationExp * Distance * Distance;
 
     return Color / Attenuation;
@@ -180,8 +198,9 @@ vec4 CalcSpotLight(int Index, vec3 Normal) {
     float Distance = length(v2f.WorldPos0 - gSpotLights[Index].Position);
     float Attenuation = gSpotLights[Index].AttenuationConstant + gSpotLights[Index].AttenuationLinear * Distance + gSpotLights[Index].AttenuationExp * Distance * Distance;
 
-    // 聚光灯暂不参与阴影，Shadow 传 0.0
-    vec4 Color = CalcLightInternal(gSpotLights[Index].Color, LightToPixel, Normal, 0.0) / Attenuation;
+    // 聚光灯：三个强度全量传入；暂不参与阴影，Shadow 传 0.0
+    vec4 Color = CalcLightInternal(gSpotLights[Index].Color, LightToPixel, Normal,
+                                   gSpotLights[Index].AmbientIntensity, gSpotLights[Index].DiffuseIntensity, gSpotLights[Index].SpecularIntensity, 0.0) / Attenuation;
 
     if (SpotFactor <= CosOuterCutoff) {
         return vec4(0, 0, 0, 0);

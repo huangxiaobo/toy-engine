@@ -25,11 +25,15 @@
 #include "camera/camera.h"
 #include "fps/fps.h"
 #include "shadow/shadow_framebuffer.h"
+#include "postprocess/scene_framebuffer.h"
+#include "debug/debug_draw.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/transform.hpp>
+
+#include <cmath>
 
 Renderer::Renderer() : m_eye_pos(0) {
 }
@@ -66,11 +70,11 @@ Renderer::~Renderer() {
         m_lights.clear();
     }
 
-    // 释放光源模型（m_light_models 与 light->m_model 指向同一对象，只在 map 中删一次）
-    for (auto &kv: m_light_models) {
-        delete kv.second;
+    // 释放光源调试可视化系统（DebugDraw 自管 VAO/VBO，着色器归 m_techniques）
+    if (m_debug_draw != nullptr) {
+        delete m_debug_draw;
+        m_debug_draw = nullptr;
     }
-    m_light_models.clear();
 
     // 释放所有摄像机
     // 注意：m_camera 始终是 m_cameras 中的一个元素，这里统一删除一次即可，
@@ -106,6 +110,17 @@ Renderer::~Renderer() {
     if (m_shadow_fbo != nullptr) {
         delete m_shadow_fbo;
         m_shadow_fbo = nullptr;
+    }
+
+    // 释放 HDR 场景帧缓冲（后处理着色器 m_post_tech 已随 m_techniques 释放）
+    if (m_scene_fbo != nullptr) {
+        delete m_scene_fbo;
+        m_scene_fbo = nullptr;
+    }
+    // 释放后处理全屏三角形空 VAO
+    if (m_post_vao != 0) {
+        glDeleteVertexArrays(1, &m_post_vao);
+        m_post_vao = 0;
     }
 
     if (m_fps_counter != nullptr) {
@@ -208,6 +223,19 @@ void Renderer::init(int w, int h) {
                                         "./resource/shader/depth.frag");
     m_techniques.push_back(m_shadow_depth_tech);
 
+    // ---- 初始化 HDR 场景帧缓冲与后处理 Pass（多 Pass 渲染框架）----
+    // 场景 Pass 画到 RGBA16F FBO，后处理全屏 Pass 采样它做 tone mapping 再画到默认缓冲
+    m_scene_fbo = new SceneFramebuffer();
+    m_scene_fbo->Init(width, height);
+    // 后处理着色器注册进 m_techniques 统一释放
+    m_post_tech = new Technique("post",
+                                "./resource/shader/post.vert",
+                                "./resource/shader/post.frag");
+    m_techniques.push_back(m_post_tech);
+    // 空 VAO：全屏三角形坐标由顶点着色器 gl_VertexID 生成，无需顶点属性缓冲，
+    // 但 Core Profile 在未绑定 VAO 时绘制会报错，故创建空 VAO 占位
+    glGenVertexArrays(1, &m_post_vao);
+
     m_sky_dome = new SkyDome();
     m_sky_dome->Init(
         gConfig->SkyDome.Radius,
@@ -257,6 +285,20 @@ void Renderer::init(int w, int h) {
     // 复用 m_cameras 中的第一个摄像机作为当前摄像机，避免重复创建造成内存泄漏
     m_camera = m_cameras[0];
 
+    // 光源调试可视化系统（DebugDraw，方案 B）：独立于 Model 体系，
+    // 每帧从 Light 对象直接收集线段顶点并批量绘制。
+    // 调试着色器（debug.vert/debug.frag，纯顶点色忽略光照）由 Renderer 创建
+    // 并共享给 DebugDraw，注册进 m_techniques 统一释放。
+    auto *debugEffect = new Technique(
+        "debug",
+        "./resource/shader/debug.vert",
+        "./resource/shader/debug.frag"
+    );
+    m_techniques.push_back(debugEffect);
+
+    m_debug_draw = new DebugDraw();
+    m_debug_draw->Init(debugEffect);
+
     int i = 0;
     // 创建方向光（平行光）
     for (const auto &lightConfig: gConfig->DirectionLights) {
@@ -278,6 +320,7 @@ void Renderer::init(int w, int h) {
         light->DiffuseIntensity = lightConfig.DiffuseIntensity;
         light->SpecularIntensity = lightConfig.SpecularIntensity;
         m_lights.push_back(light);
+
         i++;
     }
 
@@ -302,23 +345,6 @@ void Renderer::init(int w, int h) {
         light->Attenuation.Exp = lightConfig.Attenuation.Exp;
         m_lights.push_back(light);
 
-        // 创建光源模型
-        auto model = Model::CreatePointLightModelV2();
-        model->SetPosition(light->Position);
-        light->SetModel(model);
-
-        // 光源模型的着色器由 CreatePointLightModelV2 内部创建，未注册任何所有权；
-        // 这里统一登记到 m_techniques 以便释放，避免内存泄漏（多个 mesh 共享同一 effect，需去重）
-        for (const auto &mesh: model->GetMeshes()) {
-            auto effect = mesh->GetEffect();
-            if (effect != nullptr &&
-                std::find(m_techniques.begin(), m_techniques.end(), effect) == m_techniques.end()) {
-                m_techniques.push_back(effect);
-            }
-        }
-
-        //
-        m_light_models[light->GetUUID()] = model;
         std::cout << "Setup light finish" << std::endl;
         i++;
     }
@@ -350,20 +376,6 @@ void Renderer::init(int w, int h) {
         light->OuterCutoff = lightConfig.OuterCutoff;
         m_lights.push_back(light);
 
-        // 为聚光灯创建光源模型（复用点光源模型，仅用于可视化位置）
-        auto model = Model::CreatePointLightModelV2();
-        model->SetPosition(light->Position);
-        light->SetModel(model);
-
-        for (const auto &mesh: model->GetMeshes()) {
-            auto effect = mesh->GetEffect();
-            if (effect != nullptr &&
-                std::find(m_techniques.begin(), m_techniques.end(), effect) == m_techniques.end()) {
-                m_techniques.push_back(effect);
-            }
-        }
-
-        m_light_models[light->GetUUID()] = model;
         std::cout << "Setup spot light finish" << std::endl;
         i++;
     }
@@ -531,6 +543,11 @@ void Renderer::draw(long long elapsed) {
     // 同步阴影贴图可用状态到 Mesh（供 Mesh::Draw 决定是否上传 lightSpace / 绑定 shadowMap）
     Mesh::SetShadowMapAvailable(m_shadow_map_ready);
 
+    // ---- 场景 Pass：所有 3D 内容渲染到 HDR 场景 FBO ----
+    // 原实现直接画进默认帧缓冲；现在先画到 RGBA16F 离屏 FBO（保留 HDR 精度），
+    // 结束后由后处理 Pass 统一做 tone mapping 输出到默认缓冲
+    m_scene_fbo->BindForWrite();
+
     glDepthMask(GL_FALSE);
     m_sky_dome->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos);
     glDepthMask(GL_TRUE);
@@ -545,32 +562,65 @@ void Renderer::draw(long long elapsed) {
         ps->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
     }
 
-    // 绘制光源模型
-    // 注意：光源模型与 light 的 m_model 指向同一对象，这里统一在绘制时同步位置与颜色，
-    // 避免重复绘制、重复绑定着色器，以及 map 顺序与 lights 顺序不一致导致的颜色错乱
-    for (const auto &kv: m_light_models) {
-        auto lightModel = kv.second;
-        if (lightModel == nullptr) {
-            continue;
-        }
-        // 根据 UUID 查找对应光源，同步位置与颜色
-        auto it = std::find_if(m_lights.begin(), m_lights.end(),
-                               [&](Light *l) { return l->GetUUID() == kv.first; });
-        if (it != m_lights.end()) {
-            auto point_light = static_cast<PointLight *>(*it);
-            lightModel->SetTranslate(point_light->Position);
-            for (const auto &mesh: lightModel->GetMeshes()) {
-                auto tech = mesh->GetEffect();
-                tech->Enable();
-                tech->SetUniform("color", point_light->Color);
+    // 光源调试可视化（DebugDraw）：直接遍历灯光列表，把 gizmo 顶点收集进
+    // DebugDraw 后统一渲染。位置/朝向/衰减每帧从 Light 对象读取，
+    // 编辑器修改后自动跟随，无"先创建后绑定"的同步问题。
+    // 开关关闭时整段跳过，不收集也不提交（ImGui 阴影面板可配置）。
+    if (m_debugDrawEnabled) {
+        for (auto light: m_lights) {
+            if (light == nullptr) {
+                continue;
+            }
+            switch (light->GetLightType()) {
+                case LightTypeSpot:
+                    m_debug_draw->DrawSpotLight(static_cast<SpotLight *>(light));
+                    break;
+                case LightTypeDirection:
+                    m_debug_draw->DrawDirectionLight(static_cast<DirectionLight *>(light));
+                    break;
+                case LightTypePoint:
+                    m_debug_draw->DrawPointLight(static_cast<PointLight *>(light));
+                    break;
+                default:
+                    break;
             }
         }
-        lightModel->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+        // 批量提交：上传本帧全部 gizmo 线段，一次 glDrawArrays(GL_LINES) 绘制（内部自动 Clear）
+        m_debug_draw->Render(m_projection_matrix, m_view_matrix);
     }
 
     // 绘制模型
     for (const auto &m: m_models) {
         m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    }
+
+    // 场景 Pass 结束，回到默认帧缓冲（SceneFramebuffer 内部恢复主视口）
+    m_scene_fbo->Unbind();
+
+    // ---- 后处理 Pass：全屏三角形采样 HDR 场景纹理，做 tone mapping 后画到默认缓冲 ----
+    // 后处理是 2D 全屏操作，不需要深度测试与混合；
+    // 先保存再禁用、绘制后恢复，遵循 AGENTS.md "修改全局 OpenGL 状态必须保存和恢复"的教训
+    const GLboolean depthTestWas = glIsEnabled(GL_DEPTH_TEST);
+    const GLboolean blendWas = glIsEnabled(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+
+    m_post_tech->Enable();
+    m_post_tech->SetUniform("sceneTex", 0);   // 场景 HDR 纹理绑定到纹理单元0
+    m_post_tech->SetUniform("toneMapMode", m_toneMappingEnabled ? 1 : 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_scene_fbo->GetColorTexture());
+
+    glBindVertexArray(m_post_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);   // 全屏三角形：3 个顶点覆盖整个视口
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    if (depthTestWas) {
+        glEnable(GL_DEPTH_TEST);
+    }
+    if (blendWas) {
+        glEnable(GL_BLEND);
     }
 }
 
@@ -579,6 +629,11 @@ void Renderer::resize(int w, int h) {
     height = h;
     glViewport(0, 0, w, h);
     calculateProjectMatrix(w, h);
+
+    // 场景 FBO 与视口同尺寸；尺寸变化时重建（SceneFramebuffer::Init 同尺寸幂等跳过）
+    if (m_scene_fbo != nullptr) {
+        m_scene_fbo->Init(w, h);
+    }
 }
 
 void Renderer::update(long long elapsed) {

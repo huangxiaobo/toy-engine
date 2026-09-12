@@ -53,8 +53,10 @@ public:
 
     void SetRotate(glm::f32 rotation, glm::vec3 axis);
 
+    // 平移模型（累积变换：叠加到现有 m_matrix 上）
     void SetTranslate(glm::vec3 position);
 
+    // 设置模型世界位置（一次性重建整个 m_matrix，与 SetTranslate 的累积语义不同）
     void SetPosition(glm::vec3 position);
 
     vector<Mesh *> GetMeshes() const;
@@ -70,11 +72,6 @@ public:
 
     virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
                       const glm::vec3 &camera, const std::vector<Light *> &lights);
-
-
-public:
-    static Model* CreatePointLightModelV1();
-    static Model* CreatePointLightModelV2();
 };
 
 #endif

@@ -66,19 +66,19 @@ world:
           r: 1.0
           g: 1.0
           b: 1.0
-        intensity: 0.6
+        intensity: 1.5
       ambient:
         color:
           r: 0.1
           g: 0.1
           b: 0.1
-        intensity: 0.3
+        intensity: 0.2
       specular:
         color:
           r: 1.0
           g: 1.0
           b: 1.0
-        intensity: 0.3
+        intensity: 1.0
     - type: 1
       name: "red_light"
       id: "b1000000-0000-0000-0000-000000000001"
@@ -102,17 +102,17 @@ world:
           r: 1.0
           g: 0.5
           b: 0.0
-        intensity: 1.0
+        intensity: 0.08
       specular:
         color:
           r: 1.0
           g: 0.5
           b: 0.0
-        intensity: 1.0
+        intensity: 0.5
       attenuation:
         constant: 1.0
-        linear: 0.0
-        exp: 0.0
+        linear: 0.014
+        exp: 0.0008
     - type: 1
       name: "blue_light"
       id: "b1000000-0000-0000-0000-000000000002"
@@ -137,13 +137,13 @@ world:
           r: 0.0
           g: 0.5
           b: 1.0
-        intensity: 1.0
+        intensity: 0.08
       specular:
         color:
           r: 1.0
           g: 0.5
           b: 0.0
-        intensity: 1.0
+        intensity: 0.5
       attenuation:
         constant: 1.0
         linear: 0.0
@@ -169,19 +169,19 @@ world:
           r: 1.0
           g: 0.9
           b: 0.6
-        intensity: 2.0
+        intensity: 3.0
       ambient:
         color:
           r: 1.0
           g: 0.9
           b: 0.6
-        intensity: 0.5
+        intensity: 0.08
       specular:
         color:
           r: 1.0
           g: 1.0
           b: 1.0
-        intensity: 1.0
+        intensity: 1.5
       attenuation:
         constant: 1.0
         linear: 0.0
@@ -197,8 +197,8 @@ world:
           z: 15
       emit_rate: 150.0
       max_particles: 5000
-      min_life: 7.5
-      max_life: 12.5
+      min_life: 3.5
+      max_life: 7.5
       min_size: 8.0
       max_size: 15.0
       min_velocity:

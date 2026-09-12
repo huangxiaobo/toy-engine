@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <format>
+#include <cmath>
 
 #include "../technique/technique.h"
 #include "../technique/technique_light.h"
@@ -331,56 +332,4 @@ void Model::Draw(long long elapsed,
     for (int i = 0; i < this->m_meshes.size(); i++) {
         this->m_meshes[i]->Draw(elapsed, projection, view, model_local, camera, lights);
     }
-}
-
-/*
- * 创建点光源可视化模型 V1（线段环版本）
- *
- * 用 CreatePointLightMeshes(5) 生成的线段勾勒光源范围，
- * 配合 only_vertex_color 着色器（纯顶点色绘制）。
- */
-Model *Model::CreatePointLightModelV1() {
-    auto model = new Model(std::format("light-{}", 1));
-    auto meshes = Mesh::CreatePointLightMeshes(5);
-    model->SetMeshes(meshes);
-    model->SetPosition(glm::vec3{0.0f, 0.0f, 0.0f});
-
-    Technique *effect = new Technique(
-        "only_vertex_color",
-        "./resource/shader/only_vertex_color.vert",
-        "./resource/shader/only_vertex_color.frag"
-    );
-
-    for (auto m: meshes) {
-        m->SetEffect(effect);
-    }
-    return model;
-}
-
-/*
- * 创建点光源可视化模型 V2（球体 + 线段环组合版本）
- *
- * 相比 V1，额外叠加一个细分 5 次的二十面体球体，让光源在空间中
- * 有更立体的实体外观；两部分共用 only_vertex_color 着色器。
- */
-Model *Model::CreatePointLightModelV2() {
-    auto model = new Model(std::format("light-{}", 1));
-
-    Technique *effect = new Technique(
-        "only_vertex_color",
-        "./resource/shader/only_vertex_color.vert",
-        "./resource/shader/only_vertex_color.frag"
-    );
-
-    for (auto m: Mesh::CreateIcosphereMesh(5, glm::vec3{0.0f}, glm::vec3{1.0f})) {
-        model->SetMesh(m);
-        m->SetEffect(effect);
-    }
-
-    for (auto m: Mesh::CreatePointLightMeshes(5)) {
-        model->SetMesh(m);
-        m->SetEffect(effect);
-    }
-    model->SetScale(glm::vec3{0.5f});
-    return model;
 }

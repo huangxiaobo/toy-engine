@@ -1,7 +1,6 @@
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
 
-#include <map>
 #include <vector>
 #include <glm/glm.hpp>
 #include "config.h"
@@ -19,6 +18,8 @@ class TerrainManager;
 class ParticleSystem;
 class SkyDome;
 class ShadowFramebuffer;
+class SceneFramebuffer;
+class DebugDraw;
 
 enum class ProjectionType {
     Perspective,
@@ -122,6 +123,14 @@ public:
     // 获取本帧光源（阴影）摄像机参数（供 ImGui 阴影属性面板展示与调试）
     const ShadowCameraParams &GetShadowCameraParams() const { return m_shadow_camera; }
 
+    // 后处理 tone mapping 开关：关闭时全屏 Pass 直通输出（调试用），开启时做 Reinhard+gamma
+    void SetToneMappingEnabled(bool enabled) { m_toneMappingEnabled = enabled; }
+    bool IsToneMappingEnabled() const { return m_toneMappingEnabled; }
+
+    // 光源调试可视化（DebugDraw gizmo）开关：禁用时跳过 gizmo 顶点收集与绘制
+    void SetDebugDrawEnabled(bool enabled) { m_debugDrawEnabled = enabled; }
+    bool IsDebugDrawEnabled() const { return m_debugDrawEnabled; }
+
 private:
     void calculateProjectMatrix(int w, int h);
 
@@ -148,7 +157,10 @@ private:
     SkyDome *m_sky_dome{};
     vector<ParticleSystem *> m_particle_systems;
     vector<Model *> m_models;
-    map<string, Model *> m_light_models;
+    // 光源位置/范围调试可视化系统（DebugDraw，方案 B），独立于 Model 体系
+    DebugDraw *m_debug_draw = nullptr;
+    // 光源调试可视化是否启用（ImGui 可配置，见 SetDebugDrawEnabled）
+    bool m_debugDrawEnabled = true;
     vector<Light *> m_lights;
 
     // 渲染器创建并拥有的地形纹理，用于退出时统一释放
@@ -176,6 +188,16 @@ private:
 
     // 本帧光源（阴影）摄像机参数，深度 Pass 计算后保存，供 ImGui 面板展示
     ShadowCameraParams m_shadow_camera;
+
+    // ---- HDR 场景帧缓冲 + 后处理（多 Pass 渲染框架）----
+    // 所有 3D 场景绘制到该 FBO 的 RGBA16F 颜色纹理，后处理 Pass 再采样它做 tone mapping
+    SceneFramebuffer *m_scene_fbo = nullptr;
+    // 后处理全屏 Pass 着色器（post.vert/post.frag），输出到默认帧缓冲
+    Technique *m_post_tech = nullptr;
+    // 全屏三角形 VAO：无顶点属性绑定，仅满足 Core Profile 对 VAO 的强制要求
+    unsigned int m_post_vao = 0;
+    // tone mapping 是否启用（见 SetToneMappingEnabled）
+    bool m_toneMappingEnabled = true;
 };
 
 #endif
