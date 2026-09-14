@@ -2,79 +2,53 @@
 #define __CAMERA_H__
 #include <string>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 using namespace std;
 
-enum CameraMoveType
-{
-    FORWARD,
-    BACKWARD,
-    LEFT,
-    RIGHT,
-};
-
+/*
+ * 相机类（纯状态容器）
+ *
+ * 按业界（OSG）"相机-操控器"分层设计：本类只承载相机状态——
+ *   位置（m_position）+ 朝向（m_orientation 四元数）——并提供
+ *   视图矩阵生成（GetViewMatrix）与状态访问/修改接口。
+ *
+ * 所有"输入 → 姿态变化"的交互逻辑（轨道 / 平移 / 缩放等）不在此实现，
+ * 而是由 CameraManipulator 子类（如 OrbitManipulator）负责；相机只提供
+ * SetPosition/SetOrientation 让操控器写入最新姿态。
+ *
+ * 朝向用四元数表示而非 front/right/up 三向量：旋转紧凑、可任意组合、
+ * 无万向节锁（与业界一致）。视图矩阵由四元数推导，保证与朝向严格一致。
+ */
 class Camera
 {
 public:
-
     Camera();
     Camera(glm::vec3 position, glm::vec3 target, glm::vec3 world_up);
     ~Camera();
 
     std::string GetName() const;
 
-    // 滚转角(Roll)：沿z轴旋转的角（对于摄像机而言，一般不关心这个)
-    void Roll(float angle);
-    // 俯仰角(Pitch)：沿x轴旋转的角，从上往下看的角
-    void Pitch(float angle);
-    // 偏航角(Yaw)：沿y轴旋转的角，从左往右看的角
-    void Yaw(float angle);
-    void Slide(float du, float dv, float dn);
-
-    glm::mat4 GetViewMatrix();
-
-    glm::vec3 GetEyePosition() { return m_position; }
-
-    void ProcessKeyboard   (
-        CameraMoveType direction,
-        float deltaTime
-    );
-    void ProcessMouseMovement
-    (
-        float xoffset,
-        float yoffset,
-        bool constrainPitch = true
-    );
-    void ProcessMouseScroll(float yoffset);
-    
-    // 新增的相机控制方法
-    void RotateHorizontal(float angle);
-    void RotateVertical(float angle);
-    void Pan(float dx, float dy);
-    void Zoom(float amount);
-    
-    // 绕世界原点轨道旋转
-    void OrbitAroundOrigin(float horizontalAngle, float verticalAngle);
-    
+    // ---- 状态访问 ----
     glm::vec3 GetPosition() const { return m_position; }
-    void SetPosition(const glm::vec3& position) { m_position = position; updateCameraVectors(); }
-    
-private:
-    void updateCameraVectors();
+    glm::quat GetOrientation() const { return m_orientation; }
+
+    // ---- 状态修改（供操控器写入最新姿态） ----
+    void SetPosition(const glm::vec3 &position);
+    // 设置朝向四元数（相机前方 = 四元数旋转后的 -Z；由操控器计算并传入）
+    void SetOrientation(const glm::quat &orientation);
+    // 以「位置-目标-上方向」重建朝向（构造时 / 配置加载时使用）
+    void LookAt(const glm::vec3 &target, const glm::vec3 &world_up);
+
+    // 视图矩阵：由「位置 + 四元数朝向」推导（相机前方 -Z 经四元数旋转）
+    glm::mat4 GetViewMatrix() const;
 
 public:
     std::string m_name;
-    glm::vec3 m_position; // 摄像机位置
-    glm::vec3 m_target;
+    glm::vec3 m_position;   // 相机位置
 
-    glm::vec3 m_front;    // 摄像机前方
-    glm::vec3 m_right;    // 摄像机右边
-    glm::vec3 m_up;       // 摄像机上方
-    glm::vec3 m_world_up; // 世界空间的上方
-
-    float m_move_speed; // 摄像机移动速度
-    float m_mouse_sensitivity; // 鼠标灵敏度
-    float m_zoom; // 摄像机缩放
+private:
+    glm::quat m_orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // 朝向（单位四元数）
 };
 
 #endif

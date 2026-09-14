@@ -80,7 +80,7 @@ world:
           b: 1.0
         intensity: 1.0
     - type: 1
-      name: "red_light"
+      name: "point_light_red"
       id: "b1000000-0000-0000-0000-000000000001"
       enabled: true
       position:
@@ -114,7 +114,7 @@ world:
         linear: 0.014
         exp: 0.0008
     - type: 1
-      name: "blue_light"
+      name: "point_light_blue"
       id: "b1000000-0000-0000-0000-000000000002"
       enabled: true
       position:

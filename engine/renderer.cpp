@@ -23,6 +23,8 @@
 #include "material/material.h"
 #include "material/mtl_parser.h"
 #include "camera/camera.h"
+#include "camera/manipulator.h"
+#include "camera/orbit_manipulator.h"
 #include "fps/fps.h"
 #include "shadow/shadow_framebuffer.h"
 #include "postprocess/scene_framebuffer.h"
@@ -83,6 +85,10 @@ Renderer::~Renderer() {
         delete cam;
     }
     m_cameras.clear();
+
+    // 释放相机操控器（不持有相机，仅绑定，相机生命期由上面 m_cameras 统一管理）
+    delete m_manipulator;
+    m_manipulator = nullptr;
 
     // 释放渲染器创建并拥有的着色器与材质
     for (auto tech: m_techniques) {
@@ -285,6 +291,12 @@ void Renderer::init(int w, int h) {
     // 复用 m_cameras 中的第一个摄像机作为当前摄像机，避免重复创建造成内存泄漏
     m_camera = m_cameras[0];
 
+    // 创建轨道相机操控器并绑定当前相机：所有相机交互（轨道/平移/缩放）
+    // 由操控器承载，相机只做状态存储。初始轨道参数由相机当前姿态反推。
+    m_manipulator = new OrbitManipulator();
+    m_manipulator->SetCamera(m_camera);
+    m_manipulator->ResetFromCamera();
+
     // 光源调试可视化系统（DebugDraw，方案 B）：独立于 Model 体系，
     // 每帧从 Light 对象直接收集线段顶点并批量绘制。
     // 调试着色器（debug.vert/debug.frag，纯顶点色忽略光照）由 Renderer 创建
@@ -444,7 +456,7 @@ void Renderer::draw(long long elapsed) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_view_matrix = m_camera->GetViewMatrix();
-    m_eye_pos = m_camera->GetEyePosition();
+    m_eye_pos = m_camera->GetPosition();
 
     // ---- 方向光阴影深度 Pass ----
     // 先用光源视角把场景写进深度贴图，主渲染 Pass 再采样它判定阴影。
@@ -637,7 +649,7 @@ void Renderer::resize(int w, int h) {
 }
 
 void Renderer::update(long long elapsed) {
-    m_eye_pos = m_camera->GetEyePosition();
+    m_eye_pos = m_camera->GetPosition();
     
     // 地形为静态网格平面（无 LOD/无动态 chunk），无需每帧更新
     
@@ -685,10 +697,10 @@ void Renderer::SwitchCamera(int index) {
     }
     m_camera = m_cameras[index];
 
-    // 通过设置位置来触发相机向量更新
-    m_camera->m_front = glm::normalize(m_camera->m_target - m_camera->m_position);
-    m_camera->m_right = glm::normalize(glm::cross(m_camera->m_front, m_camera->m_world_up));
-    m_camera->m_up = glm::normalize(glm::cross(m_camera->m_right, m_camera->m_front));
+    // 操控器重新绑定到新相机，并由新相机姿态反推轨道参数：
+    // 每次切换后轨道中心落在新相机正前方（保持当前缩放级别），视角不跳变
+    m_manipulator->SetCamera(m_camera);
+    m_manipulator->ResetFromCamera();
 
     std::cout << "Camera switch to " << m_camera->GetName() << std::endl;
 }

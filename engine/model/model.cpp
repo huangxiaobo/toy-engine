@@ -2,16 +2,11 @@
 
 #include <iostream>
 #include <format>
-#include <cmath>
 
-#include "../technique/technique.h"
-#include "../technique/technique_light.h"
 #include "../mesh/mesh.h"
 #include "../texture/texture.h"
 #include "../utils/utils.h"
 #include "../light/light.h"
-#include "../shader/shader.h"
-#include "../material/material.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>

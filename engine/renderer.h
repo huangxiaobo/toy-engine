@@ -20,6 +20,7 @@ class SkyDome;
 class ShadowFramebuffer;
 class SceneFramebuffer;
 class DebugDraw;
+class OrbitManipulator;
 
 enum class ProjectionType {
     Perspective,
@@ -94,6 +95,9 @@ public:
     // 获取相机
     Camera *GetCamera() const { return m_camera; }
 
+    // 获取当前相机操控器（相机交互逻辑由操控器承载，与相机状态分离）
+    OrbitManipulator *GetManipulator() const { return m_manipulator; }
+
     // 获取屏幕空间坐标轴 gizmo（供 mainwindow 在 ImGui 绘制阶段叠加到视口角落）
     Axis *GetAxis() const { return m_axis; }
     
@@ -152,6 +156,9 @@ private:
     Axis *m_axis{};
     Camera* m_camera{};
     vector<Camera *> m_cameras;
+    // 当前相机操控器：负责把输入转换为相机姿态变化（轨道/平移/缩放），
+    // 与相机状态分离（业界 Camera-Manipulator 分层）。由构造时创建并绑定 m_camera。
+    OrbitManipulator *m_manipulator = nullptr;
 
     TerrainManager *m_terrain_manager{};
     SkyDome *m_sky_dome{};

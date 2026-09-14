@@ -8,6 +8,7 @@
 #include "technique/technique_light.h"
 #include "material/material.h"
 #include "camera/camera.h"
+#include "camera/orbit_manipulator.h"
 #include "terrain/terrain_manager.h"
 #include "sky/sky_dome.h"
 #include "particle/particle_system.h"
@@ -326,13 +327,13 @@ void ToyEngineMainWindow::CreateDockSpace() {
         ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->WorkSize);
 
-        // 依次切分：先分出左栏（25%），再在剩余空间中分出右栏（30%），
-        // 剩余部分即中央 3D 视口节点
+        // 依次切分：先分出左栏（16.7% = 原 25% 的 2/3），再在剩余空间中分出右栏。
+        // 右栏比例取 0.20（= 16.7% / 剩余 83.3%），使右栏实际占总宽 16.7%，与左栏等宽
         ImGuiID mainNode = dockspaceId;
         ImGuiID leftNode = ImGui::DockBuilderSplitNode(
-            mainNode, ImGuiDir_Left, 0.25f, nullptr, &mainNode);
+            mainNode, ImGuiDir_Left, 0.1667f, nullptr, &mainNode);
         ImGuiID rightNode = ImGui::DockBuilderSplitNode(
-            mainNode, ImGuiDir_Right, 0.30f, nullptr, &mainNode);
+            mainNode, ImGuiDir_Right, 0.20f, nullptr, &mainNode);
 
         // 面板窗口按标题绑定到对应节点（窗口标题必须与停靠目标一致）
         // 调试属性面板停靠于左节点下方（与资源列表同栏，垂直排列）
@@ -795,34 +796,41 @@ void ToyEngineMainWindow::ShowLightProperties() {
 }
 
 // ---- 相机属性编辑器 ----
-// 可编辑：名称（只读）、位置、目标点、上方向
+// 可编辑：名称（只读）、轨道参数（中心/半径/水平角/俯仰角）。
+// 相机交互由 OrbitManipulator 承载，故编辑的是操控器状态而非相机本体。
 void ToyEngineMainWindow::ShowCameraProperties() {
     Camera* camera = static_cast<Camera*>(m_selectedObject);
+    OrbitManipulator* manipulator = m_renderer->GetManipulator();
 
     ImGui::Text("类型: 摄像机");
     ImGui::Separator();
     ImGui::Text("名称: %s", camera->GetName().c_str());
     ImGui::Separator();
 
-    glm::vec3 position = camera->GetPosition();
-    if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
-        camera->SetPosition(position);
+    if (manipulator == nullptr) {
+        ImGui::Text("（无操控器绑定）");
+        return;
     }
 
-    glm::vec3 target = camera->m_target;
-    if (ImGui::DragFloat3("目标点", glm::value_ptr(target), 0.1f)) {
-        camera->m_target = target;
+    glm::vec3 center = manipulator->GetCenter();
+    if (ImGui::DragFloat3("轨道中心", glm::value_ptr(center), 0.1f)) {
+        manipulator->SetCenter(center);
     }
 
-    glm::vec3 up = camera->m_world_up;
-    if (ImGui::DragFloat3("上方向", glm::value_ptr(up), 0.01f)) {
-        camera->m_world_up = up;
+    float radius = manipulator->GetRadius();
+    if (ImGui::DragFloat("半径", &radius, 0.1f, 0.5f, 100.0f)) {
+        manipulator->SetRadius(radius);
     }
 
-    ImGui::Separator();
-    ImGui::DragFloat("移动速度", &camera->m_move_speed, 0.1f, 0.1f, 100.0f);
-    ImGui::DragFloat("鼠标灵敏度", &camera->m_mouse_sensitivity, 0.01f, 0.01f, 10.0f);
-    ImGui::DragFloat("缩放", &camera->m_zoom, 0.1f, 1.0f, 90.0f);
+    float yaw = manipulator->GetYaw();
+    if (ImGui::DragFloat("水平角", &yaw, 0.5f, -180.0f, 180.0f)) {
+        manipulator->SetYaw(yaw);
+    }
+
+    float pitch = manipulator->GetPitch();
+    if (ImGui::DragFloat("俯仰角", &pitch, 0.5f, -89.0f, 89.0f)) {
+        manipulator->SetPitch(pitch);
+    }
 }
 
 // ---- 地形属性编辑器 ----
@@ -1283,23 +1291,23 @@ void ToyEngineMainWindow::OnMouseRightButtonUp() {
 void ToyEngineMainWindow::OnMouseMove(double deltaX, double deltaY) {
     if (!m_renderer) return;
 
-    // 相机绕世界原点旋转（鼠标左键拖动）
+    // 相机绕轨道中心旋转（鼠标左键拖动）：交互交给操控器，相机只接收结果
     if (m_mouseLeftPressed) {
-        auto camera = m_renderer->GetCamera();
-        if (camera) {
+        auto *manipulator = m_renderer->GetManipulator();
+        if (manipulator) {
             float sensitivity = 0.5f;
-            camera->OrbitAroundOrigin(
+            manipulator->Orbit(
                 static_cast<float>(-deltaX * sensitivity),
                 static_cast<float>(-deltaY * sensitivity));
         }
     }
 
-    // 相机平移（鼠标右键拖动）
+    // 相机平移（鼠标右键拖动）：轨道中心沿视图右/上方向移动
     if (m_cameraPanning) {
-        auto camera = m_renderer->GetCamera();
-        if (camera) {
+        auto *manipulator = m_renderer->GetManipulator();
+        if (manipulator) {
             float panSpeed = 0.01f;
-            camera->Pan(
+            manipulator->Pan(
                 static_cast<float>(deltaX * panSpeed),
                 static_cast<float>(-deltaY * panSpeed));
         }
@@ -1308,10 +1316,10 @@ void ToyEngineMainWindow::OnMouseMove(double deltaX, double deltaY) {
 
 void ToyEngineMainWindow::OnMouseWheel(double delta) {
     if (m_renderer) {
-        auto camera = m_renderer->GetCamera();
-        if (camera) {
+        auto *manipulator = m_renderer->GetManipulator();
+        if (manipulator) {
             float zoomSpeed = 0.1f;
-            camera->Zoom(static_cast<float>(delta * zoomSpeed));
+            manipulator->Zoom(static_cast<float>(delta * zoomSpeed));
         }
     }
 }
