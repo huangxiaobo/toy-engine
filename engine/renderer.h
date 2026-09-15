@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
+#include <map>
 #include "config.h"
 
 using namespace std;
@@ -25,6 +26,16 @@ class OrbitManipulator;
 enum class ProjectionType {
     Perspective,
     Orthographic
+};
+
+// 运行时可切换的模型渲染风格（RenderStyle）
+// 对应 resource/shader 下的四套标准着色器（unlit/textured/lit/toon）。
+// 基础版：不含 Toon 参数调节滑块，仅切换着色器。
+enum class RenderStyle {
+    Unlit,    // 纯色：仅顶点颜色（unlit.vert/.frag）
+    Textured, // 顶点颜色 × 漫反射贴图（textured.vert/.frag，无贴图时退化纯色）
+    Lit,      // 材质 Blinn-Phong + 阴影 + 法线贴图（lit.vert/.frag）
+    Toon      // 卡通渲染（toon.vert/.frag）
 };
 
 // 光源（阴影）摄像机参数
@@ -135,8 +146,49 @@ public:
     void SetDebugDrawEnabled(bool enabled) { m_debugDrawEnabled = enabled; }
     bool IsDebugDrawEnabled() const { return m_debugDrawEnabled; }
 
+    // 线框模式开关：启用时场景 Pass 中地形与模型以线框渲染（阴影 Pass 不受影响）
+    void SetWireframeEnabled(bool enabled) { m_wireframeEnabled = enabled; }
+    bool IsWireframeEnabled() const { return m_wireframeEnabled; }
+
+    // 网格地面辅助线开关：XZ 平面世界网格（复用 DebugDraw 线段管线），帮助判断空间方位
+    void SetGridEnabled(bool enabled) { m_gridEnabled = enabled; }
+    bool IsGridEnabled() const { return m_gridEnabled; }
+
+    // 视口背景色（glClearColor 的 RGB），运行时修改立即生效
+    void SetClearColor(const glm::vec3 &color) { m_clearColor = color; }
+    const glm::vec3 &GetClearColor() const { return m_clearColor; }
+
+    // 视野角度（度）：修改后立即重算投影矩阵，运行时可调
+    void SetFov(float fov);
+    float GetFov() const { return m_fov; }
+
+    // 法线可视化开关：启用时模型以法线方向着色（RGB = XYZ），便于检查法线方向是否正确
+    void SetNormalVisualizationEnabled(bool enabled) { m_normalVisualizationEnabled = enabled; }
+    bool IsNormalVisualizationEnabled() const { return m_normalVisualizationEnabled; }
+
+    // 法线线段统一长度（世界空间单位），对所有模型生效（ImGui 可调）
+    void SetNormalLength(float len) { m_normalLength = len; }
+    float GetNormalLength() const { return m_normalLength; }
+
+    // 光照范围可视化开关：启用时点光源/聚光灯显示影响范围球体/锥体线框
+    void SetLightRangeEnabled(bool enabled) { m_lightRangeEnabled = enabled; }
+    bool IsLightRangeEnabled() const { return m_lightRangeEnabled; }
+
+    // 运行时切换模型渲染风格（基础版，无参数调节）
+    // 遍历模型所有 mesh 换成风格池中对应 Technique；切换后下一帧自动生效。
+    void SetModelStyle(Model *model, RenderStyle style);
+    // 查询模型当前渲染风格（默认 Lit，与 world.yaml 默认行为一致）
+    RenderStyle GetModelStyle(Model *model) const;
+    // 查询模型的材质指针（属性面板显示/编辑用，Mesh 上的 Technique 可能为共享
+    // 风格技术，其内部 m_material 会被其它模型覆盖，故必须按模型单独登记）
+    Material *GetModelMaterial(Model *model) const;
+
 private:
     void calculateProjectMatrix(int w, int h);
+    // 收集并提交世界网格辅助线（XZ 平面，覆盖地形范围），由 draw 中网格开关控制
+    void DrawGrid();
+    // 收集模型法线线段到 DebugDraw（将顶点世界坐标与法线变换到世界空间）
+    void CollectModelNormals();
 
 private:
     int width{};
@@ -168,6 +220,20 @@ private:
     DebugDraw *m_debug_draw = nullptr;
     // 光源调试可视化是否启用（ImGui 可配置，见 SetDebugDrawEnabled）
     bool m_debugDrawEnabled = true;
+    // 线框模式是否启用（ImGui 可配置，见 SetWireframeEnabled）
+    bool m_wireframeEnabled = false;
+    // 网格地面辅助线是否启用（ImGui 可配置，见 SetGridEnabled）
+    bool m_gridEnabled = false;
+    // 视口背景色（glClearColor RGB），默认与旧硬编码值一致（深灰）
+    glm::vec3 m_clearColor = glm::vec3(0.2f);
+    // 视野角度（度），初始取自 config,运行时可调（见 SetFov）
+    float m_fov = 45.0f;
+    // 法线可视化是否启用（ImGui 可配置，见 SetNormalVisualizationEnabled）
+    bool m_normalVisualizationEnabled = false;
+    // 法线线段统一长度（世界空间单位），默认 2.0，ImGui 可调（见 SetNormalLength）
+    float m_normalLength = 2.0f;
+    // 光照范围可视化是否启用（ImGui 可配置，见 SetLightRangeEnabled）
+    bool m_lightRangeEnabled = false;
     vector<Light *> m_lights;
 
     // 渲染器创建并拥有的地形纹理，用于退出时统一释放
@@ -180,6 +246,15 @@ private:
     vector<Technique *> m_techniques;
     // 渲染器创建并拥有的材质（Material），用于统一释放
     vector<Material *> m_materials;
+
+    // ---- 运行时渲染风格切换（基础版）----
+    // 风格池：四套标准着色器各持一个共享 Technique，运行时通过 SetModelStyle 换给模型 mesh
+    map<RenderStyle, Technique *> m_style_techniques;
+    // 模型 → 当前风格（默认 Lit），供 UI 下拉框回显当前选项
+    map<Model *, RenderStyle> m_model_styles;
+    // 模型 → 材质指针（仅引用不拥有）。风格技术为多模型共享实例，其内部材质会被
+    // 交叉覆盖，属性面板必须按模型查自己的材质（见 GetModelMaterial）
+    map<Model *, Material *> m_model_materials;
 
     // ---- 方向光阴影映射资源 ----
     // 阴影深度贴图 FBO（只写深度）

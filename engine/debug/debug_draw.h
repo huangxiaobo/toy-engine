@@ -69,6 +69,14 @@ public:
     // 方向光：场景原点三轴十字标记 + 沿光照方向延伸的方向线
     void DrawDirectionLight(const DirectionLight *light);
 
+    // ---- 法线可视化 ----
+
+    /*
+     * 绘制单个顶点的法线线段：从顶点位置出发沿法线方向延伸 length
+     * 长度，颜色按法线方向编码（RGB 各分量映射到 [0.5, 1.0] 区间使线段醒目）。
+     */
+    void DrawNormal(const glm::vec3 &vertexPos, const glm::vec3 &normal, float length);
+
     /*
      * 每帧统一提交渲染：
      *   - 把 CPU 端收集的线段顶点全量上传到动态 VBO（GL_DYNAMIC_DRAW）；
@@ -81,14 +89,15 @@ public:
     // 清空本帧收集的顶点（Render 尾部自动调用；也可用于手动提前清空）
     void Clear();
 
-private:
     /*
-     * 由点光源衰减系数反推"影响边界"半径
+     * 由点光源衰减系数反推"影响边界"半径（供 Renderer 绘制范围线框使用）
      *
      * 衰减公式 att = 1 / (Kc + Kl*d + Ke*d²)，求衰减到阈值 threshold 处的距离 d，
      * 作为点光源 gizmo 放射线的影响半径，保证球体轮廓严格对应真实光照衰减范围。
      */
     static float ComputePointLightRadius(const PointLight *light, float threshold = 0.6f);
+
+private:
 
     /*
      * 构造"本地 +Z 轴对齐 direction"的右手正交基

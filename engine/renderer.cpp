@@ -151,8 +151,12 @@ void Renderer::init(int w, int h) {
     glDisable(GL_PROGRAM_POINT_SIZE);
     // 以填充模式绘制前后
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    // 统一设置线宽，供线段/点光源模型等以线框方式绘制的对象使用(原实现在每次 Model::Draw 中重复设置)
-    glLineWidth(5);
+    // 统一设置线宽，供线段/点光源模型等以线框方式绘制的对象使用(原实现在每次 Model::Draw 中重复设置)。
+    // 【macOS 兼容】Metal 后端 GL_ALIASED_LINE_WIDTH_RANGE 只有 [1,1]，
+    // 直接 glLineWidth(5) 会产生 GL_INVALID_VALUE；需先查询最大值再取 min。
+    GLfloat lineWidthRange[2];
+    glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, lineWidthRange);
+    glLineWidth(lineWidthRange[1] < 5.0f ? lineWidthRange[1] : 5.0f);
     // 设置 OpenGL 只绘制正面 , 不绘制背面
     // glEnable(GL_CULL_FACE);
     // 设置顺时针方向 CW : Clock Wind 顺时针方向, 默认是 GL_CCW : Counter Clock Wind 逆时针方向
@@ -160,6 +164,9 @@ void Renderer::init(int w, int h) {
 
     width = w;
     height = h;
+
+    // 视野角度以配置为初始值，运行时可经 SetFov 调整（调试面板滑块）
+    m_fov = gConfig->Clip.ClipFov;
 
     m_fps_counter = new FPSCounter();
 
@@ -173,11 +180,11 @@ void Renderer::init(int w, int h) {
     // 具体绘制见 mainwindow.cpp RenderFrame 中的 ApplyViewportAxisGizmo 调用
     m_axis = new Axis();
 
-    // Create Plane
+    // Create Plane：使用标准管线 ① 纯顶点颜色 shader（unlit，无光照）
     vector<Mesh *> plane_mesh = Mesh::CreatePlaneMesh();
     auto *plane_effect = new Technique("plane",
-                                       "./resource/shader/light.vert",
-                                       "./resource/shader/light.frag");
+                                       "./resource/shader/unlit.vert",
+                                       "./resource/shader/unlit.frag");
 
     auto *plane = new Model("plane");
     plane->SetScale(glm::vec3(5.0f, 5.0f, 5.0f));
@@ -187,6 +194,9 @@ void Renderer::init(int w, int h) {
     }
     // 平面着色器交由渲染器统一管理释放
     m_techniques.push_back(plane_effect);
+
+    // 平面为纯顶点颜色辅助网格（无材质），初始风格登记为 Unlit，供属性面板回显
+    m_model_styles[plane] = RenderStyle::Unlit;
 
     m_models.push_back(plane);
 
@@ -439,20 +449,69 @@ void Renderer::init(int w, int h) {
         m_materials.push_back(material);
         m_techniques.push_back(effect);
 
+        // 登记模型 → 材质映射：模型切换到共享风格技术(Lit/Toon)时，
+        // 共享技术的 GetMaterial() 会被其它模型覆盖，属性面板必须按模型查自己的材质
+        m_model_materials[model_obj] = material;
+        // 记录模型初始渲染风格：按 world.yaml 指定的片元着色器文件名推断，
+        // 供属性面板下拉框回显当前风格（与 GetModelStyle 的默认值 Lit 区分）
+        RenderStyle initialStyle = RenderStyle::Lit;
+        const std::string &fragFile = modelConfig.ShaderFragFile;
+        if (fragFile.find("toon") != std::string::npos) {
+            initialStyle = RenderStyle::Toon;
+        } else if (fragFile.find("textured") != std::string::npos) {
+            initialStyle = RenderStyle::Textured;
+        } else if (fragFile.find("unlit") != std::string::npos) {
+            initialStyle = RenderStyle::Unlit;
+        }
+        m_model_styles[model_obj] = initialStyle;
+
         model_obj->SetScale(modelConfig.Scale);
         model_obj->SetTranslate(modelConfig.Position);
         model_obj->SetRotate(modelConfig.Rotation);
 
         m_models.push_back(model_obj);
     }
+
+    // ---- 渲染风格技术池（运行时切换，基础版：无参数调节）----
+    // 为四套标准着色器（unlit/textured/lit/toon）各创建一个共享 Technique，
+    // 运行时 SetModelStyle 遍历模型 mesh 换用对应技术，实现界面切换渲染风格。
+    // 共享实例登记进 m_techniques 统一释放；材质按模型单独登记（见 m_model_materials）。
+    auto *styleUnlit = new Technique("style_unlit",
+                                     "./resource/shader/unlit.vert",
+                                     "./resource/shader/unlit.frag");
+    m_style_techniques[RenderStyle::Unlit] = styleUnlit;
+    m_techniques.push_back(styleUnlit);
+
+    auto *styleTextured = new Technique("style_textured",
+                                        "./resource/shader/textured.vert",
+                                        "./resource/shader/textured.frag");
+    m_style_techniques[RenderStyle::Textured] = styleTextured;
+    m_techniques.push_back(styleTextured);
+
+    // lit/toon 需要接收材质与灯光：使用 TechniqueLight（支持 SetMaterial/SetLights），
+    // 与 unlit/textured 的普通 Technique 区分开
+    auto *styleLit = new TechniqueLight("style_lit",
+                                        "./resource/shader/lit.vert",
+                                        "./resource/shader/lit.frag");
+    m_style_techniques[RenderStyle::Lit] = styleLit;
+    m_techniques.push_back(styleLit);
+
+    auto *styleToon = new TechniqueLight("style_toon",
+                                         "./resource/shader/toon.vert",
+                                         "./resource/shader/toon.frag");
+    m_style_techniques[RenderStyle::Toon] = styleToon;
+    m_techniques.push_back(styleToon);
+
     std::cout << "Setup world finish" << std::endl;
 }
 
 void Renderer::draw(long long elapsed) {
+    // 计算投影竖切像机矩阵
     // 绘制帧数量加1
     m_fps_counter->Add();
 
-    glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
+    // 视口背景色：默认深灰，调试面板 ColorEdit3 可实时修改（见 SetClearColor）
+    glClearColor(m_clearColor.r, m_clearColor.g, m_clearColor.b, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_view_matrix = m_camera->GetViewMatrix();
@@ -566,8 +625,32 @@ void Renderer::draw(long long elapsed) {
 
     // 坐标轴 gizmo 不在 3D 场景中绘制：由 mainwindow 在 ImGui 绘制阶段
     // 以屏幕空间叠加方式渲染于视口角落（见 mainwindow.cpp 的 RenderFrame）
+
+    // ---- 线框模式 ----
+    // 开启时地形与模型以线框渲染（便于观察布线），天空穹/粒子保持原样：
+    // 天空穹始终 FILL（半球线框会视觉污染背景），粒子是点图元不受 polygonMode 影响。
+    // 阴影 Pass 在线框开关之前已结束，深度贴图始终以实体生成，不受影响。
+    // 修改全局 GL 状态必须保存并在作用域结束恢复（AGENTS.md 教训2）。
+    // 【macOS 兼容】开关与恢复都必须整体用 GL_FRONT_AND_BACK 调用：
+    //   Metal 后端（OpenGL 4.1 Metal）对 glPolygonMode(GL_FRONT/_BACK, ...) 单独设置
+    //   face 的调用返回 GL_INVALID_ENUM 且状态不变。若恢复时分开设置 front/back，
+    //   线框关闭后 GL_LINE 残留，连后处理全屏三角形也会退化为边线导致画面全黑。
+    //   front/back 光栅化模式始终一致（本项目从未单面设置），故可直接取 front 值整体恢复。
+    GLint prevPolygonMode[2];
+    glGetIntegerv(GL_POLYGON_MODE, prevPolygonMode);
+    if (m_wireframeEnabled) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
+
     // 绘制地形
     m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, m_lights);
+
+    // 网格地面辅助线：XZ 平面世界网格，独立于光源 gizmo 开关（见 DrawGrid）
+    if (m_gridEnabled && m_debug_draw != nullptr) {
+        DrawGrid();
+        // 线框模式下不额外恢复状态：DebugDraw 是 GL_LINES，polygonMode 不影响线段图元
+        m_debug_draw->Render(m_projection_matrix, m_view_matrix);
+    }
 
     // 绘制配置的粒子系统
     for (auto ps: m_particle_systems) {
@@ -597,13 +680,63 @@ void Renderer::draw(long long elapsed) {
                     break;
             }
         }
+        // 光照范围可视化：在 gizmo 基础上叠加更大的影响范围线框，
+        // 点光源为球形线框、聚光灯为锥体线框、方向光无影响范围概念跳过。
+        if (m_lightRangeEnabled) {
+            for (auto light: m_lights) {
+                if (light == nullptr) {
+                    continue;
+                }
+                switch (light->GetLightType()) {
+                    case LightTypePoint: {
+                        auto *pointLight = static_cast<PointLight *>(light);
+                        const float radius = DebugDraw::ComputePointLightRadius(pointLight);
+                        m_debug_draw->DrawSphereWireframe(pointLight->Position, radius,
+                                                          glm::vec3(0.3f, 1.0f, 0.6f), 24);
+                        break;
+                    }
+                    case LightTypeSpot: {
+                        auto *spotLight = static_cast<SpotLight *>(light);
+                        // 用外锥角（OuterCutoff）绘制完整半影锥体范围
+                        m_debug_draw->DrawConeWireframe(spotLight->Position, spotLight->Direction,
+                                                        spotLight->OuterCutoff, 30.0f,
+                                                        glm::vec3(1.0f, 0.75f, 0.2f), 24);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
         // 批量提交：上传本帧全部 gizmo 线段，一次 glDrawArrays(GL_LINES) 绘制（内部自动 Clear）
         m_debug_draw->Render(m_projection_matrix, m_view_matrix);
     }
 
     // 绘制模型
     for (const auto &m: m_models) {
+        // 共享风格技术（lit/toon）的材质 uniform 会被绘制顺序在后的同技术模型覆盖：
+        // 每帧按模型重设材质，保证材质编辑与多模型共用风格技术时互不串色
+        if (!m->GetMeshes().empty()) {
+            auto matIt = m_model_materials.find(m);
+            Technique *effect = m->GetMeshes()[0]->GetEffect();
+            if (matIt != m_model_materials.end() && effect != nullptr && matIt->second != nullptr) {
+                effect->SetMaterial(matIt->second);
+            }
+        }
         m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, m_lights);
+    }
+
+    // 法线可视化：在模型绘制之后收集所有模型顶点的法线线段，
+    // 颜色按法线方向编码，便于检查法线朝向是否正确
+    if (m_normalVisualizationEnabled && m_debug_draw != nullptr) {
+        CollectModelNormals();
+        m_debug_draw->Render(m_projection_matrix, m_view_matrix);
+    }
+
+    // 线框作用域结束：恢复进入场景 Pass 前的多边形光栅化模式（GL_FILL）。
+    // 必须整体用 GL_FRONT_AND_BACK 恢复（macOS Metal 兼容性，见上方线框模式注释）
+    if (m_wireframeEnabled) {
+        glPolygonMode(GL_FRONT_AND_BACK, prevPolygonMode[0]);
     }
 
     // 场景 Pass 结束，回到默认帧缓冲（SceneFramebuffer 内部恢复主视口）
@@ -677,6 +810,56 @@ Model *Renderer::GetModelByUUID(const string &uuid) {
     return nullptr;
 }
 
+/*
+ * 运行时切换模型渲染风格（基础版，无参数调节）
+ *
+ * 思路（业界常见"共享技术池"做法）：四套标准着色器各持一个共享 Technique
+ * （见 init 中 m_style_techniques），切换 = 把模型所有 mesh 的 effect 换成池中实例。
+ * Mesh::Draw 每帧会重设变换矩阵/相机/灯光/阴影等 uniform，故切换后下一帧自动生效。
+ * 材质是唯一的"隐性状态"，需在切换时立即随模型重设（见 m_model_materials），
+ * 避免共享技术之间残留上一模型的材质 uniform。
+ */
+void Renderer::SetModelStyle(Model *model, RenderStyle style) {
+    if (model == nullptr) {
+        return;
+    }
+    auto it = m_style_techniques.find(style);
+    if (it == m_style_techniques.end()) {
+        return;
+    }
+
+    // 切换技术
+    for (auto *mesh: model->GetMeshes()) {
+        if (mesh != nullptr) {
+            mesh->SetEffect(it->second);
+        }
+    }
+    m_model_styles[model] = style;
+
+    // 同步材质：lit/toon 技术依赖材质 uniform，用本模型材质立即重设，
+    // 防止共享技术残留其它模型（或此前的默认材质）的 uniform 值
+    auto matIt = m_model_materials.find(model);
+    if (matIt != m_model_materials.end() && matIt->second != nullptr) {
+        it->second->SetMaterial(matIt->second);
+    }
+}
+
+RenderStyle Renderer::GetModelStyle(Model *model) const {
+    auto it = m_model_styles.find(model);
+    if (it != m_model_styles.end()) {
+        return it->second;
+    }
+    return RenderStyle::Lit; // 默认与 old.world.yaml 传统光照一致
+}
+
+Material *Renderer::GetModelMaterial(Model *model) const {
+    auto it = m_model_materials.find(model);
+    if (it != m_model_materials.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 Light *Renderer::GetLightByUUID(const std::string &uuid) const {
     for (auto const light: m_lights) {
         if (light->GetUUID() == uuid) {
@@ -724,9 +907,80 @@ bool Renderer::IsShadowMapReady() const {
     return m_shadow_map_ready;
 }
 
+void Renderer::SetFov(float fov) {
+    // 范围钳制：避免极端值导致投影矩阵数值异常
+    m_fov = glm::clamp(fov, 10.0f, 160.0f);
+    // 视野变化需立即生效：以当前窗口尺寸重算投影矩阵
+    calculateProjectMatrix(width, height);
+}
+
+/*
+ * 收集世界网格辅助线（XZ 平面）
+ *
+ * 地形范围 ±100 × 模型缩放 2.1 = ±210，故网格覆盖 ±200；
+ * 间距 20 单位，共 21+21 条等距线段，肉眼可辨且开销极小。
+ * 每条线仅两个调试顶点，通过 DebugDraw::DrawLine 收集后统一提交。
+ * 网格仅与开关（m_gridEnabled）绑定，不受光源 gizmo 开关（m_debugDrawEnabled）影响。
+ */
+void Renderer::DrawGrid() {
+    constexpr float kExtent = 200.0f; // 覆盖范围（半边长，略小于地形最远顶点 ±210）
+    constexpr float kStep = 20.0f;    // 网格间距（单位）
+    constexpr float kY = 0.02f;       // 略高于地面（y=0），避免与地形共面 Z-fighting
+    const glm::vec3 gridColor(0.35f, 0.35f, 0.35f); // 常规网格线：深灰
+
+    // 沿 X 与 Z 两个方向生成相互垂直的两组等距平行线
+    for (float pos = -kExtent; pos <= kExtent + 0.5f; pos += kStep) {
+        // X 方向线：固定 x=pos，从 z=-kExtent 到 z=+kExtent
+        m_debug_draw->DrawLine(glm::vec3(pos, kY, -kExtent), glm::vec3(pos, kY, kExtent), gridColor);
+        // Z 方向线：固定 z=pos，从 x=-kExtent 到 x=+kExtent
+        m_debug_draw->DrawLine(glm::vec3(-kExtent, kY, pos), glm::vec3(kExtent, kY, pos), gridColor);
+    }
+}
+
+/*
+ * 收集模型法线线段到 DebugDraw
+ *
+ * 遍历所有模型的每个网格的每个顶点，把顶点位置沿法线方向延伸一小段，
+ * 作为线段加入 DebugDraw。顶点位置用模型矩阵变换到世界空间，
+ * 法线用模型矩阵的逆转置矩阵（法线矩阵）变换，保证非均匀缩放下方向正确。
+ *
+ * 法线线段长度使用统一的世界空间固定值（m_normalLength，ImGui 可调），
+ * 保证所有模型法线等长、视觉一致；不再按网格包围盒比例计算，
+ * 避免大模型法线过长、小模型法线过短的尺度差异。
+ */
+void Renderer::CollectModelNormals() {
+    for (const auto &model: m_models) {
+        if (model == nullptr) {
+            continue;
+        }
+        // 构造与 Model::Draw 相同的模型矩阵：translate * scale * rotate(Y)
+        glm::mat4 modelMat = glm::mat4(1.0f);
+        modelMat = glm::translate(modelMat, model->GetPosition());
+        modelMat = glm::scale(modelMat, model->GetScale());
+        modelMat = glm::rotate(modelMat, glm::radians(model->GetRotation()), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // 法线矩阵 = 模型矩阵的逆转置，用于把模型空间的法线变换到世界空间，
+        // 保证非均匀缩放时法线方向正确（scale=1 时等价于 modelMat 的旋转部分）
+        glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(modelMat)));
+
+        const auto meshes = model->GetMeshes();
+        for (auto *mesh: meshes) {
+            if (mesh == nullptr) {
+                continue;
+            }
+            for (const auto &vertex: mesh->GetVertices()) {
+                glm::vec3 worldPos = glm::vec3(modelMat * glm::vec4(vertex.Position, 1.0f));
+                glm::vec3 worldNormal = glm::normalize(normalMat * vertex.Normal);
+                // 统一长度（世界空间固定值），所有模型法线视觉等长
+                m_debug_draw->DrawNormal(worldPos, worldNormal, m_normalLength);
+            }
+        }
+    }
+}
+
 void Renderer::calculateProjectMatrix(const int w, const int h) {
     if (m_projectionType == ProjectionType::Perspective) {
-        const float fov = gConfig->Clip.ClipFov; // 视野角度
+        const float fov = m_fov; // 视野角度（member，调试面板可调）
         const float aspectRatio = (float) w / (float) (1 * h); // 宽高比
         const float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
         const float farPlane = gConfig->Clip.ClipFar; // 远平面距离

@@ -618,6 +618,15 @@ void ToyEngineMainWindow::ShowModelProperties() {
     ImGui::Text("名称: %s", model->GetName().c_str());
     ImGui::Separator();
 
+    // ---- 渲染风格（运行时切换，基础版：无参数调节）----
+    // 四套标准着色器：纯色 / 纹理 / 光照 / 卡通，顺序与 RenderStyle 枚举保持一致
+    static const char *kRenderStyleNames[] = {"纯色", "纹理", "光照", "卡通"};
+    int styleIdx = static_cast<int>(m_renderer->GetModelStyle(model));
+    if (ImGui::Combo("渲染风格", &styleIdx, kRenderStyleNames, IM_ARRAYSIZE(kRenderStyleNames))) {
+        m_renderer->SetModelStyle(model, static_cast<RenderStyle>(styleIdx));
+    }
+    ImGui::Separator();
+
     glm::vec3 position = model->GetPosition();
     if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
         model->SetTranslate(position);
@@ -634,13 +643,15 @@ void ToyEngineMainWindow::ShowModelProperties() {
     }
 
     // ---- 材质属性 ----
-    // 从模型的第一个网格获取材质；若使用 TechniqueLight 则显示并可编辑材质参数
+    // 材质按模型单独登记（Renderer::m_model_materials），不读取共享风格技术的
+    // GetMaterial()：Lit/Toon 风格为多模型共用的享实例，其内部材质会被其它模型覆盖。
+    // 仅当前生效风格需要材质（TechniqueLight，即光照/卡通）时才显示材质编辑。
     const auto meshes = model->GetMeshes();
     if (!meshes.empty()) {
         Technique* effect = meshes[0]->GetEffect();
         if (effect != nullptr && effect->GetType() == TechniqueTypeLight) {
             auto* lightEffect = dynamic_cast<TechniqueLight*>(effect);
-            const Material* material = lightEffect->GetMaterial();
+            Material* material = m_renderer->GetModelMaterial(model);
             if (material != nullptr) {
                 ImGui::Separator();
                 ImGui::Text("材质");
@@ -649,9 +660,8 @@ void ToyEngineMainWindow::ShowModelProperties() {
                 }
 
                 // 注意：Material 成员为 public，此处直接修改以实现实时预览；
-                // TechnqiueLight::SetMaterial() 仅在初始化时调用，编辑后需
-                // 重新调用以同步到 GPU uniform。
-                auto* mat = const_cast<Material*>(material);
+                // 编辑后需重新调用 SetMaterial() 同步到当前技术的 GPU uniform。
+                auto* mat = material;
 
                 glm::vec3 ambient = mat->AmbientColor;
                 if (ImGui::ColorEdit3("环境光颜色", glm::value_ptr(ambient))) {
@@ -1049,15 +1059,64 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
  *
  * 集中放置渲染/编辑器调试相关的全局开关，与阴影属性面板相互独立：
  *   - 光源调试线框（DebugDraw）：控制场景中光源位置/范围 gizmo 的显示
- * 后续新增调试项（帧率图、GL 状态覆盖等）统一补充到这里。
+ *   - 线框模式：地形/模型以线框渲染（GLPolygonMode 切换，阴影 Pass 不受影响）
+ *   - 网格地面：XZ 平面世界网格辅助线，帮助判断空间方位
+ *   - 视口背景色：运行时修改 glClearColor RGB（ColorEdit3 调色器）
+ *   - 视野 FOV（度）：滑块实时调整透视投影范围
+ * 后续新增调试项统一补充到这里。
  */
 void ToyEngineMainWindow::ShowDebugPropertiesPanel() {
     ImGui::Begin("调试属性", &m_showDebugProperties, ImGuiWindowFlags_NoCollapse);
 
-    // 光源调试可视化（DebugDraw gizmo）开关：关闭后隐藏场景中的光源位置/范围线框
+    // ---- 光源调试可视化 ----
     bool debugDraw = m_renderer->IsDebugDrawEnabled();
     if (ImGui::Checkbox("光源调试线框 (DebugDraw)", &debugDraw)) {
         m_renderer->SetDebugDrawEnabled(debugDraw);
+    }
+
+    // ---- 线框模式 ----
+    bool wireframe = m_renderer->IsWireframeEnabled();
+    if (ImGui::Checkbox("线框模式 (场景)", &wireframe)) {
+        m_renderer->SetWireframeEnabled(wireframe);
+    }
+
+    // ---- 网格地面辅助线 ----
+    bool grid = m_renderer->IsGridEnabled();
+    if (ImGui::Checkbox("网格地面", &grid)) {
+        m_renderer->SetGridEnabled(grid);
+    }
+
+    // ---- 法线可视化 ----
+    // 启用时模型顶点法线以彩色线段显示（RGB 编码方向），用于检查法线朝向
+    bool normalVis = m_renderer->IsNormalVisualizationEnabled();
+    if (ImGui::Checkbox("法线可视化", &normalVis)) {
+        m_renderer->SetNormalVisualizationEnabled(normalVis);
+    }
+    // 法线线段统一长度（世界空间单位），滑块实时调整，所有模型等长
+    float normalLen = m_renderer->GetNormalLength();
+    if (ImGui::SliderFloat("法线长度", &normalLen, 0.1f, 10.0f, "%.1f")) {
+        m_renderer->SetNormalLength(normalLen);
+    }
+
+    // ---- 光照范围可视化 ----
+    // 在光源 gizmo 基础上叠加球形/锥形影响范围线框，直观展示衰减边界
+    bool lightRange = m_renderer->IsLightRangeEnabled();
+    if (ImGui::Checkbox("光照范围可视化", &lightRange)) {
+        m_renderer->SetLightRangeEnabled(lightRange);
+    }
+
+    ImGui::Separator();
+
+    // ---- 视口背景色 ----
+    glm::vec3 clearColor = m_renderer->GetClearColor();
+    if (ImGui::ColorEdit3("视口背景色", glm::value_ptr(clearColor))) {
+        m_renderer->SetClearColor(clearColor);
+    }
+
+    // ---- 视野 FOV（度）----
+    float fov = m_renderer->GetFov();
+    if (ImGui::SliderFloat("FOV (度)", &fov, 10.0f, 160.0f, "%.1f")) {
+        m_renderer->SetFov(fov);
     }
 
     ImGui::End();

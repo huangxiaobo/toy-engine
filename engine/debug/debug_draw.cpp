@@ -287,16 +287,34 @@ void DebugDraw::DrawDirectionLight(const DirectionLight *light) {
 }
 
 /*
+ * 绘制单个顶点的法线线段
+ *
+ * 颜色按法线方向编码：将归一化法线 XYZ 各分量从 [-1,1] 映射到 [0.5,1]，
+ * 使线段保持亮色（避免半黑不可见），且三个分量能直观区分法线朝向
+ * （如 +X 偏红、+Y 偏绿、+Z 偏蓝）。
+ */
+void DebugDraw::DrawNormal(const glm::vec3 &vertexPos, const glm::vec3 &normal, float length) {
+    glm::vec3 n = normal;
+    const float len = glm::length(n);
+    if (len < 1e-6f) {
+        return; // 零法线不绘制，避免退化线段
+    }
+    n /= len;
+    // 法线方向 -> 亮色编码：[-1,1] -> [0.5,1]，保证三通道都在可见亮度以上
+    const glm::vec3 color = n * 0.25f + 0.75f;
+    DrawLine(vertexPos, vertexPos + n * length, color);
+}
+
+/*
  * 每帧统一提交渲染
  *
  * 1. CPU 顶点列表非空才执行（无 gizmo 时零开销）；
  * 2. 启用调试着色器（纯顶点色，不参与光照），上传 projection/view；
- * 3. 全量重传顶点到动态 VBO（GL_DYNAMIC_DRAW）——每帧顶点量级小（数千条线），
- *    重传成本可忽略，换来"改数据即改画面"的简洁性；
+ * 3. 全量重传顶点到动态 VBO（GL_DYNAMIC_DRAW）；
  * 4. glDrawArrays(GL_LINES) 一次批量绘制全部线段；
  * 5. 绘制结束自动 Clear() 释放本帧列表。
  *
- * 注意：本方法不修改全局 OpenGL 状态（深度测试/混合等），调用方负责在
+ * 注意：不修改全局 OpenGL 状态（深度测试/混合等），调用方负责在
  * 场景 Pass 内调用（深度测试开启），遵循 AGENTS.md 教训2"状态不泄漏"。
  */
 void DebugDraw::Render(const glm::mat4 &projection, const glm::mat4 &view) {

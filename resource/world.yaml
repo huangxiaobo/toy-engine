@@ -118,9 +118,9 @@ world:
       id: "b1000000-0000-0000-0000-000000000002"
       enabled: true
       position:
-        x: -20.0
+        x: 0.0
         y: 20.0
-        z: 0.0
+        z: 20.0
         w: 1.0
       color:
         r: 0.0
@@ -269,8 +269,8 @@ world:
         technique:
           name: light
       shader:
-        vert: "./resource/model/bunny/shader.vert"
-        frag: "./resource/model/bunny/shader.frag"
+        vert: "./resource/shader/toon.vert"
+        frag: "./resource/shader/toon.frag"
 
       material:
         file: "./resource/model/bunny/bunny.mtl"
@@ -294,8 +294,8 @@ world:
         technique:
           name: light
       shader:
-        vert: "./resource/model/sphere/shader.vert"
-        frag: "./resource/model/sphere/shader.frag"
+        vert: "./resource/shader/lit.vert"
+        frag: "./resource/shader/lit.frag"
       material:
         file: "./resource/model/sphere/sphere.mtl"
         name: "sphere_material"

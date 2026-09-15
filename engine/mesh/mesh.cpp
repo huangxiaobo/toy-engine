@@ -243,6 +243,9 @@ void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
     }
 
     // 绑定纹理：漫反射贴图用第0纹理单元（gTexture），法线贴图用第1纹理单元（gNormalMap）
+    // gHasTexture / gHasNormalMap 标志供着色器判断是否采样贴图：
+    // 无贴图时（m_textureID == 0）关闭采样，避免采样到残留/脏纹理单元导致的错误着色
+    this->m_effect->SetUniform("gHasTexture", m_textureID != 0 ? 1 : 0);
     if (m_textureID != 0) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_textureID);
@@ -250,6 +253,7 @@ void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
         this->m_effect->SetUniform("gTexture", 0);
     }
 
+    this->m_effect->SetUniform("gHasNormalMap", m_normalMapID != 0 ? 1 : 0);
     if (m_normalMapID != 0) {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, m_normalMapID);
