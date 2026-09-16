@@ -58,6 +58,9 @@ public:
     // 绘制带箭头头的线段：主轴线 + 顶端两条斜线箭头
     void DrawArrow(const glm::vec3 &from, const glm::vec3 &to, const glm::vec3 &color);
 
+    // 绘制轴对齐线框盒：min/max 为世界空间对角点，12 条边勾勒（拾取高亮等用途）
+    void DrawBoxWireframe(const glm::vec3 &min, const glm::vec3 &max, const glm::vec3 &color);
+
     // ---- 光源可视化 gizmo（参数每帧直接从 Light 对象读取，自动跟随编辑）----
 
     // 点光源：斐波那契球面放射线，长度 = 由衰减系数反推的影响半径

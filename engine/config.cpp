@@ -261,46 +261,8 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                     particleConfig.MaxVelocity = glm::vec3(0.5f, 3.0f, 0.5f);
                 }
                 
-                if (particle_node["min_color"]) {
-                    particleConfig.MinColor = glm::vec3(
-                        particle_node["min_color"]["r"].as<float>(),
-                        particle_node["min_color"]["g"].as<float>(),
-                        particle_node["min_color"]["b"].as<float>()
-                    );
-                } else {
-                    particleConfig.MinColor = glm::vec3(1.0f, 0.6f, 0.0f);
-                }
-                
-                if (particle_node["max_color"]) {
-                    particleConfig.MaxColor = glm::vec3(
-                        particle_node["max_color"]["r"].as<float>(),
-                        particle_node["max_color"]["g"].as<float>(),
-                        particle_node["max_color"]["b"].as<float>()
-                    );
-                } else {
-                    particleConfig.MaxColor = glm::vec3(1.0f, 1.0f, 0.2f);
-                }
-                
-                if (particle_node["min_color_end"]) {
-                    particleConfig.MinColorEnd = glm::vec3(
-                        particle_node["min_color_end"]["r"].as<float>(),
-                        particle_node["min_color_end"]["g"].as<float>(),
-                        particle_node["min_color_end"]["b"].as<float>()
-                    );
-                } else {
-                    particleConfig.MinColorEnd = glm::vec3(1.0f, 0.0f, 0.0f);
-                }
-                
-                if (particle_node["max_color_end"]) {
-                    particleConfig.MaxColorEnd = glm::vec3(
-                        particle_node["max_color_end"]["r"].as<float>(),
-                        particle_node["max_color_end"]["g"].as<float>(),
-                        particle_node["max_color_end"]["b"].as<float>()
-                    );
-                } else {
-                    particleConfig.MaxColorEnd = glm::vec3(0.8f, 0.2f, 0.0f);
-                }
-                
+                // 颜色不再由 YAML 配置，改由发射器内部"烟花配色表"决定（见 ParticleEmitter::RandomFireworkColor）
+
                 particleConfig.MinSizeEnd = particle_node["min_size_end"] ? particle_node["min_size_end"].as<float>() : 0.0f;
                 particleConfig.MaxSizeEnd = particle_node["max_size_end"] ? particle_node["max_size_end"].as<float>() : 0.02f;
                 

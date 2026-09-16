@@ -20,8 +20,6 @@ public:
     float MinLife, MaxLife;       // 生命周期范围
     float MinSize, MaxSize;       // 大小范围
     glm::vec3 MinVelocity, MaxVelocity; // 速度范围
-    glm::vec3 MinColor, MaxColor; // 颜色范围
-    glm::vec3 MinColorEnd, MaxColorEnd; // 结束颜色范围
     float MinSizeEnd, MaxSizeEnd; // 结束大小范围
     
     // 物理属性
@@ -45,6 +43,8 @@ private:
     
     float RandomFloat(float min, float max);
     glm::vec3 RandomVec3(const glm::vec3& min, const glm::vec3& max);
+    int RandomInt(int min, int max);
+    glm::vec3 RandomFireworkColor();
 };
 
 #endif

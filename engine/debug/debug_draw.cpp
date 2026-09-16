@@ -162,6 +162,35 @@ void DebugDraw::DrawArrow(const glm::vec3 &from, const glm::vec3 &to, const glm:
 }
 
 /*
+ * 绘制轴对齐线框盒：min/max 为世界空间对角点，12 条边勾勒
+ *
+ * 具体边集合：底面 4 条 + 顶面 4 条 + 连接上下底的竖棱 4 条。
+ * 用于拾取高亮、包围盒可视化等需要"框住一个区域"的调试场景。
+ */
+void DebugDraw::DrawBoxWireframe(const glm::vec3 &min, const glm::vec3 &max, const glm::vec3 &color) {
+    // 八个角点（按底/顶两类枚举，便于成对连线）
+    const glm::vec3 corners[8] = {
+        glm::vec3(min.x, min.y, min.z), glm::vec3(max.x, min.y, min.z),
+        glm::vec3(max.x, min.y, max.z), glm::vec3(min.x, min.y, max.z),  // 底面
+        glm::vec3(min.x, max.y, min.z), glm::vec3(max.x, max.y, min.z),
+        glm::vec3(max.x, max.y, max.z), glm::vec3(min.x, max.y, max.z),  // 顶面
+    };
+
+    // 底面闭合环（0-1-2-3-0）
+    for (int i = 0; i < 4; ++i) {
+        DrawLine(corners[i], corners[(i + 1) % 4], color);
+    }
+    // 顶面闭合环（4-5-6-7-4）
+    for (int i = 4; i < 8; ++i) {
+        DrawLine(corners[i], corners[(i == 7) ? 4 : (i + 1)], color);
+    }
+    // 四根竖棱（底面点 <-> 对应顶面点）
+    for (int i = 0; i < 4; ++i) {
+        DrawLine(corners[i], corners[i + 4], color);
+    }
+}
+
+/*
  * 绘制点光源 gizmo（放射线球面）
  *
  * 从光源位置沿斐波那契球面均匀分布的 128 个方向放射线段到影响边界，

@@ -61,6 +61,9 @@ public:
     // 获取总三角形数量（用于调试）
     int GetTotalTriangleCount() const;
 
+    // 获取地形网格（供鼠标拾取读取顶点/索引；不拥有，转发自 TerrainChunk）
+    class Mesh* GetTerrainMesh() const;
+
 private:
     // 配置
     TerrainConfig m_config;

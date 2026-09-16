@@ -134,3 +134,10 @@ int TerrainManager::GetTotalTriangleCount() const {
     }
     return m_plane->GetTriangleCount();
 }
+
+class Mesh* TerrainManager::GetTerrainMesh() const {
+    if (m_plane) {
+        return m_plane->GetMesh();
+    }
+    return nullptr;
+}

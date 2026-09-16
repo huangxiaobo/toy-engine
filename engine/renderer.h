@@ -106,6 +106,12 @@ public:
     // 获取相机
     Camera *GetCamera() const { return m_camera; }
 
+    // 获取当前投影矩阵（供鼠标拾取等需要与渲染一致的空间换算复用）
+    const glm::mat4 &GetProjectionMatrix() const { return m_projection_matrix; }
+
+    // 获取当前视图矩阵（与 GetProjectionMatrix 配套，供拾取反投影使用）
+    const glm::mat4 &GetViewMatrix() const { return m_view_matrix; }
+
     // 获取当前相机操控器（相机交互逻辑由操控器承载，与相机状态分离）
     OrbitManipulator *GetManipulator() const { return m_manipulator; }
 
@@ -182,6 +188,12 @@ public:
     // 查询模型的材质指针（属性面板显示/编辑用，Mesh 上的 Technique 可能为共享
     // 风格技术，其内部 m_material 会被其它模型覆盖，故必须按模型单独登记）
     Material *GetModelMaterial(Model *model) const;
+
+    // ---- 拾取高亮 ----
+    // 设置鼠标拾取结果的线框高亮盒（世界空间 AABB），下一帧生效；传入空盒清除高亮
+    void SetPickHighlight(const glm::vec3 &min, const glm::vec3 &max);
+    // 清除拾取高亮（与 SetPickHighlight 传空盒等价，语义更明确）
+    void ClearPickHighlight();
 
 private:
     void calculateProjectMatrix(int w, int h);
@@ -280,6 +292,12 @@ private:
     unsigned int m_post_vao = 0;
     // tone mapping 是否启用（见 SetToneMappingEnabled）
     bool m_toneMappingEnabled = true;
+
+    // ---- 拾取高亮状态 ----
+    // 鼠标拾取结果的线框高亮盒（世界空间 AABB），draw 末尾用 DebugDraw 叠加绘制
+    // 空盒（min==max）表示无高亮
+    glm::vec3 m_pickHighlightMin = glm::vec3(0.0f);
+    glm::vec3 m_pickHighlightMax = glm::vec3(0.0f);
 };
 
 #endif

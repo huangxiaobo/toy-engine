@@ -50,6 +50,9 @@ public:
     // 获取网格三角形数量（用于调试显示）
     int GetTriangleCount() const { return m_resolution * m_resolution * 2; }
 
+    // 获取地形网格指针（供鼠标拾取读取顶点与索引；不拥有，生命周期由本类管理）
+    Mesh* GetMesh() const { return m_mesh.get(); }
+
 private:
     // 生成平面网格（不含高度）
     void GeneratePlaneVertices(std::vector<struct Vertex>& vertices,

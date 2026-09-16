@@ -61,6 +61,15 @@ public:
 
     vector<Mesh *> GetMeshes() const;
 
+    /*
+     * 获取模型世界变换矩阵
+     *
+     * 返回与 Draw() 内部完全相同的本地变换矩阵（T(position) × S(scale) × R(m_matrix, rotation)），
+     * 供鼠标拾取、日后物理/调试等需要「与渲染几何一致」的空间变换复用。
+     * 拾取必须使用本矩阵而非手动重建，否则与画面实际显示的几何位置不一致导致点不中。
+     */
+    glm::mat4 GetWorldMatrix() const;
+
     glm::vec3 GetPosition() const;
 
     glm::vec3 GetScale() const;

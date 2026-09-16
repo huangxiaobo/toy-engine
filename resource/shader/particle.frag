@@ -65,8 +65,13 @@ void main() {
     // 实现粒子随生命减少逐渐淡出的效果
     float fade = texColor.a * vLifeRatio;
 
+    // 纹理颜色对粒子色调的影响权重：0.0 = 纯粒子色，1.0 = 完全按纹理调制
+    // 棋盘格纹理的黑色方格会将颜色压暗至 0，设为 0.35 既能保留纹理细节，
+    // 又不让棋盘格大幅削弱烟花的鲜艳发光效果
+    const float kTextureColorWeight = 0.35;
+
     // ========== 第五步：最终颜色合成 ==========
-    // RGB: 粒子颜色 × 纹理颜色（纹理用于增加细节变化）
+    // RGB: 粒子颜色 × 混合纹理（轻度影响），保持烟花色彩鲜艳
     // A:   圆形 alpha × 淡出 alpha（两者的乘积）
-    color = vec4(vColor * texColor.rgb, alpha * fade);
+    color = vec4(vColor * mix(vec3(1.0), texColor.rgb, kTextureColorWeight), alpha * fade);
 }

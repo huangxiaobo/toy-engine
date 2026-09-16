@@ -28,6 +28,8 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <cmath>
+#include <limits>
 
 #include <iostream>
 
@@ -938,15 +940,34 @@ void ToyEngineMainWindow::ShowParticleProperties() {
     ImGui::DragFloat3("最小速度", glm::value_ptr(emitter->MinVelocity), 0.1f);
     ImGui::DragFloat3("最大速度", glm::value_ptr(emitter->MaxVelocity), 0.1f);
 
-    // 颜色
+    // 颜色：烟花配色表（只读，由 ParticleEmitter 内部调色板决定）
     ImGui::Separator();
-    ImGui::Text("初始颜色");
-    ImGui::ColorEdit3("最小颜色", glm::value_ptr(emitter->MinColor));
-    ImGui::ColorEdit3("最大颜色", glm::value_ptr(emitter->MaxColor));
-
-    ImGui::Text("结束颜色");
-    ImGui::ColorEdit3("最小结束颜色", glm::value_ptr(emitter->MinColorEnd));
-    ImGui::ColorEdit3("最大结束颜色", glm::value_ptr(emitter->MaxColorEnd));
+    ImGui::Text("颜色（烟花配色表）");
+    {
+        // 调色板与 particle_emitter.cpp 中 kFireworkPalette 保持一致
+        static const float kPalette[][3] = {
+            {1.00f, 0.84f, 0.00f}, // 金色
+            {1.00f, 1.00f, 0.20f}, // 明黄
+            {1.00f, 0.55f, 0.00f}, // 橙红
+            {1.00f, 0.10f, 0.05f}, // 火红
+            {1.00f, 0.25f, 0.50f}, // 粉红
+            {1.00f, 0.00f, 1.00f}, // 品红
+            {0.70f, 0.00f, 1.00f}, // 紫罗兰
+            {0.00f, 0.40f, 1.00f}, // 蓝色
+            {0.00f, 1.00f, 0.90f}, // 青色
+            {0.10f, 1.00f, 0.20f}, // 翠绿
+        };
+        const float swatchSize = 18.0f;
+        for (int i = 0; i < 10; i++) {
+            ImGui::ColorButton(
+                "##palswatch",
+                ImVec4(kPalette[i][0], kPalette[i][1], kPalette[i][2], 1.0f),
+                ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip,
+                ImVec2(swatchSize, swatchSize)
+            );
+            if (i < 9) ImGui::SameLine();
+        }
+    }
 
     // 物理
     ImGui::Separator();
@@ -1319,6 +1340,101 @@ void ToyEngineMainWindow::DrawViewportAxisGizmo() {
     axis->Draw(camera->GetViewMatrix(), center);
 }
 
+// ---- 3D 拾取辅助函数 ----
+
+// 拾取半径（世界单位）：用于点光源/聚光灯/粒子发射器的射线-球求交。
+// 取较小的固定值，点击 gizmo 附近即可命中，无需精确点中对象中心。
+static constexpr float kPickRadius = 0.5f;
+
+/*
+ * 射线-三角形求交（Möller–Trumbore 算法）
+ *
+ * 返回是否相交，相交时通过 outT 输出射线参数 t（命中点 = origin + t * dir）。
+ * 只计算正面相交（det 过小视为与三角面片平行，不视为命中），
+ * t 必须大于 0（射线前进方向上的命中）。
+ */
+static bool RayTriangleIntersect(
+    const glm::vec3& origin, const glm::vec3& dir,
+    const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2,
+    float& outT) {
+    const float kEpsilon = 1e-6f;
+
+    // 计算两个边向量，构造以 v0 为原点的局部坐标系
+    const glm::vec3 edge1 = v1 - v0;
+    const glm::vec3 edge2 = v2 - v0;
+
+    // Möller–Trumbore：先用 dir × edge2 得到 P 向量，det 为三角形法线与射线的点积
+    const glm::vec3 p = glm::cross(dir, edge2);
+    const float det = glm::dot(edge1, p);
+
+    // |det| 过小说明射线与三角形所在平面几乎平行（掠射），跳过避免除零与病态结果
+    if (std::fabs(det) < kEpsilon) {
+        return false;
+    }
+    const float invDet = 1.0f / det;
+
+    // 射线起点相对三角形顶点 v0 的偏移向量
+    const glm::vec3 tVec = origin - v0;
+
+    // 重心坐标 u（沿 edge1 方向）
+    const float u = glm::dot(tVec, p) * invDet;
+    if (u < 0.0f || u > 1.0f) {
+        return false;
+    }
+
+    // 重心坐标 v（沿 edge2 方向）
+    const glm::vec3 q = glm::cross(tVec, edge1);
+    const float v = glm::dot(dir, q) * invDet;
+    if (v < 0.0f || u + v > 1.0f) {
+        return false;
+    }
+
+    // 距离参数 t（沿射线方向），必须为正值（只取射线前方的命中）
+    const float t = glm::dot(edge2, q) * invDet;
+    if (t <= 0.0f) {
+        return false;
+    }
+
+    outT = t;
+    return true;
+}
+
+/*
+ * 射线-球体求交
+ *
+ * 用于点光源/聚光灯/粒子发射器等"有位置、无网格"对象的拾取。
+ * 解二次方程 |origin + t*dir - center|² = r²，返回最近的正根 t。
+ */
+static bool RaySphereIntersect(
+    const glm::vec3& origin, const glm::vec3& dir,
+    const glm::vec3& center, float radius,
+    float& outT) {
+    // 将射线方程代入球方程后展开为关于 t 的二次方程 a*t² + b*t + c = 0，
+    // 其中 dir 为单位向量所以 a == 1，可直接用简化判别式
+    const glm::vec3 oc = origin - center;
+    const float b = glm::dot(oc, dir);
+    const float c = glm::dot(oc, oc) - radius * radius;
+
+    // 判别式 < 0：射线与球不相交
+    const float discriminant = b * b - c;
+    if (discriminant < 0.0f) {
+        return false;
+    }
+
+    // 取最近的正根 t = -b - sqrt(disc)；若为负则取另一个根（起点在球内的情况）
+    const float sqrtDisc = std::sqrt(discriminant);
+    float t = -b - sqrtDisc;
+    if (t < 0.0f) {
+        t = -b + sqrtDisc;
+    }
+    if (t < 0.0f) {
+        return false;
+    }
+
+    outT = t;
+    return true;
+}
+
 // ---- 选择管理 ----
 void ToyEngineMainWindow::SelectObject(void* obj, const std::string& type) {
     m_selectedObject = obj;
@@ -1331,12 +1447,242 @@ void ToyEngineMainWindow::ClearSelection() {
     m_selectedParticleIndex = -1;
 }
 
+/*
+ * 3D 拾取：从鼠标点击位置发出一条拾取射线，与场景中所有可拾取对象求交，
+ * 选中"最近"的命中对象并联动属性面板（SelectObject）与渲染器高亮（SetPickHighlight）。
+ *
+ * 拾取流程：
+ *   1. 鼠标屏幕坐标（ImGui 逻辑坐标）→ 归一化设备坐标 NDC（Y 翻转，origin 在左上）；
+ *   2. 用「逆(投影 × 视图)」矩阵把近/远裁剪面上的同一像素反投影回世界空间，
+ *      构成世界射线（近点 = 射线原点，远点 - 近点 = 射线方向）；
+ *   3. 依次与模型（逐三角形 Möller–Trumbore，顶点经 GetWorldMatrix 变换）、
+ *      点/聚光灯（射线-球）、粒子发射器（射线-球）、地形（单位矩阵世界坐标三角形）求交，
+ *      保留 t 最小（沿射线最近）的命中；
+ *   4. 命中 → SelectObject + SetPickHighlight(命中对象包围盒)；未命中 → 清除选择与高亮。
+ */
+void ToyEngineMainWindow::PerformPick() {
+    // 渲染器或视口尚未就绪（首帧 DockSpace 布局未完成）时无法拾取
+    if (!m_renderer || m_viewportWidth <= 0.0f || m_viewportHeight <= 0.0f) {
+        return;
+    }
+
+    // 取当前鼠标位置（ImGui 窗口逻辑坐标，位于中央 3D 视口内时才拾取；
+    // 视口外的点击已被 ImGui WantCaptureMouse 拦截，此处仅做兜底）
+    double cursorX = 0.0, cursorY = 0.0;
+    glfwGetCursorPos(m_window, &cursorX, &cursorY);
+
+    // 屏幕像素坐标 → NDC：先归一化到 [0,1]，再映射到 [-1,1]（NDC 的 Y 轴向上）
+    const float ndcX = static_cast<float>((cursorX - m_viewportX) / m_viewportWidth) * 2.0f - 1.0f;
+    const float ndcY = 1.0f - static_cast<float>((cursorY - m_viewportY) / m_viewportHeight) * 2.0f;
+
+    // 拾取必须使用与渲染完全一致的投影/视图矩阵（当前相机 + 当前宽高比）
+    const glm::mat4 invViewProj = glm::inverse(
+        m_renderer->GetProjectionMatrix() * m_renderer->GetViewMatrix());
+
+    // 近/远裁剪面上的同一点（NDC z = -1 / +1）反投影到世界空间，构成拾取射线
+    const glm::vec4 nearWorld4 = invViewProj * glm::vec4(ndcX, ndcY, -1.0f, 1.0f);
+    const glm::vec4 farWorld4  = invViewProj * glm::vec4(ndcX, ndcY,  1.0f, 1.0f);
+    const glm::vec3 rayOrigin = glm::vec3(nearWorld4) / nearWorld4.w;
+    const glm::vec3 rayDir = glm::normalize(glm::vec3(farWorld4) / farWorld4.w - rayOrigin);
+
+    // 记录沿射线最近（t 最小）的命中对象
+    float bestT = std::numeric_limits<float>::max();
+    void* hitObject = nullptr;
+    std::string hitType;
+    int hitParticleIndex = -1;
+
+    // ---- 模型：逐三角形求交 ----
+    // 把射线变换到模型本地空间求交（避免逐顶点做世界变换）：
+    // 世界坐标射线 × 逆世界矩阵 → 本地坐标射线，等价于把网格顶点留在本地坐标系做测试。
+    for (Model* model : m_renderer->GetModels()) {
+        if (model == nullptr) {
+            continue;
+        }
+        const glm::mat4 invWorld = glm::inverse(model->GetWorldMatrix());
+        const glm::vec3 localOrigin = glm::vec3(invWorld * glm::vec4(rayOrigin, 1.0f));
+        const glm::vec3 localDir = glm::normalize(glm::vec3(invWorld * glm::vec4(rayDir, 0.0f)));
+
+        for (Mesh* mesh : model->GetMeshes()) {
+            // 只有三角形图元才能按「每 3 个索引一个三角形」拾取；
+            // GL_LINES/GL_POINTS 等调试类网格无面片概念，跳过
+            if (mesh == nullptr || mesh->DrawMode != GL_TRIANGLES || mesh->indices.size() < 3) {
+                continue;
+            }
+            const std::vector<Vertex>& verts = mesh->vertices;
+            const std::vector<GLuint>& idx = mesh->indices;
+            // 采用索引三角形的图元拓扑（GL_TRIANGLES），每 3 个索引构成一个三角形
+            for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+                float t = 0.0f;
+                if (RayTriangleIntersect(localOrigin, localDir,
+                        verts[idx[i]].Position,
+                        verts[idx[i + 1]].Position,
+                        verts[idx[i + 2]].Position, t) && t < bestT) {
+                    bestT = t;
+                    hitObject = model;
+                    hitType = "Model";
+                }
+            }
+        }
+    }
+
+    // ---- 点光源 / 聚光灯：射线-球求交（方向光无位置，跳过）----
+    // 拾取半径取 0.5（世界单位），点击光源 gizmo 附近即可命中，无需精确点中
+    for (Light* light : m_renderer->GetLights()) {
+        if (light == nullptr || !light->IsEnabled()) {
+            continue;
+        }
+        glm::vec3 lightPos;
+        switch (light->GetLightType()) {
+            case LightTypePoint:
+                lightPos = static_cast<PointLight*>(light)->Position;
+                break;
+            case LightTypeSpot:
+                lightPos = static_cast<SpotLight*>(light)->Position;
+                break;
+            default:
+                continue; // 方向光没有世界位置可拾取
+        }
+
+        float t = 0.0f;
+        if (RaySphereIntersect(rayOrigin, rayDir, lightPos, kPickRadius, t) && t < bestT) {
+            bestT = t;
+            hitObject = light;
+            hitType = "Light";
+        }
+    }
+
+    // ---- 粒子系统：以发射器位置做射线-球求交 ----
+    const std::vector<ParticleSystem*>& particleSystems = m_renderer->GetParticleSystems();
+    for (size_t i = 0; i < particleSystems.size(); ++i) {
+        const ParticleSystem* ps = particleSystems[i];
+        if (ps == nullptr || ps->GetEmitter() == nullptr) {
+            continue;
+        }
+
+        float t = 0.0f;
+        if (RaySphereIntersect(rayOrigin, rayDir, ps->GetEmitter()->Position, kPickRadius, t) && t < bestT) {
+            bestT = t;
+            hitObject = const_cast<ParticleSystem*>(ps);
+            hitType = "Particle";
+            hitParticleIndex = static_cast<int>(i);
+        }
+    }
+
+    // ---- 地形：单位矩阵绘制，网格顶点即为世界坐标，直接逐三角形求交 ----
+    TerrainManager* terrain = m_renderer->GetTerrainManager();
+    if (terrain != nullptr) {
+        Mesh* terrainMesh = terrain->GetTerrainMesh();
+        if (terrainMesh != nullptr && terrainMesh->indices.size() >= 3) {
+            const std::vector<Vertex>& verts = terrainMesh->vertices;
+            const std::vector<GLuint>& idx = terrainMesh->indices;
+            for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+                float t = 0.0f;
+                if (RayTriangleIntersect(rayOrigin, rayDir,
+                        verts[idx[i]].Position,
+                        verts[idx[i + 1]].Position,
+                        verts[idx[i + 2]].Position, t) && t < bestT) {
+                    bestT = t;
+                    hitObject = terrain;
+                    hitType = "Terrain";
+                }
+            }
+        }
+    }
+
+    // ---- 命中分发：选中 + 高亮；未命中则清除选择与高亮 ----
+    if (hitObject == nullptr) {
+        ClearSelection();
+        m_renderer->ClearPickHighlight();
+        return;
+    }
+
+    SelectObject(hitObject, hitType);
+    if (hitType == "Particle") {
+        m_selectedParticleIndex = hitParticleIndex;
+    }
+
+    // 计算命中对象的包围盒用于线框高亮：
+    //   模型/地形 —— 遍历网格顶点（含变换）求世界空间 AABB；
+    //   灯光/粒子 —— 直接以位置 ± 半径构成小盒
+    glm::vec3 aabbMin(0.0f), aabbMax(0.0f);
+    if (hitType == "Model" || hitType == "Terrain") {
+        // 初始化 AABB 为反向极大/极小值
+        aabbMin = glm::vec3(std::numeric_limits<float>::max());
+        aabbMax = glm::vec3(-std::numeric_limits<float>::max());
+
+        std::vector<Mesh*> meshes;
+        glm::mat4 world(1.0f);
+        if (hitType == "Model") {
+            Model* model = static_cast<Model*>(hitObject);
+            meshes = model->GetMeshes();
+            world = model->GetWorldMatrix();
+        } else {
+            Mesh* terrainMesh = terrain->GetTerrainMesh();
+            if (terrainMesh != nullptr) {
+                meshes.push_back(terrainMesh);
+            }
+        }
+
+        for (const Mesh* mesh : meshes) {
+            if (mesh == nullptr) {
+                continue;
+            }
+            for (const Vertex& v : mesh->vertices) {
+                const glm::vec3 worldPos = glm::vec3(world * glm::vec4(v.Position, 1.0f));
+                aabbMin = glm::min(aabbMin, worldPos);
+                aabbMax = glm::max(aabbMax, worldPos);
+            }
+        }
+
+        // 顶点列表为空时回退为无高亮（正常模型/地形必有顶点，此处仅防御）
+        if (aabbMax.x < aabbMin.x) {
+            m_renderer->ClearPickHighlight();
+            return;
+        }
+    } else {
+        // 灯光 / 粒子：以命中位置为中心的小包围盒
+        glm::vec3 center(0.0f);
+        if (hitType == "Light") {
+            auto* light = static_cast<Light*>(hitObject);
+            if (light->GetLightType() == LightTypePoint) {
+                center = static_cast<PointLight*>(light)->Position;
+            } else {
+                center = static_cast<SpotLight*>(light)->Position;
+            }
+        } else if (hitType == "Particle") {
+            center = static_cast<ParticleSystem*>(hitObject)->GetEmitter()->Position;
+        }
+        aabbMin = center - glm::vec3(kPickRadius);
+        aabbMax = center + glm::vec3(kPickRadius);
+    }
+
+    m_renderer->SetPickHighlight(aabbMin, aabbMax);
+}
+
 // ---- 鼠标事件 ----
 // 所有 ImGui 捕获判断已在 GLFW 回调（MouseButtonCallback / CursorPosCallback / ScrollCallback）中完成
+
+// 区分"点击"与"拖拽"的位移阈值（像素）：
+// 左键按下到松开位移小于该值视为点击（触发 3D 拾取），
+// 大于等于该值视为拖拽（用于轨道相机旋转/平移，不触发拾取）。
+static constexpr double kClickDragThresholdPx = 5.0;
+
 void ToyEngineMainWindow::OnMouseLeftButtonDown() {
+    // 记录左键按下位置，供松开时判断是否为"点击"（位移 < 阈值）
+    glfwGetCursorPos(m_window, &m_mouseDownX, &m_mouseDownY);
 }
 
 void ToyEngineMainWindow::OnMouseLeftButtonUp() {
+    // 松开时计算与按下位置的位移，小于阈值判定为"点击"并触发 3D 拾取；
+    // 拖拽（位移较大）仅用于相机控制，不触发拾取。
+    double cx = 0.0, cy = 0.0;
+    glfwGetCursorPos(m_window, &cx, &cy);
+
+    const double dx = cx - m_mouseDownX;
+    const double dy = cy - m_mouseDownY;
+    if (dx * dx + dy * dy < kClickDragThresholdPx * kClickDragThresholdPx) {
+        PerformPick();
+    }
 }
 
 void ToyEngineMainWindow::OnMouseRightButtonDown() {

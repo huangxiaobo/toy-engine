@@ -130,8 +130,6 @@ public:
     float MinLife, MaxLife;
     float MinSize, MaxSize;
     glm::vec3 MinVelocity, MaxVelocity;
-    glm::vec3 MinColor, MaxColor;
-    glm::vec3 MinColorEnd, MaxColorEnd;
     float MinSizeEnd, MaxSizeEnd;
     
     glm::vec3 Gravity;

@@ -308,19 +308,35 @@ glm::f32 Model::GetRotation() const {
 }
 
 /*
+ * 计算模型世界变换矩阵
+ *
+ * 与 Draw() 保持同一份构建逻辑：T(position) × S(scale) × R(m_matrix, rotation)，
+ * 返回由成员 m_position/m_scale/m_matrix/m_rotation 推导出的本地变换。
+ * Draw() 内部也调用本方法（见下方重构），确保拾取与渲染使用的矩阵严格一致。
+ */
+glm::mat4 Model::GetWorldMatrix() const {
+    auto model_local = glm::mat4(1.0f);
+    // 平移：把模型放到世界位置 m_position
+    model_local = glm::translate(model_local, m_position);
+    // 缩放：按 m_scale 缩放本地几何
+    model_local = glm::scale(model_local, m_scale);
+    // 旋转：以累积变换 m_matrix 为基础绕 Y 轴旋转 m_rotation 度（与旧绘制逻辑一致）
+    model_local = glm::rotate(m_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    return model_local;
+}
+
+/*
  * 绘制模型：构建本地变换矩阵后逐个绘制子网格
  *
  * 变换组合顺序：model * Translate(position) * Scale(scale) * Rotate(m_rotation, Y轴)
  * 说明：旋转使用成员 m_matrix（初始为单位阵，可被外部直接修改）绕 Y 轴旋转 m_rotation 度，
  * 因此实际施加的顺序是"先绕 Y 旋转、再缩放、再平移"（逆序相乘）。
+ * 本地变换矩阵统一由 GetWorldMatrix() 生成，与鼠标拾取共用同一份矩阵。
  */
 void Model::Draw(long long elapsed,
                  const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
                  const glm::vec3 &camera, const std::vector<Light *> &lights) {
-    auto model_local = glm::mat4(1.0f);
-    model_local = glm::translate(model_local, m_position);
-    model_local = glm::scale(model_local, m_scale);
-    model_local = glm::rotate(m_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    auto model_local = GetWorldMatrix();
 
     model_local = model * model_local;
 

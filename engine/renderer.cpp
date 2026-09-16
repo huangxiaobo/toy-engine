@@ -277,10 +277,6 @@ void Renderer::init(int w, int h) {
         emitter->MaxSize = particleConfig.MaxSize;
         emitter->MinVelocity = particleConfig.MinVelocity;
         emitter->MaxVelocity = particleConfig.MaxVelocity;
-        emitter->MinColor = particleConfig.MinColor;
-        emitter->MaxColor = particleConfig.MaxColor;
-        emitter->MinColorEnd = particleConfig.MinColorEnd;
-        emitter->MaxColorEnd = particleConfig.MaxColorEnd;
         emitter->MinSizeEnd = particleConfig.MinSizeEnd;
         emitter->MaxSizeEnd = particleConfig.MaxSizeEnd;
         emitter->Gravity = particleConfig.Gravity;
@@ -733,6 +729,15 @@ void Renderer::draw(long long elapsed) {
         m_debug_draw->Render(m_projection_matrix, m_view_matrix);
     }
 
+    // 鼠标拾取高亮：把命中的世界空间 AABB 画成线框盒叠加在场景之上
+    // （DebugDraw 支持 GL_LINES，不受上方线框/FILL 多边形模式开关影响）；
+    // 空盒（min==max）代表无高亮，直接跳过
+    if (m_debug_draw != nullptr && m_pickHighlightMin != m_pickHighlightMax) {
+        m_debug_draw->DrawBoxWireframe(m_pickHighlightMin, m_pickHighlightMax,
+                                       glm::vec3(1.0f, 0.85f, 0.2f));
+        m_debug_draw->Render(m_projection_matrix, m_view_matrix);
+    }
+
     // 线框作用域结束：恢复进入场景 Pass 前的多边形光栅化模式（GL_FILL）。
     // 必须整体用 GL_FRONT_AND_BACK 恢复（macOS Metal 兼容性，见上方线框模式注释）
     if (m_wireframeEnabled) {
@@ -858,6 +863,18 @@ Material *Renderer::GetModelMaterial(Model *model) const {
         return it->second;
     }
     return nullptr;
+}
+
+/* 设置鼠标拾取结果的线框高亮盒（世界空间 AABB），draw 末尾叠加绘制 */
+void Renderer::SetPickHighlight(const glm::vec3 &min, const glm::vec3 &max) {
+    m_pickHighlightMin = min;
+    m_pickHighlightMax = max;
+}
+
+/* 清除拾取高亮：置为空盒（min==max），draw 末尾检测空盒跳过绘制 */
+void Renderer::ClearPickHighlight() {
+    m_pickHighlightMin = glm::vec3(0.0f);
+    m_pickHighlightMax = glm::vec3(0.0f);
 }
 
 Light *Renderer::GetLightByUUID(const std::string &uuid) const {

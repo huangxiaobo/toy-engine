@@ -77,10 +77,8 @@ void ParticleSystem::Init(const glm::vec3& position) {
     m_emitter->MaxSize = 0.15f;
     m_emitter->MinVelocity = glm::vec3(-0.5f, 1.0f, -0.5f);
     m_emitter->MaxVelocity = glm::vec3(0.5f, 3.0f, 0.5f);
-    m_emitter->MinColor = glm::vec3(1.0f, 0.6f, 0.0f);
-    m_emitter->MaxColor = glm::vec3(1.0f, 1.0f, 0.2f);
-    m_emitter->MinColorEnd = glm::vec3(1.0f, 0.0f, 0.0f);
-    m_emitter->MaxColorEnd = glm::vec3(0.8f, 0.2f, 0.0f);
+    // 颜色无需在此配置：发射器按"烟花配色表"自动生成高饱和颜色，
+    // 出生为白热核心、结束为同色相暗色（见 ParticleEmitter::RandomFireworkColor）
     m_emitter->MinSizeEnd = 0.0f;
     m_emitter->MaxSizeEnd = 0.02f;
     m_emitter->Gravity = glm::vec3(0.0f, -2.0f, 0.0f);

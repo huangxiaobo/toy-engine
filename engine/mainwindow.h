@@ -68,6 +68,9 @@ private:
     void SelectObject(void* obj, const std::string& type);
     void ClearSelection();
 
+    // ---- 3D 拾取（左键点击无拖拽时触发，屏幕射线 → 逐对象求交 → 最近命中 → SelectObject）----
+    void PerformPick();
+
     // ---- 鼠标事件处理 ----
     void OnMouseLeftButtonDown();
     void OnMouseLeftButtonUp();
@@ -131,6 +134,9 @@ private:
     bool m_mouseRightPressed = false;
     double m_currentMouseX = 0.0;
     double m_currentMouseY = 0.0;
+    // 左键按下时的光标位置（松开时用于区分"点击"与"拖拽"，位移小于阈值视为点击并触发拾取）
+    double m_mouseDownX = 0.0;
+    double m_mouseDownY = 0.0;
 
     // 相机控制状态
     bool m_cameraPanning = false;
