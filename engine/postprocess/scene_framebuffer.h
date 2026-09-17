@@ -1,7 +1,7 @@
 #ifndef __SCENE_FRAMEBUFFER_H__
 #define __SCENE_FRAMEBUFFER_H__
 
-#include <glad/gl.h> // 必须在所有库的顶部（AGENTS.md 经验5）
+#include <glad/gl.h> // 必须在所有库的顶部
 
 /*
  * HDR 场景帧缓冲封装（多 Pass 渲染的第一步）
@@ -14,8 +14,7 @@
  *
  * 视口约定（重要）：
  *   BindForWrite() 会保存当前视口并切换到本 FBO 分辨率，
- *   Unbind() 恢复之前保存的视口——遵循 AGENTS.md 中
- *   "修改全局 OpenGL 状态必须保存和恢复"的教训，调用方无需自己处理视口。
+ *   Unbind() 恢复之前保存的视口——修改全局 OpenGL 状态必须保存和恢复，调用方无需自己处理视口。
  */
 class SceneFramebuffer {
 public:

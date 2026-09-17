@@ -333,7 +333,7 @@ Config *Config::LoadFromYaml(const std::string &filename) {
         for (const auto &i: model_nodes) {
             const YAML::Node &model_node = i;
 
-            ModelCoinfig modelConfig;
+            ModelConfig modelConfig;
             modelConfig.Name = model_node["name"].as<std::string>();
 
             modelConfig.Mesh.Name = model_node["mesh"]["name"].as<std::string>();

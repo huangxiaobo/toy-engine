@@ -133,6 +133,9 @@ void ToyEngineMainWindow::KeyCallback(GLFWwindow* window, int key, int scancode,
     }
 }
 
+// 构造/析构定义在 .cpp：unique_ptr 成员需持有类型完整
+ToyEngineMainWindow::ToyEngineMainWindow() = default;
+
 ToyEngineMainWindow::~ToyEngineMainWindow() {
     Cleanup();
 }
@@ -210,8 +213,8 @@ bool ToyEngineMainWindow::Initialize() {
     glfwSetScrollCallback(m_window, ScrollCallback);
     glfwSetKeyCallback(m_window, KeyCallback);
 
-    // 初始化渲染器
-    m_renderer = new Renderer();
+    // 初始化渲染器（unique_ptr 自管，析构自动释放）
+    m_renderer = std::make_unique<Renderer>();
     m_renderer->init(m_windowWidth, m_windowHeight);
 
     m_lastTime = static_cast<float>(glfwGetTime());
@@ -488,12 +491,12 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
 
     // ---- 摄像机 ----
     if (ImGui::TreeNodeEx("摄像机", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto cameras = m_renderer->GetCameras();
+        const auto& cameras = m_renderer->GetCameras();
         for (size_t i = 0; i < cameras.size(); ++i) {
             const auto& camera = cameras[i];
             std::string displayName = camera->GetName().empty()
                 ? "Camera " + std::to_string(i) : camera->GetName();
-            bool isSelected = (m_selectedObject == camera
+            bool isSelected = (m_selectedObject == camera.get()
                 && m_selectedObjectType == "Camera"
                 && m_currentCameraIndex == static_cast<int>(i));
 
@@ -508,14 +511,14 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
 
     // ---- 灯光 ----
     if (ImGui::TreeNodeEx("灯光", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto lights = m_renderer->GetLights();
+        const auto& lights = m_renderer->GetLights();
         for (size_t i = 0; i < lights.size(); ++i) {
-            auto light = lights[i];
+            const auto& light = lights[i];
             if (light == nullptr) continue;
             std::string nodeName = light->GetName() + "##light" + std::to_string(i);
-            bool isSelected = (m_selectedObject == light && m_selectedObjectType == "Light");
+            bool isSelected = (m_selectedObject == light.get() && m_selectedObjectType == "Light");
             if (ImGui::Selectable(nodeName.c_str(), isSelected)) {
-                SelectObject(light, "Light");
+                SelectObject(light.get(), "Light");
             }
         }
         ImGui::TreePop();
@@ -523,14 +526,14 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
 
     // ---- 模型 ----
     if (ImGui::TreeNodeEx("模型", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto models = m_renderer->GetModels();
+        const auto& models = m_renderer->GetModels();
         for (size_t i = 0; i < models.size(); ++i) {
-            auto model = models[i];
+            const auto& model = models[i];
             if (model == nullptr) continue;
             std::string nodeName = model->GetName() + "##model" + std::to_string(i);
-            bool isSelected = (m_selectedObject == model && m_selectedObjectType == "Model");
+            bool isSelected = (m_selectedObject == model.get() && m_selectedObjectType == "Model");
             if (ImGui::Selectable(nodeName.c_str(), isSelected)) {
-                SelectObject(model, "Model");
+                SelectObject(model.get(), "Model");
             }
         }
         ImGui::TreePop();
@@ -553,7 +556,7 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
     }
 
     // ---- 粒子系统 ----
-    auto& particles = m_renderer->GetParticleSystems();
+    const auto& particles = m_renderer->GetParticleSystems();
     if (!particles.empty()) {
         if (ImGui::TreeNodeEx("粒子系统", ImGuiTreeNodeFlags_DefaultOpen)) {
             for (size_t i = 0; i < particles.size(); ++i) {
@@ -564,7 +567,7 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
                 bool isSelected = (m_selectedObjectType == "Particle"
                     && m_selectedParticleIndex == static_cast<int>(i));
                 if (ImGui::Selectable(displayName.c_str(), isSelected)) {
-                    SelectObject(particles[i], "Particle");
+                    SelectObject(particles[i].get(), "Particle");
                     m_selectedParticleIndex = static_cast<int>(i);
                 }
             }
@@ -648,7 +651,7 @@ void ToyEngineMainWindow::ShowModelProperties() {
     // 材质按模型单独登记（Renderer::m_model_materials），不读取共享风格技术的
     // GetMaterial()：Lit/Toon 风格为多模型共用的享实例，其内部材质会被其它模型覆盖。
     // 仅当前生效风格需要材质（TechniqueLight，即光照/卡通）时才显示材质编辑。
-    const auto meshes = model->GetMeshes();
+    const auto& meshes = model->GetMeshes();
     if (!meshes.empty()) {
         Technique* effect = meshes[0]->GetEffect();
         if (effect != nullptr && effect->GetType() == TechniqueTypeLight) {
@@ -900,7 +903,7 @@ void ToyEngineMainWindow::ShowParticleProperties() {
         return;
     }
 
-    ParticleSystem* ps = m_renderer->GetParticleSystems()[m_selectedParticleIndex];
+    ParticleSystem* ps = m_renderer->GetParticleSystems()[m_selectedParticleIndex].get();
     ParticleEmitter* emitter = ps->GetEmitter();
     if (emitter == nullptr) {
         ImGui::Text("粒子发射器未初始化");
@@ -995,7 +998,7 @@ void ToyEngineMainWindow::ShowViewportStatusBar() {
     int projType = static_cast<int>(m_renderer->GetProjectionType());
     ImGui::SameLine();
     if (ImGui::Combo("##proj", &projType, projTypes, IM_ARRAYSIZE(projTypes))) {
-        m_renderer->SerProjectionType(static_cast<ProjectionType>(projType));
+        m_renderer->SetProjectionType(static_cast<ProjectionType>(projType));
     }
 
     ImGui::End();
@@ -1494,7 +1497,7 @@ void ToyEngineMainWindow::PerformPick() {
     // ---- 模型：逐三角形求交 ----
     // 把射线变换到模型本地空间求交（避免逐顶点做世界变换）：
     // 世界坐标射线 × 逆世界矩阵 → 本地坐标射线，等价于把网格顶点留在本地坐标系做测试。
-    for (Model* model : m_renderer->GetModels()) {
+    for (const auto& model : m_renderer->GetModels()) {
         if (model == nullptr) {
             continue;
         }
@@ -1502,14 +1505,14 @@ void ToyEngineMainWindow::PerformPick() {
         const glm::vec3 localOrigin = glm::vec3(invWorld * glm::vec4(rayOrigin, 1.0f));
         const glm::vec3 localDir = glm::normalize(glm::vec3(invWorld * glm::vec4(rayDir, 0.0f)));
 
-        for (Mesh* mesh : model->GetMeshes()) {
+        for (const auto& mesh : model->GetMeshes()) {
             // 只有三角形图元才能按「每 3 个索引一个三角形」拾取；
             // GL_LINES/GL_POINTS 等调试类网格无面片概念，跳过
             if (mesh == nullptr || mesh->DrawMode != GL_TRIANGLES || mesh->indices.size() < 3) {
                 continue;
             }
             const std::vector<Vertex>& verts = mesh->vertices;
-            const std::vector<GLuint>& idx = mesh->indices;
+            const auto& idx = mesh->indices;
             // 采用索引三角形的图元拓扑（GL_TRIANGLES），每 3 个索引构成一个三角形
             for (size_t i = 0; i + 2 < idx.size(); i += 3) {
                 float t = 0.0f;
@@ -1518,7 +1521,7 @@ void ToyEngineMainWindow::PerformPick() {
                         verts[idx[i + 1]].Position,
                         verts[idx[i + 2]].Position, t) && t < bestT) {
                     bestT = t;
-                    hitObject = model;
+                    hitObject = model.get();
                     hitType = "Model";
                 }
             }
@@ -1527,17 +1530,17 @@ void ToyEngineMainWindow::PerformPick() {
 
     // ---- 点光源 / 聚光灯：射线-球求交（方向光无位置，跳过）----
     // 拾取半径取 0.5（世界单位），点击光源 gizmo 附近即可命中，无需精确点中
-    for (Light* light : m_renderer->GetLights()) {
+    for (const auto& light : m_renderer->GetLights()) {
         if (light == nullptr || !light->IsEnabled()) {
             continue;
         }
         glm::vec3 lightPos;
         switch (light->GetLightType()) {
             case LightTypePoint:
-                lightPos = static_cast<PointLight*>(light)->Position;
+                lightPos = static_cast<PointLight*>(light.get())->Position;
                 break;
             case LightTypeSpot:
-                lightPos = static_cast<SpotLight*>(light)->Position;
+                lightPos = static_cast<SpotLight*>(light.get())->Position;
                 break;
             default:
                 continue; // 方向光没有世界位置可拾取
@@ -1546,15 +1549,15 @@ void ToyEngineMainWindow::PerformPick() {
         float t = 0.0f;
         if (RaySphereIntersect(rayOrigin, rayDir, lightPos, kPickRadius, t) && t < bestT) {
             bestT = t;
-            hitObject = light;
+            hitObject = light.get();
             hitType = "Light";
         }
     }
 
     // ---- 粒子系统：以发射器位置做射线-球求交 ----
-    const std::vector<ParticleSystem*>& particleSystems = m_renderer->GetParticleSystems();
+    const auto& particleSystems = m_renderer->GetParticleSystems();
     for (size_t i = 0; i < particleSystems.size(); ++i) {
-        const ParticleSystem* ps = particleSystems[i];
+        const ParticleSystem* ps = particleSystems[i].get();
         if (ps == nullptr || ps->GetEmitter() == nullptr) {
             continue;
         }
@@ -1610,11 +1613,14 @@ void ToyEngineMainWindow::PerformPick() {
         aabbMin = glm::vec3(std::numeric_limits<float>::max());
         aabbMax = glm::vec3(-std::numeric_limits<float>::max());
 
-        std::vector<Mesh*> meshes;
+        // 收集命中对象的网格指针
+        std::vector<const Mesh*> meshes;
         glm::mat4 world(1.0f);
         if (hitType == "Model") {
             Model* model = static_cast<Model*>(hitObject);
-            meshes = model->GetMeshes();
+            for (const auto& mesh : model->GetMeshes()) {
+                meshes.push_back(mesh.get());
+            }
             world = model->GetWorldMatrix();
         } else {
             Mesh* terrainMesh = terrain->GetTerrainMesh();
@@ -1734,10 +1740,8 @@ void ToyEngineMainWindow::Cleanup() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    if (m_renderer) {
-        delete m_renderer;
-        m_renderer = nullptr;
-    }
+    // 渲染器须在窗口销毁与 glfwTerminate 之前释放 OpenGL 资源
+    m_renderer.reset();
 
     if (m_window) {
         glfwDestroyWindow(m_window);

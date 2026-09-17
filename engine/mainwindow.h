@@ -2,11 +2,10 @@
 #define __MAIN_WINDOW_H__
 
 #include <GLFW/glfw3.h>
+#include <memory>
 #include <string>
 #include <vector>
 #include <map>
-
-using namespace std;
 
 class Renderer;
 class Model;
@@ -29,7 +28,7 @@ class Light;
 class ToyEngineMainWindow  {
 
 public:
-    ToyEngineMainWindow() = default;
+    ToyEngineMainWindow();
     ~ToyEngineMainWindow();
 
     bool Initialize();
@@ -39,7 +38,7 @@ public:
     void Cleanup();
 
     GLFWwindow* GetWindow() const { return m_window; }
-    Renderer* GetRenderer() const { return m_renderer; }
+    Renderer* GetRenderer() const { return m_renderer.get(); }
 
 private:
     // ---- ImGui 面板创建 ----
@@ -87,7 +86,7 @@ private:
 
 private:
     GLFWwindow* m_window = nullptr;
-    Renderer* m_renderer = nullptr;
+    std::unique_ptr<Renderer> m_renderer;
 
     // 窗口尺寸
     int m_windowWidth = 1280;

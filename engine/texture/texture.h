@@ -2,8 +2,6 @@
 
 #include <string>
 
-using namespace std;
-
 class Texture {
 public:
     Texture();
@@ -12,8 +10,8 @@ public:
 
 public:
     unsigned int id;
-    string type;
-    string path;
+    std::string type;
+    std::string path;
 };
 
 #endif // # __TEXTURE_H__

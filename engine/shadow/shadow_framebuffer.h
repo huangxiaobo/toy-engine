@@ -16,11 +16,10 @@
  *   稳定拿到原始深度。深度缓冲本身仍由一张离屏 Depth Renderbuffer 承担（用于深度测试），
  *   深度值与采样到的颜色值一致（都由 gl_FragCoord.z 产生）。
  *
- * 注意：本引擎已存在 GL 状态泄漏的历史教训（见 AGENTS.md），
- * 因此 BindForWrite/Unbind 必须成对调用，Unbind 只解绑 FBO，主视口由调用方恢复。
+ * 注意：BindForWrite/Unbind 必须成对调用，Unbind 只解绑 FBO，主视口由调用方恢复。
  */
 
-#include <glad/gl.h> // 必须在所有库的顶部（AGENTS.md 经验5）
+#include <glad/gl.h> // 必须在所有库的顶部
 
 class ShadowFramebuffer {
 public:

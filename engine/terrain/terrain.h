@@ -2,10 +2,9 @@
 #define __TERRAIN_H__
 
 #include <glm/glm.hpp>
+#include <memory>
 #include <vector>
 #include <string>
-
-using namespace std;
 
 class Model;
 class Technique;
@@ -21,7 +20,7 @@ private:
     int m_textureRepeat;
     
     // 高度图相关
-    string m_heightmapPath;
+    std::string m_heightmapPath;
     float m_heightScale;  // 高度缩放因子
     int m_terrainResolution; // 地形网格分辨率
 
@@ -33,7 +32,7 @@ public:
     void Init(float size = 10.0f, int textureRepeat = 5);
     
     // 从高度图初始化地形
-    void InitFromHeightmap(const string &heightmapPath, 
+    void InitFromHeightmap(const std::string &heightmapPath, 
                           float size = 10.0f, 
                           float heightScale = 2.0f,
                           int terrainResolution = 256,
@@ -44,7 +43,7 @@ public:
               const glm::mat4 &view, 
               const glm::mat4 &model,
               const glm::vec3 &camera,
-              const vector<class Light *> &lights);
+              const std::vector<class Light *> &lights);
     
     Model* GetModel() const { return m_model; }
     void SetScale(glm::vec3 scale);
@@ -52,7 +51,7 @@ public:
     
 private:
     // 从高度图生成地形网格
-    vector<Mesh *> GenerateTerrainFromHeightmap();
+    std::vector<std::unique_ptr<Mesh>> GenerateTerrainFromHeightmap();
 };
 
 #endif

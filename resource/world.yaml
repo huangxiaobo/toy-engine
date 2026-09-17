@@ -11,9 +11,9 @@ world:
   cameras:
     - name: "Main Camera"
       position:
-        x: 50.0
-        y: 30.0
-        z: 50.0
+        x: 80.0
+        y: 60.0
+        z: 80.0
       target:
         x: 0.0
         y: 0.0
@@ -229,7 +229,7 @@ world:
       g: 0.2
       b: 0.5
   terrain:
-    plane-size: 200.0
+    plane-size: 100.0
     resolution: 128
     height-scale: 0.0
     noise-seed: 12345

@@ -165,13 +165,13 @@ public:
  */
 class TerrainConfigCfg {
 public:
-    float PlaneSize = 200.0f;
+    float PlaneSize = 100.0f;
     int Resolution = 128;
     float HeightScale = 20.0f;
     unsigned int NoiseSeed = 12345;
 };
 
-class ModelCoinfig {
+class ModelConfig {
 public:
     std::string Name;
     std::string Effect;
@@ -204,7 +204,7 @@ public:
     std::vector<SpotLightConfig> SpotLights;
     std::vector<ParticleConfig> Particles;
     SkyDomeConfig SkyDome;
-    std::vector<ModelCoinfig> Models;
+    std::vector<ModelConfig> Models;
 
     // 地形配置（程序化LOD地形）
     TerrainConfigCfg Terrain;

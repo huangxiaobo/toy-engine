@@ -1,7 +1,7 @@
 #ifndef __DEBUG_DRAW_H__
 #define __DEBUG_DRAW_H__
 
-#include <glad/gl.h> // 必须在所有库的顶部（AGENTS.md 教训5）
+#include <glad/gl.h> // 必须在所有库的顶部
 
 #include <cstddef> // offsetof
 #include <glm/glm.hpp>
@@ -24,7 +24,7 @@ class Technique;
  *   2. 统一提交：Render() 一次性把收集到的顶点上传到动态 VBO，以
  *      glDrawArrays(GL_LINES) 批量绘制，避免每光源一次 draw call。
  *   3. 无状态同步：灯的衰减参数、位置、朝向变化后，下一帧绘制时直接从
- *      Light 对象读取，不存在"先创建后绑定"的同步问题（对比 AGENTS.md 教训1）。
+ *      Light 对象读取，不存在"先创建后绑定"的同步问题。
  *
  * 生命周期约定：
  *   - 着色器（Technique）由调用方（Renderer）创建并共享，本类只引用不拥有；

@@ -2,15 +2,11 @@
 #define __MESH_H__
 
 #include <glm/glm.hpp>
+#include <memory>
 #include <vector>
 #include <string>
-// OpenGL类型前向声明
-typedef unsigned int GLenum;
-typedef unsigned int GLuint;
-typedef int GLint;
 #include <iostream>
-
-using namespace std;
+// GLuint/GLenum 等 GL 类型由 glad 提供，须先包含 glad
 
 class Light;
 class Technique;
@@ -25,12 +21,12 @@ public:
     glm::vec3 Tangent;
     glm::vec3 Bitangent;
 
-    alignas(16) static constexpr int PositionLocation = 0;
-    alignas(16) static constexpr int ColorLocation = 1;
-    alignas(16) static constexpr int NormalLocation = 2;
-    alignas(16) static constexpr int TexCoordsLocation = 3;
-    alignas(16) static constexpr int TangentLocation = 4;
-    alignas(16) static constexpr int BitangentLocation = 5;
+    static constexpr int PositionLocation = 0;
+    static constexpr int ColorLocation = 1;
+    static constexpr int NormalLocation = 2;
+    static constexpr int TexCoordsLocation = 3;
+    static constexpr int TangentLocation = 4;
+    static constexpr int BitangentLocation = 5;
 
 public:
     void Debug()
@@ -50,10 +46,11 @@ class Mesh
 
 public:
     Mesh();
-    Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices);
-    ~Mesh();
+    Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices);
+    // 虚析构：Mesh 经基类指针/unique_ptr 持有派生对象，需可安全析构
+    virtual ~Mesh();
 
-    void SetDrawMode(GLuint mode);
+    void SetDrawMode(unsigned int mode);
 
     void SetEffect(Technique *effect);
     Technique* GetEffect() const;
@@ -84,12 +81,10 @@ public:
      */
     static void SetShadowMapAvailable(bool available);
 
-    static vector<Mesh *> CreatePlaneMesh();
-    static vector<Mesh *> CreateGroundMesh();
-    static vector<Mesh *> CreateTexturedGroundMesh(float size, int repeatCount);
-    static vector<Mesh *> CreatePointMesh(glm::vec3 pos, glm::vec3 color);
+    // 工厂方法返回 unique_ptr 容器，mesh 所有权随容器转移
+    static std::vector<std::unique_ptr<Mesh>> CreatePlaneMesh();
+    static std::vector<std::unique_ptr<Mesh>> CreateTexturedGroundMesh(float size, int repeatCount);
 
-    Mesh *Clone();
     void UpdateVertexBuffer();
 
 private:
@@ -98,18 +93,18 @@ private:
 
 
 public:
-    vector<Vertex>& GetVertices();
+    std::vector<Vertex> &GetVertices();
 
 public:
-    string name;
-    vector<Vertex> vertices;
-    vector<GLuint> indices;
+    std::string name;
+    std::vector<Vertex> vertices;
+    std::vector<unsigned int> indices;
 
-    GLuint VAO; // 创建 VAO 顶点数组对象
-    GLuint VBO; // 创建 VBO 顶点缓冲对象
-    GLuint EBO; // 创建 EBO 元素缓冲对象
+    unsigned int VAO; // 创建 VAO 顶点数组对象
+    unsigned int VBO; // 创建 VBO 顶点缓冲对象
+    unsigned int EBO; // 创建 EBO 元素缓冲对象
 
-    GLuint DrawMode; // 绘制模式
+    unsigned int DrawMode; // 绘制模式
 
     Technique *m_effect;  // 裸指针，只引用不拥有，由外部管理生命周期
     

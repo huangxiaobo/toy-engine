@@ -8,6 +8,8 @@
 #include <iostream>
 #include <format>
 
+using namespace std;
+
 /*
  * TechniqueLight 构造函数
  *
@@ -28,7 +30,8 @@ TechniqueLight::TechniqueLight(string name, string vertexShader, string fragment
     InitDirectionLightUniform();
     InitPointLightUniform(8);
     InitSpotLightUniform(8);
-    MaterialUniform.Init(this->m_shader);
+    // m_shader 为基类持有的 unique_ptr，此处传入裸指针供 uniform 缓存
+    MaterialUniform.Init(this->m_shader.get());
 }
 
 TechniqueLight::~TechniqueLight() {
@@ -147,8 +150,8 @@ void TechniqueLight::InitPointLightUniform(int num) {
         name = std::format("gPointLights[{}].SpecularColor", i);
         uniform.SpecularColor = this->m_shader->GetUniformLocation(name.c_str());
 
-        name = std::format("gPointLights[{}].AmbienColor", i);
-        uniform.AmbienColor = this->m_shader->GetUniformLocation(name.c_str());
+        name = std::format("gPointLights[{}].AmbientColor", i);
+        uniform.AmbientColor = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AttenuationConstant", i);
         uniform.Atten.Constant = this->m_shader->GetUniformLocation(name.c_str());
@@ -277,7 +280,7 @@ void TechniqueLight::SetPointLight(int i, PointLight *light) {
     this->m_shader->SetUniformValue(PointLightUniforms[i].DiffuseIntensity, light->DiffuseIntensity);
     this->m_shader->SetUniformValue(PointLightUniforms[i].DiffuseColor, light->DiffuseColor);
     this->m_shader->SetUniformValue(PointLightUniforms[i].SpecularColor, light->SpecularColor);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].AmbienColor, light->AmbientColor);
+    this->m_shader->SetUniformValue(PointLightUniforms[i].AmbientColor, light->AmbientColor);
     this->m_shader->SetUniformValue(PointLightUniforms[i].Atten.Constant, light->Attenuation.Constant);
     this->m_shader->SetUniformValue(PointLightUniforms[i].Atten.Linear, light->Attenuation.Linear);
     this->m_shader->SetUniformValue(PointLightUniforms[i].Atten.Exp, light->Attenuation.Exp);
@@ -300,20 +303,20 @@ void TechniqueLight::SetMaterial(const Material *m) {
     // 必须先激活本 technique 的 shader program，否则 glUniform* 会写入
     // 当前绑定的其他 program（如属性面板编辑时，活跃 program 是上一帧最后绘制的模型）
     this->m_shader->Use();
-    MaterialUniform.SetAmbientColor(this->m_shader, m->AmbientColor);
-    MaterialUniform.SetDiffuseColor(this->m_shader, m->DiffuseColor);
-    MaterialUniform.SetSpecularColor(this->m_shader, m->SpecularColor);
-    MaterialUniform.SetShininess(this->m_shader, m->Shininess);
+    MaterialUniform.SetAmbientColor(this->m_shader.get(), m->AmbientColor);
+    MaterialUniform.SetDiffuseColor(this->m_shader.get(), m->DiffuseColor);
+    MaterialUniform.SetSpecularColor(this->m_shader.get(), m->SpecularColor);
+    MaterialUniform.SetShininess(this->m_shader.get(), m->Shininess);
 }
 
 void TechniqueLight::SetPointLights(vector<PointLight *> lights) {
-    for (int i = 0; i < lights.size(); i++) {
+    for (size_t i = 0; i < lights.size(); i++) {
         SetPointLight(i, lights[i]);
     }
 }
 
 void TechniqueLight::SetSpotLights(vector<SpotLight *> lights) {
-    for (int i = 0; i < lights.size(); i++) {
+    for (size_t i = 0; i < lights.size(); i++) {
         SetSpotLight(i, lights[i]);
     }
 }

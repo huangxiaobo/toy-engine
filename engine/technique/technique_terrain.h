@@ -1,7 +1,7 @@
 #ifndef __TECHNIQUE_TERRAIN_H__
 #define __TECHNIQUE_TERRAIN_H__
 
-// glad 必须在所有头文件之前（AGENTS.md 经验5）
+// glad 必须在所有头文件之前
 #include <glad/gl.h>
 
 #include "technique_light.h"

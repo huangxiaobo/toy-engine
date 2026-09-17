@@ -1,10 +1,13 @@
 #include "terrain.h"
 #include <glad/gl.h>
+#include <memory>
 #include "../model/model.h"
 #include "../mesh/mesh.h"
 #include "../technique/technique_light.h"
 #include "../material/material.h"
 #include "../utils/utils.h"
+
+using namespace std;
 
 // stb_image 已经在3rdparty/stb模块中编译，这里只需要包含头文件
 #include "stb_image.h"
@@ -41,26 +44,26 @@ void Terrain::Init(float size, int textureRepeat) {
     m_textureRepeat = textureRepeat;
     
     // 创建带纹理的地面网格
-    vector<Mesh *> terrain_mesh = Mesh::CreateTexturedGroundMesh(m_size, m_textureRepeat);
+    auto terrain_mesh = Mesh::CreateTexturedGroundMesh(m_size, m_textureRepeat);
     
     // 创建着色器效果
     m_effect = new Technique("terrain",
                              "./resource/shader/ground.vert",
                              "./resource/shader/ground.frag");
     
-    // 创建模型
-    m_model = new Model("terrain");
-    m_model->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
-    m_model->SetMeshes(terrain_mesh);
-    
     // 创建棋盘格纹理 (512x512, 每个格子64像素)
     m_textureID = Utils::CreateCheckerboardTexture(512, 512, 64);
     
-    // 为每个网格设置效果和纹理
-    for (auto m: terrain_mesh) {
+    // 为网格设置效果/纹理（须在 SetMeshes 移交所有权前）
+    for (const auto &m: terrain_mesh) {
         m->SetEffect(m_effect);
         m->SetTexture(m_textureID);
     }
+    
+    // 创建模型并移交网格所有权
+    m_model = new Model("terrain");
+    m_model->SetScale(glm::vec3(2.1f, 2.0f, 2.1f));
+    m_model->SetMeshes(std::move(terrain_mesh));
     
     // 设置纹理uniform
     m_effect->Enable();
@@ -95,7 +98,7 @@ void Terrain::InitFromHeightmap(const string &heightmapPath,
     m_textureRepeat = textureRepeat;
     
     // 从高度图生成地形网格
-    vector<Mesh *> terrain_mesh = GenerateTerrainFromHeightmap();
+    auto terrain_mesh = GenerateTerrainFromHeightmap();
     
     // 创建支持光照的着色器效果
     m_effect = new TechniqueLight("terrain",
@@ -110,19 +113,19 @@ void Terrain::InitFromHeightmap(const string &heightmapPath,
     material->Shininess = 32.0f;
     ((TechniqueLight *)m_effect)->SetMaterial(material);
     
-    // 创建模型
-    m_model = new Model("terrain");
-    m_model->SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
-    m_model->SetMeshes(terrain_mesh);
-    
     // 创建棋盘格纹理
     m_textureID = Utils::CreateCheckerboardTexture(512, 512, 64);
     
-    // 为每个网格设置效果和纹理
-    for (auto m: terrain_mesh) {
+    // 为网格设置效果/纹理（须在 SetMeshes 移交所有权前）
+    for (const auto &m: terrain_mesh) {
         m->SetEffect(m_effect);
         m->SetTexture(m_textureID);
     }
+    
+    // 创建模型并移交网格所有权
+    m_model = new Model("terrain");
+    m_model->SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
+    m_model->SetMeshes(std::move(terrain_mesh));
     
     // 设置纹理uniform
     m_effect->Enable();
@@ -179,8 +182,8 @@ void Terrain::SetPosition(glm::vec3 position) {
  * 注意：当前高度 y 乘了 0.0f（保持不变平），如需起伏可去掉 0.0f。
  * 成功返回含一个 Mesh 的 vector；高度图加载失败返回空 vector。
  */
-vector<Mesh *> Terrain::GenerateTerrainFromHeightmap() {
-    vector<Mesh *> meshes;
+std::vector<std::unique_ptr<Mesh>> Terrain::GenerateTerrainFromHeightmap() {
+    std::vector<std::unique_ptr<Mesh>> meshes;
     
     // 加载高度图
     int width, height, channels;
@@ -264,9 +267,9 @@ vector<Mesh *> Terrain::GenerateTerrainFromHeightmap() {
               << indices.size() / 3 << " triangles" << std::endl;
     
     // 创建Mesh
-    Mesh *mesh = new Mesh(vertices, indices);
+    auto mesh = std::make_unique<Mesh>(vertices, indices);
     mesh->SetDrawMode(GL_TRIANGLES);
-    meshes.push_back(mesh);
+    meshes.push_back(std::move(mesh));
     
     // 释放高度图数据
     stbi_image_free(data);

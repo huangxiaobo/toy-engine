@@ -344,7 +344,7 @@ void DebugDraw::DrawNormal(const glm::vec3 &vertexPos, const glm::vec3 &normal, 
  * 5. 绘制结束自动 Clear() 释放本帧列表。
  *
  * 注意：不修改全局 OpenGL 状态（深度测试/混合等），调用方负责在
- * 场景 Pass 内调用（深度测试开启），遵循 AGENTS.md 教训2"状态不泄漏"。
+ * 场景 Pass 内调用（深度测试开启）。
  */
 void DebugDraw::Render(const glm::mat4 &projection, const glm::mat4 &view) {
     if (m_vertices.empty() || m_effect == nullptr) {

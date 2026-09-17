@@ -25,7 +25,7 @@ class Light;
 
 // 配置参数
 struct TerrainConfig {
-    float planeSize = 200.0f;    // 平面世界尺寸（长 = 宽，单位）
+    float planeSize = 100.0f;    // 平面世界尺寸（长 = 宽，单位）
     int resolution = 128;        // 网格分辨率（每边格子数，顶点数 = resolution+1）
     float heightScale = 20.0f;   // 地形最大高度（噪声高度缩放因子，0 = 平坦）
     unsigned int noiseSeed = 12345; // 噪声生成器随机种子，相同种子产生相同地形

@@ -4,6 +4,8 @@
 
 #include <iostream>
 
+using namespace std;
+
 /*
  * Technique 基类：封装"着色器 + 常用矩阵/相机 uniform"的渲染技术
  *
@@ -14,12 +16,14 @@
  *
  * 子类（TechniqueLight）在此基础上扩展灯光与材质支持。
  */
-Technique::Technique(string name, string vertex_shader, string fragment_shader) : m_type(
+Technique::Technique(const std::string &name, const std::string &vertex_shader,
+                     const std::string &fragment_shader) : m_type(
     TechniqueType::TechniqueTypeBase) {
     // 构造时自动生成唯一 UUID
     Id = Utils::GenerateUUID();
 
-    this->m_shader = new Shader(
+    // 创建并编译着色器（Shader 由 unique_ptr 独占所有权，析构自动释放）
+    this->m_shader = std::make_unique<Shader>(
         vertex_shader.c_str(),
         fragment_shader.c_str());
 
@@ -38,15 +42,11 @@ Technique::Technique(string name, string vertex_shader, string fragment_shader) 
     m_uniform_light_space = this->m_shader->GetUniformLocation("lightSpace");
 }
 
-Technique::~Technique() {
-    if (m_shader != nullptr) {
-        delete m_shader;
-        m_shader = nullptr;
-    }
-}
+// 析构按默认即可：m_shader 为 unique_ptr，随对象销毁自动释放
+Technique::~Technique() = default;
 
 Shader *Technique::GetShader() const {
-    return m_shader;
+    return m_shader.get();
 }
 
 void Technique::SetWVPMatrix(const glm::mat4 &wvp) {

@@ -3,6 +3,8 @@
 #include <iostream>
 #include <format>
 
+using namespace std;
+
 #include "../mesh/mesh.h"
 #include "../texture/texture.h"
 #include "../utils/utils.h"
@@ -27,13 +29,8 @@ Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_
     m_matrix = glm::mat4(1.0f);
 }
 
-/* 析构函数：释放模型持有的所有网格对象 */
-Model::~Model() {
-    while (!m_meshes.empty()) {
-        delete m_meshes[0];
-        m_meshes.erase(m_meshes.begin());
-    }
-}
+// 析构：m_meshes 为 unique_ptr 容器，自动释放
+Model::~Model() = default;
 
 void Model::Init() {
 }
@@ -105,7 +102,7 @@ void Model::ProcessNode(aiNode *node, const aiScene *scene) {
  *   - 纹理坐标：取第 0 组（一个顶点最多 8 组 UV），缺失时为 (0,0)
  *   - 纹理：按 assimp 材质约定的命名（texture_diffuseN 等）从 .obj 同目录加载贴图
  */
-Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) {
+std::unique_ptr<Mesh> Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) {
     // data to fill
     vector<Vertex> vertices;
     vector<unsigned int> indices;
@@ -189,8 +186,7 @@ Mesh *Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) {
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 
     // return a mesh object created from the extracted mesh data
-    auto mesh = new Mesh(vertices, indices);
-    return mesh;
+    return std::make_unique<Mesh>(vertices, indices);
 }
 
 // checks all material textures of a given type and loads the textures if they're not loaded yet.
@@ -225,15 +221,15 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
     return textures;
 }
 
-/* 追加一个网格到模型 */
-void Model::SetMesh(Mesh *mesh) {
-    this->m_meshes.push_back(mesh);
+/* 追加一个网格到模型（所有权转移） */
+void Model::SetMesh(std::unique_ptr<Mesh> mesh) {
+    this->m_meshes.push_back(std::move(mesh));
 }
 
-/* 批量追加网格到模型（用于一次加入整组网格，如地形/光源可视化网格） */
-void Model::SetMeshes(vector<Mesh *> meshes) {
-    for (auto m: meshes) {
-        this->m_meshes.push_back(m);
+/* 批量追加网格到模型（所有权逐项转移） */
+void Model::SetMeshes(std::vector<std::unique_ptr<Mesh>> meshes) {
+    for (auto &mesh: meshes) {
+        this->m_meshes.push_back(std::move(mesh));
     }
 }
 
@@ -291,7 +287,7 @@ void Model::SetPosition(glm::vec3 position) {
 //     this->m_effect = effect;
 // }
 
-vector<Mesh *> Model::GetMeshes() const {
+const std::vector<std::unique_ptr<Mesh>> &Model::GetMeshes() const {
     return m_meshes;
 }
 

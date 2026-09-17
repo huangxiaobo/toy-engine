@@ -1,4 +1,4 @@
-#include <glad/gl.h> // 必须在所有库的顶部（AGENTS.md 经验5）
+#include <glad/gl.h> // 必须在所有库的顶部
 
 #include "scene_framebuffer.h"
 #include <iostream>

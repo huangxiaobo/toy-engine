@@ -5,11 +5,10 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+#include <memory>
 #include <vector>
 #include <glm/glm.hpp>
 #include "../mesh/mesh.h"
-
-using namespace std;
 
 class Renderer;
 class Mesh;
@@ -19,10 +18,12 @@ class Material;
 
 class Model {
 private:
-    string m_uuid;
-    string m_name;
-    vector<Mesh *> m_meshes;
-    vector<Texture> m_textures_loaded; // 存储到目前为止加载的所有纹理，优化以确保纹理不会加载超过一次。
+    std::string m_uuid;
+    std::string m_name;
+    // Mesh 所有权归模型（unique_ptr 容器，析构自动释放）
+    std::vector<std::unique_ptr<Mesh>> m_meshes;
+    // 已加载纹理缓存，避免重复加载
+    std::vector<Texture> m_textures_loaded;
 
     glm::vec3 m_position;
     glm::f32 m_rotation;
@@ -30,22 +31,23 @@ private:
     glm::mat4 m_matrix;
 
 public:
-    Model(string name);
+    Model(std::string name);
 
     virtual ~Model();
 
     void Init();
 
-    void LoadModel(const string &filename);
+    void LoadModel(const std::string &filename);
 
     void ProcessNode(aiNode *node, const aiScene *scene);
 
-    Mesh *ProcessMesh(aiMesh *mesh, const aiScene *scene);
+    std::unique_ptr<Mesh> ProcessMesh(aiMesh *mesh, const aiScene *scene);
 
-    vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName);
+    std::vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, std::string typeName);
 
-    void SetMeshes(vector<Mesh *> model);
-    void SetMesh(Mesh* model);
+    // 批量追加网格（所有权随 unique_ptr 转移给模型）
+    void SetMeshes(std::vector<std::unique_ptr<Mesh>> meshes);
+    void SetMesh(std::unique_ptr<Mesh> mesh);
 
     void SetScale(glm::vec3 scale);
 
@@ -59,7 +61,7 @@ public:
     // 设置模型世界位置（一次性重建整个 m_matrix，与 SetTranslate 的累积语义不同）
     void SetPosition(glm::vec3 position);
 
-    vector<Mesh *> GetMeshes() const;
+    const std::vector<std::unique_ptr<Mesh>> &GetMeshes() const;
 
     /*
      * 获取模型世界变换矩阵
@@ -76,8 +78,8 @@ public:
 
     glm::f32 GetRotation() const;
 
-    string GetName() const { return m_name; }
-    string GetUUID() const { return m_uuid; }
+    std::string GetName() const { return m_name; }
+    std::string GetUUID() const { return m_uuid; }
 
     virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
                       const glm::vec3 &camera, const std::vector<Light *> &lights);

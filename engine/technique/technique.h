@@ -3,10 +3,9 @@
 
 
 #include <glm/glm.hpp>
+#include <memory>
 #include <string>
 #include <vector>
-
-using namespace std;
 
 class Shader;
 class Light;
@@ -31,7 +30,7 @@ enum TechniqueType {
 
 class Technique {
 protected:
-    Shader *m_shader;
+    std::unique_ptr<Shader> m_shader;
 
     TechniqueType m_type;
 
@@ -43,7 +42,7 @@ protected:
     unsigned int m_uniform_light_space = 0; // 光源空间矩阵(lightSpace) uniform 位置
 
 public:
-    Technique(string name, string vertexShader, string fragmentShader);
+    Technique(const std::string &name, const std::string &vertexShader, const std::string &fragmentShader);
 
     virtual ~Technique();
 
@@ -90,7 +89,7 @@ public:
     void SetShadowMap(int unit);
 
 
-    virtual void SetLights(const vector<Light *> &lights);
+    virtual void SetLights(const std::vector<Light *> &lights);
 
     virtual void SetMaterial(const Material *material);
 

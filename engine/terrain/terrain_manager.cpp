@@ -41,7 +41,7 @@ void TerrainManager::Init(const TerrainConfig& config) {
         config.heightScale
     );
 
-    // 应用已提前绑定的技术与纹理（见 AGENTS.md 经验1：先创建后绑定）
+    // 应用已提前绑定的技术与纹理
     if (m_technique) {
         m_plane->SetTechnique(m_technique);
     }
@@ -65,7 +65,7 @@ void TerrainManager::Init(const TerrainConfig& config) {
  * 设置技术（着色器+材质）
  *
  * 将技术应用到平面网格（若已生成）；Init() 之后再调用时，
- * SetTechnique 会同步更新已生成的网格（见 AGENTS.md 经验1）。
+ * SetTechnique 会同步更新已生成的网格。
  */
 void TerrainManager::SetTechnique(Technique* tech) {
     m_technique = tech;

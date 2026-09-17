@@ -33,7 +33,7 @@ TerrainChunk::~TerrainChunk() {
  * 设置技术（着色器+材质）
  *
  * 同步更新已生成的网格；若网格尚未生成（先绑定后生成），
- * GenerateMesh() 创建网格时会自动应用已绑定的技术（见 AGENTS.md 经验 1）。
+ * GenerateMesh() 创建网格时会自动应用已绑定的技术。
  */
 void TerrainChunk::SetTechnique(Technique* tech) {
     m_technique = tech;
@@ -288,7 +288,7 @@ void TerrainChunk::Draw(long long elapsed,
         // 若使用地形专用技术 TechniqueTerrain，额外：
         //   1. 把地面漫反射纹理显式绑定到纹理单元0
         //   2. 应用阴影状态（绑定单元2 深度贴图 + 上传 shadowMap/lightSpace/gUseShadow）
-        // 地形自管阴影采样，不再依赖 Mesh 全局静态阴影状态链（AGENTS.md 状态自管理经验）
+        // 地形自管阴影采样，不依赖 Mesh 全局静态阴影状态链
         if (auto terrainTech = dynamic_cast<TechniqueTerrain*>(m_technique)) {
             if (m_textureID != 0) {
                 glActiveTexture(GL_TEXTURE0);

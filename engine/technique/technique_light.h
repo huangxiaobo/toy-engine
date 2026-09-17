@@ -24,7 +24,7 @@ struct UniformPointLight
     GLuint AmbientIntensity;
     GLuint DiffuseIntensity;
     GLuint SpecularIntensity;
-    GLuint AmbienColor;
+    GLuint AmbientColor;
     GLuint DiffuseColor;
     GLuint SpecularColor;
     UniformAttenuation Atten;
@@ -81,17 +81,17 @@ public:
 class TechniqueLight : public Technique
 {
 public:
-    TechniqueLight(string name, string vertexShader, string fragmentShader);
+    TechniqueLight(std::string name, std::string vertexShader, std::string fragmentShader);
     ~TechniqueLight();
-    virtual void SetLights(const vector<Light *> &lights);
+    virtual void SetLights(const std::vector<Light *> &lights);
     void SetDirectionLight(DirectionLight *light);
     void InitDirectionLightUniform();
     void InitPointLightUniform(int num);
-    void SetPointLights(vector<PointLight *> lights);
+    void SetPointLights(std::vector<PointLight *> lights);
     void SetPointLight(int index, PointLight *light);
     void SetSpotLight(int index, SpotLight *light);
     void InitSpotLightUniform(int num);
-    void SetSpotLights(vector<SpotLight *> lights);
+    void SetSpotLights(std::vector<SpotLight *> lights);
     virtual void SetMaterial(const Material *material);
 
     /* 获取当前材质指针（用于属性面板显示/编辑） */
@@ -108,11 +108,11 @@ private:
     UniformDirectionLight DirectionLightUniform;
 
     // 点光源
-    vector<UniformPointLight> PointLightUniforms;
+    std::vector<UniformPointLight> PointLightUniforms;
     GLuint PointLightCountUniform;
 
     // 聚光灯
-    vector<UniformSpotLight> SpotLightUniforms;
+    std::vector<UniformSpotLight> SpotLightUniforms;
     GLuint SpotLightCountUniform;
 };
 

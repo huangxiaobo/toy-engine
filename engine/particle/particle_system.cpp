@@ -146,7 +146,7 @@ void ParticleSystem::Update(float deltaTime) {
  *      （粒子叠加但互相无遮挡）、关闭背面剔除、开启程序点大小
  *   3. 激活着色器，绑定变换矩阵与粒子纹理
  *   4. glDrawArrays(GL_POINTS) 一次性绘制全部顶点
- *   5. 恢复第 2 步保存的 GL 状态，避免影响后续场景绘制（见 AGENTS.md 经验 #2）
+ *   5. 恢复第 2 步保存的 GL 状态，避免影响后续场景绘制
  *
  * 注意：elapsed 为毫秒，粒子物理由 Update 以秒为单位驱动。
  */

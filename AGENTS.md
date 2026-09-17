@@ -11,7 +11,8 @@ cmake -E chdir build cmake ..
 ```
 
 # 必须遵守
-- 实现功能的时候，必须添加详细的注释
+- 实现功能的时候，必须添加简要的注释,注释避免AI味道
+- 变量命名统一使用 snake_case（如 `m_shadow_map_ready`、`m_clear_color`），不使用 camelCase（如 `m_shadowMapReady`、`m_clearColor`）
 
 # 经验教训
 

@@ -1,6 +1,9 @@
-#include "mesh.h"
+// glad 必须第一个包含：GLuint/GLenum 等类型由此提供
 #include <glad/gl.h>
+#include "mesh.h"
 #include <iostream>
+
+using namespace std;
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -44,7 +47,7 @@ void Mesh::SetShadowDepthState(Technique *tech, const glm::mat4 &lightSpace, boo
     // 把写入阴影贴图的深度统一推远，保证与主绘制采样做比较时留出余量，
     // 从根本上消除平坦地面在倾斜方向光下的自阴影痤疮(acne)，且不依赖着色器内超大 bias
     // （超大 bias 会让 bunny 等模型的阴影"飘浮/peter-panning"）。
-    // 结束后必须关闭该 GL 状态，避免泄漏影响后续场景绘制（AGENTS.md 经验2）。
+    // 结束后必须关闭该 GL 状态，避免泄漏影响后续场景绘制。
     if (s_shadowPassActive) {
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(1.0f, 1.0f);
@@ -72,7 +75,7 @@ Mesh::Mesh() : DrawMode(GL_TRIANGLES) {
     m_normalMapID = 0;
 }
 
-Mesh::Mesh(const vector<Vertex> &vertices, const vector<GLuint> &indices) {
+Mesh::Mesh(const vector<Vertex> &vertices, const vector<unsigned int> &indices) {
     DrawMode = GL_TRIANGLES;
     this->vertices.insert(this->vertices.end(), vertices.begin(), vertices.end());
     this->indices.insert(this->indices.end(), indices.begin(), indices.end());
@@ -179,7 +182,7 @@ vector<Vertex> &Mesh::GetVertices() {
 }
 
 
-void Mesh::SetDrawMode(GLuint mode) {
+void Mesh::SetDrawMode(unsigned int mode) {
     DrawMode = mode;
 }
 
@@ -268,8 +271,8 @@ void Mesh::Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 
     glBindVertexArray(0);
 }
 
-vector<Mesh *> Mesh::CreatePlaneMesh() {
-    vector<Mesh *> meshes;
+std::vector<std::unique_ptr<Mesh>> Mesh::CreatePlaneMesh() {
+    std::vector<std::unique_ptr<Mesh>> meshes;
 
     vector<Vertex> vertices = {
         {
@@ -307,76 +310,10 @@ vector<Mesh *> Mesh::CreatePlaneMesh() {
         1, 2, 3 // second triangle
     };
 
-    Mesh *mesh = new Mesh(vertices, indices);
+    auto mesh = std::make_unique<Mesh>(vertices, indices);
     mesh->SetDrawMode(GL_TRIANGLES);
 
-    meshes.push_back(mesh);
-    return meshes;
-}
-
-vector<Mesh *> Mesh::CreateGroundMesh() {
-    vector<Mesh *> meshes;
-
-    Mesh *m1 = new Mesh();
-    m1->SetDrawMode(GL_LINES);
-
-    int gridNum = 100;
-
-    // draw grid 右手坐标系，逆时针方向排列
-    //   + -------------------------------> x
-    //   |
-    //   |     (xi+0, zi+0)    (xi+1, zi+0)
-    //   |     (xi+0, zi+1)    (xi+1, zi+1)
-    //   |
-    //   v
-    //   z
-    GLuint i = 0;
-    for (int xi = -gridNum / 2; xi <= gridNum / 2; xi += 1) {
-        for (int zi = -gridNum / 2; zi <= gridNum / 2; zi += 1) {
-            m1->vertices.push_back(Vertex{
-                glm::vec3{xi + 0, 0.0f, zi + 0},
-                glm::vec3{0.5, 0.5, 0.5},
-                glm::vec3{0.0, 1.0, 0.0},
-                glm::vec2{0.0, 0.0},
-            });
-
-            m1->vertices.push_back(Vertex{
-                glm::vec3{xi + 1, 0.0f, zi + 0},
-                glm::vec3{0.5, 0.5, 0.5},
-                glm::vec3{0.0, 1.0, 0.0},
-                glm::vec2{0.0, 0.0},
-            });
-
-            m1->vertices.push_back(Vertex{
-                glm::vec3{xi + 1, 0.0f, zi + 1},
-                glm::vec3{0.5, 0.5, 0.5},
-                glm::vec3{0.0, 1.0, 0.0},
-                glm::vec2{0.0, 0.0},
-            });
-
-            m1->vertices.push_back(Vertex{
-                glm::vec3{xi + 0, 0.0f, zi + 1},
-                glm::vec3{0.5, 0.5, 0.5},
-                glm::vec3{0.0, 1.0, 0.0},
-                glm::vec2{0.0, 0.0},
-            });
-            m1->indices.push_back(i + 0);
-            m1->indices.push_back(i + 1);
-            m1->indices.push_back(i + 1);
-            m1->indices.push_back(i + 2);
-            m1->indices.push_back(i + 2);
-            m1->indices.push_back(i + 3);
-            m1->indices.push_back(i + 3);
-            m1->indices.push_back(i + 0);
-            i += 4;
-        }
-    }
-
-    meshes.push_back(m1);
-
-    for (auto mesh: meshes) {
-        mesh->SetUpMesh();
-    }
+    meshes.push_back(std::move(mesh));
     return meshes;
 }
 
@@ -390,8 +327,8 @@ vector<Mesh *> Mesh::CreateGroundMesh() {
  *
  * 法线统一朝上 (0,1,0)，颜色白色以便纹理显示原色。
  */
-vector<Mesh *> Mesh::CreateTexturedGroundMesh(float size, int repeatCount) {
-    vector<Mesh *> meshes;
+std::vector<std::unique_ptr<Mesh>> Mesh::CreateTexturedGroundMesh(float size, int repeatCount) {
+    std::vector<std::unique_ptr<Mesh>> meshes;
 
     // 创建一个带有纹理坐标的平面作为地面
     vector<Vertex> vertices = {
@@ -430,67 +367,9 @@ vector<Mesh *> Mesh::CreateTexturedGroundMesh(float size, int repeatCount) {
         1, 2, 3  // second triangle
     };
 
-    Mesh *mesh = new Mesh(vertices, indices);
+    auto mesh = std::make_unique<Mesh>(vertices, indices);
     mesh->SetDrawMode(GL_TRIANGLES);
 
-    meshes.push_back(mesh);
+    meshes.push_back(std::move(mesh));
     return meshes;
-}
-
-/*
- * 创建单个点的网格（GL_POINTS 绘制）
- *
- * 用于标记光源位置等单点对象。仅 1 个顶点 + 1 个索引，
- * 绘制模式为 GL_POINTS，屏幕上表现为一个点（大小由 GL 状态控制）。
- */
-vector<Mesh *> Mesh::CreatePointMesh(glm::vec3 pos, glm::vec3 color) {
-    vector<Mesh *> meshes;
-
-    vector<Vertex> vertices = {
-        {
-            glm::vec3(pos.x, pos.y, pos.z), // Position
-            glm::vec3(color.x, color.y, color.z), // Color
-            glm::vec3(0.0f, 0.0f, 0.0f), // Normal
-            glm::vec2(1.0f, 1.0f), // texture co
-        },
-    };
-    vector<unsigned int> indices = {
-        0,
-    };
-
-    Mesh *m = new Mesh(vertices, indices);
-    m->SetDrawMode(GL_POINTS);
-
-    meshes.push_back(m);
-
-    return meshes;
-}
-
-vector<glm::vec3> drawConeArrow(float length, float arrowLength, float arrowRadius, int segments = 20) {
-    // 圆锥底部的圆
-    std::vector<float> circleVertices;
-    for (int i = 0; i <= segments; ++i) {
-        float angle = 2.0f * M_PI * i / segments;
-        float x = arrowRadius * cos(angle);
-        float y = arrowRadius * sin(angle);
-        circleVertices.push_back(x);
-        circleVertices.push_back(y);
-        circleVertices.push_back(length);
-    }
-    vector<glm::vec3> points;
-    points.push_back(glm::vec3(0.0f, 0.0f, length + arrowLength));
-    for (size_t i = 0; i < circleVertices.size(); i += 3) {
-        points.push_back(glm::vec3(circleVertices[i], circleVertices[i + 1], circleVertices[i + 2]));
-    };
-    return points;
-}
-
-/* 深拷贝网格：复制顶点/索引/名称并重建 GPU 缓冲（用于多对象共享几何但独立实例） */
-Mesh *Mesh::Clone() {
-    Mesh *m = new Mesh();
-    m->vertices = vector<Vertex>(this->vertices);
-    m->indices = vector<unsigned int>(this->indices);
-    m->name = this->name;
-    m->SetUpMesh();
-    return m;
 }

@@ -18,8 +18,7 @@ using namespace std;
  *   2. 链接为 GPU program
  *   3. 提供 uniform/attribute 定位与值设置的重载接口
  *
- * 使用约定：着色器源码字符串必须以 '\0' 结尾（见 AGENTS.md 经验教训 #4），
- * 否则 GLSL 编译会报 syntax error。
+ * 使用约定：着色器源码字符串必须以 '\0' 结尾，否则 GLSL 编译报 syntax error。
  */
 
 Shader::Shader() {
