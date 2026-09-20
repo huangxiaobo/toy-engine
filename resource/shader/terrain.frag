@@ -73,6 +73,9 @@ uniform sampler2D shadowMap;
 // 是否启用阴影采样（Mesh::Draw 每帧同步：阴影可用为1，否则为0）
 uniform int gUseShadow;
 
+// 阴影 bias 缩放系数（默认 1.0）：正交阴影范围自适应后 bias 相对比例变化，面板滑块现场微调
+uniform float gShadowBiasScale = 1.0;
+
 in VsOut {
     vec3 Color0;
     vec2 TexCoords;
@@ -89,13 +92,12 @@ out vec4 color;
  * 把片段在光源空间的裁剪坐标变换到 [0,1] 纹理坐标，用片段深度与阴影贴图中
  * 存储的最近深度比较：若片段离光源更远(被遮挡)，则处于阴影中返回 1。
  * bias 用来抵消自阴影痤疮（片元深度贴图深度数值相同造成的自身遮挡伪影）。
+ * 采样为 3×3 PCF：逐像素比较后平均，阴影边缘软过渡（贴图边界色 1.0，越界按被照亮）。
  */
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal) {
     // 透视除法转为 NDC，再映射到 [0,1] 的纹理坐标范围
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
-    // 最近深度 = 阴影贴图中该位置记录的最靠近光源的深度
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
 
     // 阴影深度比较的反自阴影偏置。
@@ -110,8 +112,18 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal) {
     //   - 对于垂直光照下的平坦地形（dot=1.0），bias = 0.005
     //   - 对于45°斜面（dot≈0.707），bias ≈ 0.008
     //   - 这个范围既能抑制自阴影痤疮，又不会让 sphere 阴影明显"漂移"
-    float bias = max(0.005 + 0.01 * (1.0 - dot(Normal, normalize(gDirectionLight.Direction))), 0.002);
-    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    float bias = max(0.005 + 0.01 * (1.0 - dot(Normal, normalize(gDirectionLight.Direction))), 0.002) * gShadowBiasScale;
+
+    // 3×3 PCF：周围 9 个贴图像素比较后平均，得到软阴影
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float closestDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > closestDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
 
     // 超出阴影贴图范围的片元当作"被照亮"(边界外无遮挡)，避免采样到 CLAMP_TO_BORDER=1.0
     // 后因 compare 恒成立而被整片误判为阴影
@@ -213,7 +225,9 @@ vec4 CalcSpotLight(int Index, vec3 Normal) {
 void main() {
     // 地面漫反射采样：world.yaml 中 terrain.texture 若给出有效路径则为真实纹理，
     // 否则替换为棋盘格纹理（两色交替，便于观察地形平面铺展）。
+    // 贴图为 sRGB 编码，采样后解码到线性空间参与光照（避免整体发灰）
     vec4 groundColor = texture(groundTexture, v2f.TexCoords);
+    groundColor.rgb = pow(groundColor.rgb, vec3(2.2));
 
     // 结合法线与光照计算最终颜色
     vec4 Color = vec4(0, 0, 0, 0);

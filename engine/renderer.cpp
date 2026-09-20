@@ -12,6 +12,7 @@
 #include "technique/technique.h"
 #include "technique/technique_light.h"
 #include "technique/technique_terrain.h"
+#include "render_context.h"
 #include "model/model.h"
 #include "axis/axis.h"
 #include "terrain/terrain_manager.h"
@@ -99,7 +100,6 @@ void Renderer::init(int w, int h) {
 
     m_projection_matrix = glm::mat4(1.0f);
     m_view_matrix = glm::mat4(1.0f); //  默认生成的是一个单位矩阵（对角线上的元素为1）
-    m_model_matrix = glm::mat4(1.0f); // 【重点】 view代表摄像机拍摄的物体，也就是全世界！！！
     m_eye_pos = glm::vec3(0, 0, 0);
     calculateProjectMatrix(w, h);
 
@@ -190,6 +190,7 @@ void Renderer::init(int w, int h) {
     );
     m_sky_dome->SetHorizonColor(gConfig->SkyDome.HorizonColor);
     m_sky_dome->SetZenithColor(gConfig->SkyDome.ZenithColor);
+    m_sky_dome->SetGroundColor(gConfig->SkyDome.GroundColor);
 
     // Create Particle Systems from config
     for (const auto &particleConfig: gConfig->Particles) {
@@ -222,10 +223,13 @@ void Renderer::init(int w, int h) {
             cameraConfig.Up
         );
         camera->m_name = cameraConfig.Name;
+        camera->SetProjectionType(cameraConfig.Projection);
         m_cameras.push_back(std::move(camera));
     }
     // 复用 m_cameras 中的第一个摄像机作为当前摄像机，避免重复创建造成内存泄漏
     m_camera = m_cameras[0].get();
+    // 相机就绪后用当前摄像机的投影属性校准投影矩阵（构造前期无相机时按默认透视计算过）
+    calculateProjectMatrix(width, height);
 
     // 创建轨道相机操控器并绑定当前相机：所有相机交互（轨道/平移/缩放）
     // 由操控器承载，相机只做状态存储。初始轨道参数由相机当前姿态反推。
@@ -453,6 +457,18 @@ void Renderer::draw(long long elapsed) {
     m_view_matrix = m_camera->GetViewMatrix();
     m_eye_pos = m_camera->GetPosition();
 
+    // ---- 组装帧级渲染上下文（RenderContext）----
+    // 整帧不变的渲染参数统一装入 ctx，沿 SkyDome/Terrain/Model/Mesh/Particle 绘制链贯通，
+    // 阴影状态（ctx.shadow）在下方深度 Pass 分段更新，场景 Pass 直接读取。
+    RenderContext ctx;
+    ctx.elapsed = elapsed;
+    ctx.projection = m_projection_matrix;
+    ctx.view = m_view_matrix;
+    ctx.camera = m_eye_pos;
+    ctx.lights = scene_lights;
+    // bias 缩放系数跟随面板滑块，每帧统一写入上下文
+    ctx.shadow.biasScale = m_shadow_bias_scale;
+
     // ---- 方向光阴影深度 Pass ----
     // 先用光源视角把场景写进深度贴图，主渲染 Pass 再采样它判定阴影。
     // 仅在启用阴影且存在已启用的方向光时执行；否则本帧不启用阴影采样。
@@ -481,16 +497,26 @@ void Renderer::draw(long long elapsed) {
             glm::vec3 lightDir = glm::normalize(dirLight->Direction);
             // 光源摄像机参数统一存入 m_shadow_camera（供 ImGui 面板展示与矩阵计算共用同一来源），
             // 后续 lightProjection/lightView 矩阵全部由这些字段构建，避免魔法数在计算处重复出现。
-            // 正交投影范围：±210 单位，覆盖全部地形（地形顶点范围 ±100 × 模型缩放 2.1 = ±210）。
-            // sphere 直径约 3 单位，在 420 单位宽的投影中仅占 ~0.7%，阴影会明显像素化，
-            // 但这是覆盖全部地形的代价。若需高质量 sphere 阴影，应使用 Cascaded Shadow Maps。
-            // 近/远平面：光源距场景约 30 单位，sphere 在 y=10（距光源 20 单位），
-            // 地形在 y=0（距光源 30 单位），故 near=1、far=100 足够覆盖。
-            // orthoLeft/Right/Bottom/Top、nearPlane/farPlane 使用 ShadowCameraParams 的默认值
-            // （±210 / 1 / 100），无需每帧重新赋值
+            // 正交投影范围按场景 AABB 自适应（computeSceneBounds → 包围球半径 + 10% 边距 + 5 单位）：
+            // 旧实现固定 ±210 覆盖全部地形，sphere 直径 3 单位仅占 ~0.7% 像素、阴影明显像素化；
+            // 当前场景收紧到约 ±80，同分辨率下阴影精度提升近 3 倍，PCF 软阴影也更细腻。
+            // 近/远平面沿用 1/100：光源在场景中心上方 30 单位，最远角点距光源约 80，100 足够。
             m_shadow_camera.direction = lightDir;
-            m_shadow_camera.position = -lightDir * 30.0f; // 光源位于场景上方（-Direction 远处），向下照射
-            m_shadow_camera.lookAt = glm::vec3(0.0f);
+
+            // 场景包围盒 → 中心 + 包围球半径，光源正交盒以 中心 ±(半径+边距) 覆盖，
+            // 用包围球而非 AABB 是因为光源视图有朝向旋转，球在任意旋转下都被正方形盒包含
+            glm::vec3 sceneMin, sceneMax;
+            computeSceneBounds(sceneMin, sceneMax);
+            const glm::vec3 sceneCenter = (sceneMin + sceneMax) * 0.5f;
+            const float sceneRadius = glm::length(sceneMax - sceneCenter);
+            const float span = sceneRadius * 1.1f + 5.0f; // 10% 边距 + 5 单位余量
+
+            m_shadow_camera.lookAt = sceneCenter;
+            m_shadow_camera.position = sceneCenter - lightDir * 30.0f; // 光源位于场景上方（-Direction 远处），向下照射
+            m_shadow_camera.orthoLeft = -span;
+            m_shadow_camera.orthoRight = span;
+            m_shadow_camera.orthoBottom = -span;
+            m_shadow_camera.orthoTop = span;
 
             // 当光源恰好垂直位于场景正上方（如太阳方向 (0,-1,0) 纯直下）时，
             // lookAt 的 look 向量与默认 up=(0,1,0) 完全平行，cross 得零向量，
@@ -519,14 +545,28 @@ void Renderer::draw(long long elapsed) {
             // 绑定阴影 FBO 并清空深度，随后以"只写深度"方式重画场景（地形 + 模型），
             // 生成光源视角的深度贴图供主 Pass 阴影判断使用
             m_shadow_fbo->BindForWrite();
-            Mesh::SetShadowDepthState(m_shadow_depth_tech, m_light_space, true);
+            // 组装 ctx.shadow：置位 passActive 后，Mesh::Draw 会改走"只写深度"分支。
+            // 阴影状态统一经 RenderContext 下发，不再依赖 Mesh 静态全局量 / 地形逐层转发
+            ctx.shadow.depthTech = m_shadow_depth_tech;
+            ctx.shadow.lightSpace = m_light_space;
+            ctx.shadow.passActive = true;
 
-            // m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, m_lights);
+            // 深度 Pass 渲染时开启面片深度偏移(GL_POLYGON_OFFSET_FILL)：
+            // 把写入阴影贴图的深度统一推远，保证与主绘制采样做比较时留出余量，
+            // 从根本上消除平坦地面在倾斜方向光下的自阴影痤疮(acne)，且不依赖着色器内超大 bias
+            // （超大 bias 会让 bunny 等模型的阴影"飘浮/peter-panning"）。
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(1.0f, 1.0f);
+
+            // m_terrain_manager->Draw(ctx);
             for (const auto &m: m_models) {
-                m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, scene_lights);
+                m->Draw(ctx, glm::mat4(1.0f));
             }
 
-            Mesh::SetShadowDepthState(nullptr, glm::mat4(1.0f), false);
+            // 退出深度 Pass：关闭深度偏移并复位 passActive，恢复光照绘制。
+            // 必须关闭该 GL 状态，避免泄漏影响后续场景绘制
+            glDisable(GL_POLYGON_OFFSET_FILL);
+            ctx.shadow.passActive = false;
             m_shadow_fbo->Unbind();
             // 恢复之前保存的主渲染视口（阴影 Pass 改写过视口，不解绑/不恢复会残余错误大小与偏移）
             glViewport(prevMainViewport[0], prevMainViewport[1], prevMainViewport[2], prevMainViewport[3]);
@@ -536,19 +576,15 @@ void Renderer::draw(long long elapsed) {
             // 后续每个 Mesh::Draw 会通过 SetShadowMap(2) 通知着色器采样它
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, m_shadow_fbo->GetDepthTexture());
-            // 标记本帧已有阴影贴图，主 Pass 的 Mesh::Draw 才会启用阴影采样
+            // 标记本帧已有阴影贴图：ctx.shadow.ready 供场景 Pass 的模型/地形启用阴影采样，
+            // m_shadow_map_ready 保留给调试面板展示
+            ctx.shadow.ready = true;
+            ctx.shadow.depthTexture = m_shadow_fbo->GetDepthTexture();
             m_shadow_map_ready = true;
-
-
-            // 把本帧阴影状态同步给地形管理器，最终存入 TechniqueTerrain，
-            // 主 Pass 绘制地形时由其自管阴影采样（见 TerrainChunk::SetShadowState / ApplyShadowState）
-            m_terrain_manager->SetShadowState(m_shadow_map_ready,
-                                              m_shadow_fbo->GetDepthTexture(),
-                                              m_light_space);
         }
     }
-    // 同步阴影贴图可用状态到 Mesh（供 Mesh::Draw 决定是否上传 lightSpace / 绑定 shadowMap）
-    Mesh::SetShadowMapAvailable(m_shadow_map_ready);
+    // 阴影不可用（开关关闭/无方向光）时 ctx.shadow.ready 保持 false，
+    // Mesh::Draw 与地形 ApplyShadowState 自动跳过阴影采样，无需再单独同步
 
     // ---- 场景 Pass：所有 3D 内容渲染到 HDR 场景 FBO ----
     // 原实现直接画进默认帧缓冲；现在先画到 RGBA16F 离屏 FBO（保留 HDR 精度），
@@ -556,7 +592,7 @@ void Renderer::draw(long long elapsed) {
     m_scene_fbo->BindForWrite();
 
     glDepthMask(GL_FALSE);
-    m_sky_dome->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos);
+    m_sky_dome->Draw(ctx);
     glDepthMask(GL_TRUE);
 
     // 坐标轴 gizmo 不在 3D 场景中绘制：由 mainwindow 在 ImGui 绘制阶段
@@ -579,7 +615,7 @@ void Renderer::draw(long long elapsed) {
     }
 
     // 绘制地形
-m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, scene_lights);
+    m_terrain_manager->Draw(ctx);
 
     // 网格地面辅助线：XZ 平面世界网格，独立于光源 gizmo 开关（见 DrawGrid）
     if (m_grid_enabled && m_debug_draw != nullptr) {
@@ -590,7 +626,7 @@ m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, 
 
     // 绘制配置的粒子系统
     for (const auto& ps: m_particle_systems) {
-        ps->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, scene_lights);
+        ps->Draw(ctx, glm::mat4(1.0f));
     }
 
     // 光源调试可视化（DebugDraw）：直接遍历灯光列表，把 gizmo 顶点收集进
@@ -659,7 +695,7 @@ m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, 
                 effect->SetMaterial(matIt->second);
             }
         }
-        m->Draw(elapsed, m_projection_matrix, m_view_matrix, m_model_matrix, m_eye_pos, scene_lights);
+        m->Draw(ctx, glm::mat4(1.0f));
     }
 
     // 法线可视化：在模型绘制之后收集所有模型顶点的法线线段，
@@ -698,6 +734,9 @@ m_terrain_manager->Draw(elapsed, m_projection_matrix, m_view_matrix, m_eye_pos, 
     m_post_tech->Enable();
     m_post_tech->SetUniform("sceneTex", 0);   // 场景 HDR 纹理绑定到纹理单元0
     m_post_tech->SetUniform("toneMapMode", m_tone_mapping_enabled ? 1 : 0);
+    m_post_tech->SetUniform("exposure", m_exposure);   // 曝光系数（ACES 映射前乘入）
+    m_post_tech->SetUniform("saturation", m_saturation); // 饱和度（gamma 后调整）
+    m_post_tech->SetUniform("contrast", m_contrast);     // 对比度（gamma 后调整）
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_scene_fbo->GetColorTexture());
 
@@ -845,12 +884,18 @@ void Renderer::SwitchCamera(int index) {
     std::cout << "Camera switch to " << m_camera->GetName() << std::endl;
 }
 
+// 投影模式是摄像机属性：写入当前摄像机后立即重算投影矩阵（与 SetFov 相同模式），
+// 切换摄像机时各自保持互不影响
 void Renderer::SetProjectionType(ProjectionType type) {
-    m_projection_type = type;
+    if (m_camera != nullptr) {
+        m_camera->SetProjectionType(type);
+        // 投影随相机属性即时生效，无需等窗口尺寸变化触发重算
+        calculateProjectMatrix(width, height);
+    }
 }
 
 ProjectionType Renderer::GetProjectionType() const {
-    return m_projection_type;
+    return (m_camera != nullptr) ? m_camera->GetProjectionType() : ProjectionType::Perspective;
 }
 
 unsigned int Renderer::GetShadowDepthTexture() const {
@@ -935,23 +980,68 @@ void Renderer::CollectModelNormals() {
     }
 }
 
+void Renderer::computeSceneBounds(glm::vec3 &outMin, glm::vec3 &outMax) const {
+    // 先以地形地面范围为基准（原点为中心 planeSize×planeSize，高度 0~heightScale），
+    // 再并入所有模型网格世界坐标范围；两者都没有时回退旧默认 ±210 保证阴影覆盖取景范围
+    bool haveBounds = false;
+
+    if (m_terrain_manager != nullptr) {
+        const TerrainConfig &cfg = m_terrain_manager->GetConfig();
+        const float half = cfg.planeSize * 0.5f;
+        outMin = glm::vec3(-half, 0.0f, -half);
+        outMax = glm::vec3(half, cfg.heightScale, half);
+        haveBounds = true;
+    }
+
+    for (const auto &model : m_models) {
+        const glm::mat4 world = model->GetWorldMatrix();
+        for (const auto &mesh : model->GetMeshes()) {
+            for (const auto &vertex : mesh->vertices) {
+                const glm::vec3 p = glm::vec3(world * glm::vec4(vertex.Position, 1.0f));
+                if (!haveBounds) {
+                    outMin = outMax = p;
+                    haveBounds = true;
+                } else {
+                    outMin = glm::min(outMin, p);
+                    outMax = glm::max(outMax, p);
+                }
+            }
+        }
+    }
+
+    if (!haveBounds) {
+        outMin = glm::vec3(-210.0f);
+        outMax = glm::vec3(210.0f);
+    }
+}
+
 void Renderer::calculateProjectMatrix(const int w, const int h) {
-    if (m_projection_type == ProjectionType::Perspective) {
+    // 投影模式取自当前摄像机（相机属性）；相机未创建时回退透视
+    const ProjectionType projection = (m_camera != nullptr)
+                                          ? m_camera->GetProjectionType()
+                                          : ProjectionType::Perspective;
+
+    if (projection == ProjectionType::Perspective) {
         const float fov = m_fov; // 视野角度（member，调试面板可调）
         const float aspectRatio = (float) w / (float) (1 * h); // 宽高比
         const float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
         const float farPlane = gConfig->Clip.ClipFar; // 远平面距离
         m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
     } else {
-        // 设置正交投影
-        float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+        // 正交投影：范围按地形地面尺寸自适应（半尺寸 + 20% 边距），
+        // 顶/侧视图能看全整个场景；旧实现固定 ±20 只能看到场景中央一小块
+        float sceneHalf = 60.0f; // 回退默认（地形管理器尚未创建时，对应默认 planeSize=100）
+        if (m_terrain_manager != nullptr) {
+            const TerrainConfig &cfg = m_terrain_manager->GetConfig();
+            sceneHalf = cfg.planeSize * 0.5f + cfg.planeSize * 0.2f;
+        }
 
-        // 定义一个合适的范围，这里我们假设使用 -10 到 10 的范围作为示例
-        // 你可以根据实际需求调整这些值
-        const float left = -20.0f * aspectRatio;
-        float right = 20.0f * aspectRatio;
-        float bottom = -20.0f;
-        float top = 20.0f;
+        // 垂直范围 = ±sceneHalf，水平范围按窗口宽高比放大（长边看更多地面）
+        float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+        const float left = -sceneHalf * aspectRatio;
+        const float right = sceneHalf * aspectRatio;
+        const float bottom = -sceneHalf;
+        const float top = sceneHalf;
 
         float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
         float farPlane = gConfig->Clip.ClipFar; // 远平面距离

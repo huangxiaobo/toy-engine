@@ -12,19 +12,12 @@ class Light;
 class Material;
 
 
+// 渲染技术类型：语义轴正交的简单标记，供渲染器按能力甄别技术
+// （当前仅 Base=无光照能力 / Light=支持光照材质），不承载"能力组合"推导。
+// 阴影/深度 Pass 等能力通过 RenderContext.shadow 显式下发，不再走类型枚举分派。
 enum TechniqueType {
     TechniqueTypeBase,
     TechniqueTypeLight,
-    TechniqueTypeModel,
-    TechniqueTypeNormal,
-    TechniqueTypeShadow,
-    TechniqueTypeShadowMap,
-    TechniqueTypeShadowMapLight,
-    TechniqueTypeShadowMapModel,
-    TechniqueTypeShadowMapNormal,
-    TechniqueTypeShadowMapShadow,
-    TechniqueTypeShadowMapShadowMap,
-    TechniqueTypeShadowMapShadowMapLight,
 };
 
 

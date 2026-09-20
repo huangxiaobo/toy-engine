@@ -22,6 +22,7 @@ class TerrainChunk;
 class Technique;
 class Noise;
 class Light;
+struct RenderContext;
 
 // 配置参数
 struct TerrainConfig {
@@ -45,15 +46,8 @@ public:
     // 设置地形纹理
     void SetTexture(unsigned int textureID);
 
-    // 转发每帧阴影状态到地形技术（见 TerrainChunk::SetShadowState）
-    void SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4& lightSpace);
-
-    // 绘制地形
-    void Draw(long long elapsed,
-              const glm::mat4& projection,
-              const glm::mat4& view,
-              const glm::vec3& cameraPos,
-              const std::vector<Light*>& lights);
+    // 绘制地形（阴影状态经 RenderContext.shadow 传入，见 terrain_chunk.cpp）
+    void Draw(const RenderContext &ctx);
 
     // 获取配置
     const TerrainConfig& GetConfig() const { return m_config; }

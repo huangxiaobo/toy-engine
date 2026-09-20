@@ -5,7 +5,7 @@
  *   1. albedo 合成：albedo = 顶点颜色 x 漫反射贴图 x 材质漫反射色
  *   2. 法线贴图：存在时用 TBN 把切空间法线变换到世界空间，替代几何法线
  *   3. 多光源累加：方向光（支持阴影）+ 点光源数组 + 聚光灯数组
- *   4. 阴影：方向光阴影贴图采样（PCF 前身的基础逐片元比较 + 斜率 bias）
+ *   4. 阴影：方向光阴影贴图采样（3×3 PCF 软阴影 + 斜率 bias）
  *   5. 镜面反射：Blinn-Phong（半程向量 H），Shininess 仅作高光聚敛指数
  *
  * uniform 命名与 engine/technique/technique_light.cpp 的上传代码严格对应，
@@ -84,6 +84,9 @@ uniform int gHasNormalMap = 0; // 是否绑定了法线贴图
 uniform sampler2D shadowMap;   // 深度贴图，纹理单元 2
 uniform int gUseShadow = 0;    // 本帧是否启用阴影采样（0/1）
 
+// 阴影 bias 缩放系数（默认 1.0）：正交阴影范围自适应后 bias 相对比例变化，面板滑块现场微调
+uniform float gShadowBiasScale = 1.0;
+
 in VS_OUT {
     vec3  Color0;
     vec2  TexCoords;
@@ -103,19 +106,30 @@ out vec4 color;
  * 抵消自阴影痤疮（表面片元深度与贴图深度数值相同造成的自身遮挡伪影）：
  *   - baseBias 补偿深度贴图量化误差
  *   - slopeFactor 项：表面越倾斜（与光照方向夹角越大）误差越大，需更大偏置
- * 超出贴图范围的片元按"被照亮"处理（贴图边界外无遮挡）。
+ *
+ * 采样方式为 3×3 PCF：对周围 9 个贴图像素逐一比较后求平均，
+ * 让阴影边缘从单探针的硬边变成软过渡，消除锯齿化/像素化。
+ * （贴图边界色为 1.0，越界样本按"被照亮"处理，不会误判阴影）
  */
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 N) {
     // 透视除法转 NDC，再映射到 [0,1] 纹理坐标
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
-    // 最近深度 = 深度贴图中记录的最靠近光源的深度
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
 
     // 反自阴影偏置：随表面与光照方向的夹角增大而增大
-    float bias = max(0.005 + 0.01 * (1.0 - dot(N, normalize(gDirectionLight.Direction))), 0.002);
-    float shadow = (currentDepth - bias) > closestDepth ? 1.0 : 0.0;
+    float bias = max(0.005 + 0.01 * (1.0 - dot(N, normalize(gDirectionLight.Direction))), 0.002) * gShadowBiasScale;
+
+    // 3×3 PCF：逐像素比较阴影，结果取 9 个样本的平均（软阴影）
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float closestDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += (currentDepth - bias) > closestDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
 
     // 超出贴图范围（NDC 越界）的片元当作为被照亮，避免边界采样到 CLAMP 值误判全黑
     if (projCoords.z > 1.0) {
@@ -240,7 +254,11 @@ void main() {
     // ---- 2. albedo 合成：顶点颜色 x 漫反射贴图 x 材质漫反射系数 ----
     vec3 albedo = v2f.Color0;
     if (gHasTexture == 1) {
-        albedo *= texture(gTexture, v2f.TexCoords).rgb;
+        // 漫反射贴图按 sRGB 编码存储，采样后先解码到线性空间再参与光照：
+        // 否则贴图被当作线性值乘进 albedo，到最后 gamma 编码时会被提亮、发灰
+        vec3 texColor = texture(gTexture, v2f.TexCoords).rgb;
+        texColor = pow(texColor, vec3(2.2));
+        albedo *= texColor;
     }
     albedo *= gMaterial.DiffuseColor;
 

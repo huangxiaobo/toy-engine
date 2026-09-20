@@ -21,6 +21,7 @@
 class Mesh;
 class Technique;
 class Noise;
+struct RenderContext;
 
 class TerrainChunk {
 public:
@@ -31,21 +32,13 @@ public:
     // 生成网格（平面顶点 + 噪声高度 + 法线 + OpenGL 缓冲），幂等：只生成一次
     void GenerateMesh();
 
-    // 绘制地形
-    void Draw(long long elapsed,
-              const glm::mat4& projection,
-              const glm::mat4& view,
-              const glm::vec3& cameraPos,
-              const std::vector<class Light*>& lights);
+    // 绘制地形（所有帧参数取自 RenderContext，含阴影状态）
+    void Draw(const RenderContext &ctx);
 
     // 设置技术（着色器+材质）
     void SetTechnique(Technique* tech);
 
     void SetTexture(unsigned int textureID);
-
-    // 转发每帧阴影状态（启用标志 + 深度贴图ID + 光源空间矩阵）到地形技术，
-    // 供 TechniqueTerrain 在绘制时自管阴影采样（见 TechniqueTerrain::ApplyShadowState）
-    void SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4& lightSpace);
 
     // 获取网格三角形数量（用于调试显示）
     int GetTriangleCount() const { return m_resolution * m_resolution * 2; }

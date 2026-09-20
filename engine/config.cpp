@@ -56,6 +56,13 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                     camera_node["up"]["y"].as<float>(),
                     camera_node["up"]["z"].as<float>()
                 );
+                // 投影模式（可选）：perspective 透视 / orthographic 正交，缺省透视
+                if (camera_node["projection"]) {
+                    std::string projection = camera_node["projection"].as<std::string>();
+                    cameraConfig.Projection = (projection == "orthographic")
+                                                  ? ProjectionType::Orthographic
+                                                  : ProjectionType::Perspective;
+                }
                 config->Cameras.push_back(cameraConfig);
             }
         } else {
@@ -79,6 +86,13 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                     camera["up"]["y"].as<float>(),
                     camera["up"]["z"].as<float>()
                 );
+                // 投影模式（可选）：perspective 透视 / orthographic 正交，缺省透视
+                if (camera["projection"]) {
+                    std::string projection = camera["projection"].as<std::string>();
+                    cameraConfig.Projection = (projection == "orthographic")
+                                                  ? ProjectionType::Orthographic
+                                                  : ProjectionType::Perspective;
+                }
                 config->Cameras.push_back(cameraConfig);
             }
         }
@@ -306,6 +320,13 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                     sky_dome_node["zenith_color"]["r"].as<float>(),
                     sky_dome_node["zenith_color"]["g"].as<float>(),
                     sky_dome_node["zenith_color"]["b"].as<float>()
+                );
+            }
+            if (sky_dome_node["ground_color"]) {
+                config->SkyDome.GroundColor = glm::vec3(
+                    sky_dome_node["ground_color"]["r"].as<float>(),
+                    sky_dome_node["ground_color"]["g"].as<float>(),
+                    sky_dome_node["ground_color"]["b"].as<float>()
                 );
             }
         }

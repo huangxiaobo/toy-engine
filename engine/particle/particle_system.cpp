@@ -2,6 +2,7 @@
 #include "particle_emitter.h"
 #include "../technique/technique.h"
 #include "../utils/utils.h"
+#include "../render_context.h"
 #include <glad/gl.h>
 #include <iostream>
 
@@ -148,14 +149,10 @@ void ParticleSystem::Update(float deltaTime) {
  *   4. glDrawArrays(GL_POINTS) 一次性绘制全部顶点
  *   5. 恢复第 2 步保存的 GL 状态，避免影响后续场景绘制
  *
- * 注意：elapsed 为毫秒，粒子物理由 Update 以秒为单位驱动。
+ * 注意：粒子物理由 Update 以秒为单位驱动，Draw 只负责渲染当前缓冲。
  */
-void ParticleSystem::Draw(long long elapsed,
-                          const glm::mat4& projection,
-                          const glm::mat4& view,
-                          const glm::mat4& model,
-                          const glm::vec3& camera,
-                          const std::vector<Light*>& lights) {
+void ParticleSystem::Draw(const RenderContext &ctx,
+                          const glm::mat4& model) {
     if (!m_emitter || m_emitter->GetAliveCount() == 0) return;
 
     // 保存当前OpenGL状态
@@ -183,8 +180,8 @@ void ParticleSystem::Draw(long long elapsed,
 
     // 使用着色器
     m_effect->Enable();
-    m_effect->SetProjectionMatrix(projection);
-    m_effect->SetViewMatrix(view);
+    m_effect->SetProjectionMatrix(ctx.projection);
+    m_effect->SetViewMatrix(ctx.view);
     m_effect->SetModelMatrix(model);
 
     // 绑定纹理到纹理单元0，并通知着色器 sampler

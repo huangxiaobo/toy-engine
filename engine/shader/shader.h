@@ -56,8 +56,6 @@ public:
 
     void BindColorAttribute(unsigned int index, const char *name);
 
-    void BindFragDataLocation();
-
 private:
     void PrintProgramLog(unsigned int id);
 

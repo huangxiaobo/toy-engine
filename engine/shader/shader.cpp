@@ -98,6 +98,11 @@ void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath
 bool Shader::Link() {
     int success;
 
+    // 绑定输出到 location 0 必须在链接之前声明才生效（链接期绑定）。
+    // 原实现把 BindFragDataLocation 放在 Technique::Enable() 每帧调用，
+    // 但 glBindFragDataLocation 只在 glLinkProgram 时生效，运行期重复调用是纯开销。
+    glBindFragDataLocation(m_program, 0, "color\x00");
+
     glLinkProgram(m_program);
 
     // check for linking errors
@@ -109,16 +114,8 @@ bool Shader::Link() {
 }
 
 /*
- * 绑定片段输出颜色到 location 0
- *
- * "color\x00" 中的显式 \0 用于确保字符串以空字符结尾（GLSL 字符串终止符规范）。
- * 显式绑定 fragment 输出可避免依赖编译器默认的语义绑定。
+ * 捕获链接着色器时的错误的函数
  */
-void Shader::BindFragDataLocation() {
-    glBindFragDataLocation(m_program, 0, "color\x00");
-}
-
-// 捕获链接着色器时的错误的函数
 void Shader::PrintProgramLog(unsigned int id) {
     int len = 0;
     char *log;

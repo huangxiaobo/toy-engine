@@ -9,6 +9,7 @@ using namespace std;
 #include "../texture/texture.h"
 #include "../utils/utils.h"
 #include "../light/light.h"
+#include "../render_context.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
@@ -329,14 +330,12 @@ glm::mat4 Model::GetWorldMatrix() const {
  * 因此实际施加的顺序是"先绕 Y 旋转、再缩放、再平移"（逆序相乘）。
  * 本地变换矩阵统一由 GetWorldMatrix() 生成，与鼠标拾取共用同一份矩阵。
  */
-void Model::Draw(long long elapsed,
-                 const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model,
-                 const glm::vec3 &camera, const std::vector<Light *> &lights) {
+void Model::Draw(const RenderContext &ctx, const glm::mat4 &model) {
     auto model_local = GetWorldMatrix();
 
     model_local = model * model_local;
 
     for (int i = 0; i < this->m_meshes.size(); i++) {
-        this->m_meshes[i]->Draw(elapsed, projection, view, model_local, camera, lights);
+        this->m_meshes[i]->Draw(ctx, model_local);
     }
 }

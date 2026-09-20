@@ -1,5 +1,6 @@
 #include "sky_dome.h"
 #include "../technique/technique.h"
+#include "../render_context.h"
 #include <glad/gl.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -41,30 +42,34 @@ void SkyDome::Init(float radius, int sectors, int stacks) {
         "./resource/shader/sky.frag"
     );
 
-    GenerateHemisphere(radius, sectors, stacks);
+    GenerateSphere(radius, sectors, stacks);
 }
 
 /*
- * 生成半球体网格
+ * 生成全球体网格
  *
- * 使用经纬度参数化生成半球体（从赤道到天顶）。
+ * 使用经纬度参数化生成完整球体（从南极到北极）。
  * 顶点格式：position (vec3) + normal (vec3)
  * 法线方向与位置相同（归一化后即为方向向量），用于计算渐变。
  *
  * 球面参数方程：
  *   x = r * cos(latitude) * cos(longitude)
- *   y = r * sin(latitude)                    // 纬度从 0（赤道）到 PI/2（天顶）
+ *   y = r * sin(latitude)                    // 纬度从 -PI/2（南极）到 PI/2（北极）
  *   z = r * cos(latitude) * sin(longitude)
+ *
+ * 为何用全球而非半球：天空穹只画 y>0 时，低头/俯视/正侧视图里
+ * 地平线以下没有几何覆盖，会露出视口底色。全球体配合片元着色器的
+ * 下半球地面雾色过渡，任何视角都不会漏底色。
  */
-void SkyDome::GenerateHemisphere(float radius, int sectors, int stacks) {
+void SkyDome::GenerateSphere(float radius, int sectors, int stacks) {
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
 
     // 生成顶点
-    // 纬度从 0（赤道）到 PI/2（天顶），共 stacks+1 行
+    // 纬度从 -PI/2（南极）到 PI/2（北极），共 stacks+1 行
     for (int stack = 0; stack <= stacks; ++stack) {
-        // 纬度角：0 = 赤道，PI/2 = 天顶
-        float latitude = (static_cast<float>(stack) / stacks) * static_cast<float>(M_PI) * 0.5f;
+        // 纬度角：-PI/2 = 南极，0 = 赤道，PI/2 = 北极
+        float latitude = (static_cast<float>(stack) / stacks - 0.5f) * static_cast<float>(M_PI);
 
         // 经度从 0 到 2*PI，共 sectors+1 列（首尾相连）
         for (int sector = 0; sector <= sectors; ++sector) {
@@ -147,32 +152,30 @@ void SkyDome::GenerateHemisphere(float radius, int sectors, int stacks) {
     glBindVertexArray(0);
 }
 
-void SkyDome::Draw(long long elapsed,
-                   const glm::mat4 &projection,
-                   const glm::mat4 &view,
-                   const glm::vec3 &cameraPos) {
+void SkyDome::Draw(const RenderContext &ctx) {
     if (!m_effect || m_indexCount == 0) return;
 
     // 激活着色器
     m_effect->Enable();
 
     // 设置变换矩阵
-    m_effect->SetProjectionMatrix(projection);
-    m_effect->SetViewMatrix(view);
+    m_effect->SetProjectionMatrix(ctx.projection);
+    m_effect->SetViewMatrix(ctx.view);
 
     // 模型矩阵：仅平移到摄像机位置（天空穹始终以摄像机为中心）
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, cameraPos);
+    model = glm::translate(model, ctx.camera);
     m_effect->SetModelMatrix(model);
 
     // 设置渐变颜色
     m_effect->SetUniform("horizonColor", m_horizonColor);
     m_effect->SetUniform("zenithColor", m_zenithColor);
+    m_effect->SetUniform("groundColor", m_groundColor);
 
     // 临时切换深度函数为 GL_LEQUAL，允许天空穹在远裁剪面（depth=1.0）通过深度测试
     glDepthFunc(GL_LEQUAL);
 
-    // 绘制半球体
+    // 绘制全球体
     glBindVertexArray(m_VAO);
     glDrawElements(GL_TRIANGLES, m_indexCount, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
@@ -187,4 +190,8 @@ void SkyDome::SetHorizonColor(const glm::vec3 &color) {
 
 void SkyDome::SetZenithColor(const glm::vec3 &color) {
     m_zenithColor = color;
+}
+
+void SkyDome::SetGroundColor(const glm::vec3 &color) {
+    m_groundColor = color;
 }

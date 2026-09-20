@@ -6,6 +6,8 @@
 
 #include "technique_light.h"
 
+struct ShadowState;
+
 /*
  * 地形专用渲染技术（TechniqueTerrain）
  *
@@ -15,8 +17,10 @@
  *   2. 在基类之上新增地形专属的阴影采样管理：
  *      - 地面纹理采样（groundTexture → 单元0）
  *      - 阴影深度贴图统一绑定到纹理单元2，并在每次绘制时显式激活/绑定，
- *        避免依赖 Mesh 全局静态阴影状态链导致主 Pass 采样到错误的纹理
+ *        避免主 Pass 采样到错误的纹理
  *
+ * 阴影参数不再由 SetShadowState 逐层转发缓存，而是绘制时直接读取
+ * RenderContext.shadow（见 render_context.h），与模型共用同一条状态通道。
  * 阴影映射涉及三套输入，本类在绘制时按固定纹理单元约定一次性激活/绑定：
  *   - lightSpace : 世界坐标 → 光源裁剪空间（顶点着色器算 FragPosLightSpace）
  *   - shadowMap  : 光源视角深度贴图采样器（片元着色器比较深度判影）
@@ -35,28 +39,13 @@ public:
     void SetGroundTexture(int unit = 0);
 
     /*
-     * 记录本帧阴影启用状态、深度贴图纹理ID 与光源空间矩阵
-     *
-     * 由 Renderer 在阴影深度 Pass 结束后调用。真正把状态应用到 GPU 的
-     * ApplyShadowState() 在绘制阶段（Enable 之后）执行。
-     */
-    void SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4 &lightSpace);
-
-    /*
      * 绘制阶段应用阴影状态（必须在 Enable() 之后、glDrawElements 之前调用）
      *
+     * 阴影状态直接取自 RenderContext.shadow（每帧由 Renderer 组装），不再本地缓存。
      * 显式激活纹理单元2、重新绑定深度贴图，并上传 shadowMap/lightSpace/gUseShadow，
      * 防止其他对象绘制覆盖了单元2 的纹理绑定。
      */
-    void ApplyShadowState();
-
-private:
-    // 是否启用阴影（0=关闭，1=启用），用于上传 gUseShadow
-    unsigned int m_useShadow = 0;
-    // 阴影深度贴图纹理ID（绘制时显式绑定到单元2）
-    unsigned int m_depthTexture = 0;
-    // 光源空间矩阵（世界坐标 → 光源裁剪空间）
-    glm::mat4 m_lightSpace = glm::mat4(1.0f);
+    void ApplyShadowState(const ShadowState &shadow);
 };
 
 #endif // __TECHNIQUE_TERRAIN_H__

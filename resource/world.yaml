@@ -10,6 +10,7 @@ world:
     aspect: 1
   cameras:
     - name: "Main Camera"
+      projection: perspective
       position:
         x: 80.0
         y: 60.0
@@ -23,6 +24,7 @@ world:
         y: 1.0
         z: 0.0
     - name: "Top View"
+      projection: orthographic
       position:
         x: 0.0
         y: 200.0
@@ -36,6 +38,7 @@ world:
         y: 0.0
         z: -1.0
     - name: "Side View"
+      projection: orthographic
       position:
         x: 200.0
         y: 0.0
@@ -217,7 +220,7 @@ world:
         z: 0.0
       drag: 0.99
   sky_dome:
-    radius: 100.0
+    radius: 200.0
     sectors: 32
     stacks: 16
     horizon_color:
@@ -228,6 +231,10 @@ world:
       r: 0.1
       g: 0.2
       b: 0.5
+    ground_color:
+      r: 0.01
+      g: 0.01
+      b: 0.01
   terrain:
     plane-size: 100.0
     resolution: 128

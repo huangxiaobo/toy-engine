@@ -4,6 +4,7 @@
 #include "../technique/technique_light.h"
 #include "../material/material.h"
 #include "../light/light.h"
+#include "../render_context.h"
 #include <iostream>
 
 TerrainManager::TerrainManager()
@@ -94,31 +95,15 @@ void TerrainManager::SetTexture(unsigned int textureID) {
 }
 
 /*
- * 转发每帧阴影状态到平面网格的地形技术
- *
- * 由 Renderer 在深度贴图生成后调用，把阴影启用标志、深度贴图纹理ID
- * 与光源空间矩阵交给 TerrainChunk（最终存入 TechniqueTerrain），
- * 供其绘制阶段自管阴影采样（见 TerrainChunk::SetShadowState）。
- */
-void TerrainManager::SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4& lightSpace) {
-    if (m_plane) {
-        m_plane->SetShadowState(enabled, depthTexture, lightSpace);
-    }
-}
-
-/*
  * 绘制地形
  *
  * 单一网格平面直接绘制，无需遍历 chunk，
  * 因此不再需要视锥体剔除的多 chunk 遍历。
+ * 阴影状态经 RenderContext.shadow 直接传给平面网格，不再逐层转发。
  */
-void TerrainManager::Draw(long long elapsed,
-                          const glm::mat4& projection,
-                          const glm::mat4& view,
-                          const glm::vec3& cameraPos,
-                          const std::vector<Light*>& lights) {
+void TerrainManager::Draw(const RenderContext &ctx) {
     if (m_plane) {
-        m_plane->Draw(elapsed, projection, view, cameraPos, lights);
+        m_plane->Draw(ctx);
     }
 }
 

@@ -8,6 +8,7 @@
 class ParticleEmitter;
 class Technique;
 class Light;
+struct RenderContext;
 
 // 粒子顶点数据结构(上传到GPU的布局)
 struct ParticleVertex {
@@ -25,12 +26,7 @@ public:
     
     void Init(const glm::vec3& position);
     void Update(float deltaTime);
-    void Draw(long long elapsed,
-              const glm::mat4& projection,
-              const glm::mat4& view,
-              const glm::mat4& model,
-              const glm::vec3& camera,
-              const std::vector<Light*>& lights);
+    void Draw(const RenderContext &ctx, const glm::mat4& model);
     
     ParticleEmitter* GetEmitter() const { return m_emitter; }
     void ReallocateVBO();

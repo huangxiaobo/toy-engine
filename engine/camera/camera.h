@@ -4,6 +4,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+// 摄像机投影模式（透视 / 正交），作为相机属性由每台摄像机各自持有
+enum class ProjectionType {
+    Perspective,
+    Orthographic
+};
+
 /*
  * 相机类（纯状态容器）
  *
@@ -30,6 +36,9 @@ public:
     // ---- 状态访问 ----
     glm::vec3 GetPosition() const { return m_position; }
     glm::quat GetOrientation() const { return m_orientation; }
+    // 投影模式（透视/正交）：相机各自的属性，切换摄像机时互不影响
+    ProjectionType GetProjectionType() const { return m_projection_type; }
+    void SetProjectionType(ProjectionType type) { m_projection_type = type; }
 
     // ---- 状态修改（供操控器写入最新姿态） ----
     void SetPosition(const glm::vec3 &position);
@@ -47,6 +56,7 @@ public:
 
 private:
     glm::quat m_orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // 朝向（单位四元数）
+    ProjectionType m_projection_type = ProjectionType::Perspective; // 投影模式（默认透视）
 };
 
 #endif

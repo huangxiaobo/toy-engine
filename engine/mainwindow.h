@@ -52,6 +52,7 @@ private:
     void ShowShadowDepthMapPanel();          // 绘制阴影深度贴图可视化调试面板（把深度图作为纹理显示）
     void ShowShadowPropertiesPanel();        // 绘制阴影属性面板（阴影开关、深度贴图预览等全局阴影设置）
     void ShowDebugPropertiesPanel();         // 绘制调试属性面板（DebugDraw 光源线框开关等渲染调试项）
+    void ShowFpsGraph();                     // 绘制视口右上角 FPS 曲线悬浮面板（最近一帧一次的瞬时帧率采样）
     void RebuildShadowDepthPreview(unsigned int srcTex); // 读回深度贴图并重建灰度预览纹理
     void SaveScreenshot();                   // 截图：读取当前默认framebuffer并保存为 PNG 文件（含时间戳文件名）
 
@@ -106,6 +107,8 @@ private:
     bool m_showResourceList = true;
     bool m_showProperties = true;
     bool m_showViewportStatusBar = true;
+    // FPS 曲线悬浮面板开关（菜单「面板 → FPS曲线」控制，默认显示）
+    bool m_showFpsGraph = true;
     // 阴影深度贴图可视化调试面板开关（把深度图作为纹理显示，辅助诊断阴影问题）
     bool m_showShadowDepthMap = false;
     // 阴影属性面板开关（阴影开关、光源摄像机参数、深度贴图预览等全局阴影设置）
@@ -144,6 +147,13 @@ private:
     // 时间相关
     float m_lastTime = 0.0f;
     float m_deltaTime = 0.0f;
+
+    // FPS 曲线历史采样：以 1/15 秒为周期结算一次窗口平均帧率入历史
+    // （容量到达 kFpsHistoryCapacity 后丢弃最旧采样，vector 前移开销可忽略）
+    std::vector<float> m_fps_history;
+    // 采样累加器：跨到结算间隔（1/15 秒）时计算帧数/流逝时间写入 m_fps_history 并清零
+    unsigned int m_fps_sample_frames = 0;
+    float m_fps_sample_elapsed = 0.0f;
 
     // 截图请求标志：菜单「工具 → 截图」置位，RenderFrame 在本帧渲染完成后、
     // swapBuffers 之前执行一次截图并复位（保证截取的是完整一帧，含 UI 叠加）

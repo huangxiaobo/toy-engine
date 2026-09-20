@@ -10,6 +10,7 @@
 
 class Light;
 class Technique;
+struct RenderContext;
 
 class Vertex
 {
@@ -62,24 +63,7 @@ public:
     void SetNormalMap(unsigned int normalMapID) { m_normalMapID = normalMapID; }
     unsigned int GetNormalMap() const { return m_normalMapID; }
 
-    virtual void Draw(long long elapsed, const glm::mat4 &projection, const glm::mat4 &view, const glm::mat4 &model, const glm::vec3 &camera, const std::vector<Light *> &lights);
-
-    /*
-     * 设置阴影深度 Pass 的全局状态（由 Renderer 在每帧切到阴影 FBO 时调用）
-     *
-     * 当 active 为 true 时，所有 Mesh::Draw 会改走"只写深度的阴影 Pass"：
-     * 用 gDepthTech 和 lightSpace 变换，绘制同样几何但不做光照计算。
-     * active 为 false 时恢复正常的光照绘制。
-     */
-    static void SetShadowDepthState(Technique *tech, const glm::mat4 &lightSpace, bool active);
-
-    /*
-     * 设置本帧是否已有可用的阴影深度贴图
-     *
-     * 主渲染 Pass 只有在存在有效阴影贴图时才上传 lightSpace/绑定 shadowMap，
-     * 避免在阴影被禁用时采样到未绑定的纹理导致画面整体变暗。
-     */
-    static void SetShadowMapAvailable(bool available);
+    virtual void Draw(const RenderContext &ctx, const glm::mat4 &model);
 
     // 工厂方法返回 unique_ptr 容器，mesh 所有权随容器转移
     static std::vector<std::unique_ptr<Mesh>> CreatePlaneMesh();

@@ -146,7 +146,6 @@ void Technique::SetMaterial(const Material *material) {
  */
 void Technique::Enable() {
     m_shader->Use();
-    m_shader->BindFragDataLocation();
 }
 
 // 停用当前 program（解绑）

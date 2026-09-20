@@ -28,6 +28,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -48,6 +49,11 @@
 void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
+
+// FPS 曲线采样容量：每 1/15 秒一个采样点 × 600 = 40 秒历史
+static constexpr size_t kFpsHistoryCapacity = 600;
+// FPS 曲线采样间隔（秒）：按此周期结算一次窗口平均帧率（15 次/秒）
+static constexpr float kFpsSampleIntervalSec = 1.0f / 15.0f;
 
 // ---- GLFW 输入回调（ImGui 优先模式） ----
 // 所有回调遵循同一模式：先转发给 ImGui → 检查 WantCapture → 再交给引擎
@@ -249,6 +255,22 @@ void ToyEngineMainWindow::RenderFrame() {
     m_deltaTime = currentTime - m_lastTime;
     m_lastTime = currentTime;
 
+    // FPS 曲线采样：按 kFpsSampleIntervalSec（1/15 秒）结算一次窗口平均帧率
+    // （帧数/流逝时间），比逐帧瞬时值平滑、又比低频采样更灵敏；
+    // 结算后清零累加器进入下一个窗口
+    if (m_deltaTime > 0.0f) {
+        m_fps_sample_frames++;
+        m_fps_sample_elapsed += m_deltaTime;
+        if (m_fps_sample_elapsed >= kFpsSampleIntervalSec) {
+            if (m_fps_history.size() >= kFpsHistoryCapacity) {
+                m_fps_history.erase(m_fps_history.begin());
+            }
+            m_fps_history.push_back(static_cast<float>(m_fps_sample_frames) / m_fps_sample_elapsed);
+            m_fps_sample_frames = 0;
+            m_fps_sample_elapsed = 0.0f;
+        }
+    }
+
     m_renderer->update(static_cast<long long>(m_deltaTime * 1000));
 
     // 获取实际 framebuffer 像素尺寸（Retina 下通常为窗口 points 尺寸的 2 倍）。
@@ -352,6 +374,11 @@ void ToyEngineMainWindow::CreateDockSpace() {
         ImGui::DockBuilderDockWindow("属性", rightNode);
         ImGui::DockBuilderDockWindow("阴影属性", rightBottomNode);
 
+        // FPS 曲线面板停靠于中央节点下方（视口底部的横条，占中央高度 15%）
+        ImGuiID viewportBottomNode = ImGui::DockBuilderSplitNode(
+            mainNode, ImGuiDir_Down, 0.15f, nullptr, &mainNode);
+        ImGui::DockBuilderDockWindow("FPS曲线", viewportBottomNode);
+
         ImGui::DockBuilderFinish(dockspaceId);
     }
 
@@ -415,6 +442,7 @@ void ToyEngineMainWindow::CreateMenuBar() {
             ImGui::MenuItem("属性", nullptr, &m_showProperties);
             ImGui::MenuItem("阴影属性", nullptr, &m_showShadowProperties);
             ImGui::MenuItem("调试属性", nullptr, &m_showDebugProperties);
+            ImGui::MenuItem("FPS曲线", nullptr, &m_showFpsGraph);
             ImGui::MenuItem("阴影深度贴图", nullptr, &m_showShadowDepthMap);
             ImGui::EndMenu();
         }
@@ -461,9 +489,14 @@ void ToyEngineMainWindow::CreateUI() {
         ShowDebugPropertiesPanel();
     }
 
-    // 视口底部浮动状态条（FPS/投影方式）
+    // 视口底部浮动状态条（窗口尺寸/投影方式）
     if (m_showViewportStatusBar) {
         ShowViewportStatusBar();
+    }
+
+    // 停靠于视口底部的 FPS 曲线面板（15 次/秒的窗口平均帧率折线）
+    if (m_showFpsGraph) {
+        ShowFpsGraph();
     }
 
     // 阴影深度贴图可视化调试面板（把深度图作为纹理显示）
@@ -650,48 +683,50 @@ void ToyEngineMainWindow::ShowModelProperties() {
     // ---- 材质属性 ----
     // 材质按模型单独登记（Renderer::m_model_materials），不读取共享风格技术的
     // GetMaterial()：Lit/Toon 风格为多模型共用的享实例，其内部材质会被其它模型覆盖。
-    // 仅当前生效风格需要材质（TechniqueLight，即光照/卡通）时才显示材质编辑。
-    const auto& meshes = model->GetMeshes();
-    if (!meshes.empty()) {
-        Technique* effect = meshes[0]->GetEffect();
-        if (effect != nullptr && effect->GetType() == TechniqueTypeLight) {
-            auto* lightEffect = dynamic_cast<TechniqueLight*>(effect);
-            Material* material = m_renderer->GetModelMaterial(model);
-            if (material != nullptr) {
-                ImGui::Separator();
-                ImGui::Text("材质");
-                if (!material->Name.empty()) {
-                    ImGui::Text("材质名称: %s", material->Name.c_str());
-                }
+    // 材质编辑与当前渲染风格解耦：选中模型即可查看/修改材质参数；仅当前生效技术为
+    // TechniqueLight（光照/卡通）时实时同步 GPU uniform，其它风格（纯色/纹理）下
+    // 的修改会在切回光照风格时由 SetModelStyle 重新应用。
+    Material* material = m_renderer->GetModelMaterial(model);
+    if (material != nullptr) {
+        ImGui::Separator();
+        ImGui::Text("材质");
+        if (!material->Name.empty()) {
+            ImGui::Text("材质名称: %s", material->Name.c_str());
+        }
 
-                // 注意：Material 成员为 public，此处直接修改以实现实时预览；
-                // 编辑后需重新调用 SetMaterial() 同步到当前技术的 GPU uniform。
-                auto* mat = material;
+        // 当前生效技术若支持材质（TechniqueLight）则动态转换成功，编辑时同步到
+        // GPU 实现实时预览；否则仅写入材质结构体，切换渲染风格后生效。
+        const auto& meshes = model->GetMeshes();
+        auto* lightEffect = (!meshes.empty())
+            ? dynamic_cast<TechniqueLight*>(meshes[0]->GetEffect())
+            : nullptr;
 
-                glm::vec3 ambient = mat->AmbientColor;
-                if (ImGui::ColorEdit3("环境光颜色", glm::value_ptr(ambient))) {
-                    mat->AmbientColor = ambient;
-                    lightEffect->SetMaterial(mat);
-                }
+        // 注意：Material 成员为 public，此处直接修改以实现实时预览；
+        // 编辑后需重新调用 SetMaterial() 同步到当前技术的 GPU uniform。
+        auto* mat = material;
 
-                glm::vec3 diffuse = mat->DiffuseColor;
-                if (ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(diffuse))) {
-                    mat->DiffuseColor = diffuse;
-                    lightEffect->SetMaterial(mat);
-                }
+        glm::vec3 ambient = mat->AmbientColor;
+        if (ImGui::ColorEdit3("环境光颜色", glm::value_ptr(ambient))) {
+            mat->AmbientColor = ambient;
+            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
+        }
 
-                glm::vec3 specular = mat->SpecularColor;
-                if (ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(specular))) {
-                    mat->SpecularColor = specular;
-                    lightEffect->SetMaterial(mat);
-                }
+        glm::vec3 diffuse = mat->DiffuseColor;
+        if (ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(diffuse))) {
+            mat->DiffuseColor = diffuse;
+            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
+        }
 
-                float shininess = mat->Shininess;
-                if (ImGui::DragFloat("光泽度", &shininess, 0.5f, 0.0f, 256.0f)) {
-                    mat->Shininess = shininess;
-                    lightEffect->SetMaterial(mat);
-                }
-            }
+        glm::vec3 specular = mat->SpecularColor;
+        if (ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(specular))) {
+            mat->SpecularColor = specular;
+            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
+        }
+
+        float shininess = mat->Shininess;
+        if (ImGui::DragFloat("光泽度", &shininess, 0.5f, 0.0f, 256.0f)) {
+            mat->Shininess = shininess;
+            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
         }
     }
 }
@@ -811,8 +846,8 @@ void ToyEngineMainWindow::ShowLightProperties() {
 }
 
 // ---- 相机属性编辑器 ----
-// 可编辑：名称（只读）、轨道参数（中心/半径/水平角/俯仰角）。
-// 相机交互由 OrbitManipulator 承载，故编辑的是操控器状态而非相机本体。
+// 可编辑：名称（只读）、投影模式（透视/正交）、轨道参数（中心/半径/水平角/俯仰角）。
+// 相机交互由 OrbitManipulator 承载，故轨道参数编辑的是操控器状态而非相机本体。
 void ToyEngineMainWindow::ShowCameraProperties() {
     Camera* camera = static_cast<Camera*>(m_selectedObject);
     OrbitManipulator* manipulator = m_renderer->GetManipulator();
@@ -820,6 +855,15 @@ void ToyEngineMainWindow::ShowCameraProperties() {
     ImGui::Text("类型: 摄像机");
     ImGui::Separator();
     ImGui::Text("名称: %s", camera->GetName().c_str());
+    ImGui::Separator();
+
+    // 投影模式是摄像机属性：下拉框读写当前选中（即当前渲染用）摄像机的属性，
+    // Renderer::SetProjectionType 写入后立即重算投影矩阵，切换即时生效
+    const char* projTypes[] = { "透视", "正交" };
+    int projType = static_cast<int>(camera->GetProjectionType());
+    if (ImGui::Combo("投影模式", &projType, projTypes, IM_ARRAYSIZE(projTypes))) {
+        m_renderer->SetProjectionType(static_cast<ProjectionType>(projType));
+    }
     ImGui::Separator();
 
     if (manipulator == nullptr) {
@@ -869,7 +913,7 @@ void ToyEngineMainWindow::ShowTerrainProperties() {
 }
 
 // ---- 天空穹属性编辑器 ----
-// 可编辑：地平线颜色、天顶颜色；只读：半径、分段数
+// 可编辑：地平线颜色、天顶颜色、地面雾色；只读：半径、分段数
 void ToyEngineMainWindow::ShowSkyDomeProperties() {
     SkyDome* sky = static_cast<SkyDome*>(m_selectedObject);
 
@@ -891,6 +935,11 @@ void ToyEngineMainWindow::ShowSkyDomeProperties() {
     glm::vec3 zenithColor = sky->GetZenithColor();
     if (ImGui::ColorEdit3("天顶颜色", glm::value_ptr(zenithColor))) {
         sky->SetZenithColor(zenithColor);
+    }
+
+    glm::vec3 groundColor = sky->GetGroundColor();
+    if (ImGui::ColorEdit3("地面雾色", glm::value_ptr(groundColor))) {
+        sky->SetGroundColor(groundColor);
     }
 }
 
@@ -991,14 +1040,57 @@ void ToyEngineMainWindow::ShowViewportStatusBar() {
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground);
 
-    ImGui::Text("FPS: %.1f  |  %dx%d", m_renderer->GetFPS(), m_windowWidth, m_windowHeight);
-    ImGui::SameLine();
+    // 帧率已由底部 FPS 曲线面板展示，状态条不再重复显示数值
+    ImGui::Text("%dx%d", m_windowWidth, m_windowHeight);
 
-    const char* projTypes[] = { "透视", "正交" };
-    int projType = static_cast<int>(m_renderer->GetProjectionType());
-    ImGui::SameLine();
-    if (ImGui::Combo("##proj", &projType, projTypes, IM_ARRAYSIZE(projTypes))) {
-        m_renderer->SetProjectionType(static_cast<ProjectionType>(projType));
+    ImGui::End();
+}
+
+// ---- 停靠于视口底部的 FPS 曲线面板 ----
+// 由 DockBuilder 停靠在中央 3D 视口下方的横条槽位，绘制最近
+// kFpsHistoryCapacity 个窗口平均帧率采样（15 次/秒）的折线图，
+// 并显示当前/平均/最低/最高帧率，辅助观察渲染性能波动。
+void ToyEngineMainWindow::ShowFpsGraph() {
+    // 窗口标题与 DockBuilderDockWindow 的停靠目标一致（见 CreateDockSpace），
+    // 停靠窗口的位置/尺寸由 DockSpace 节点管理，无需也不应手动指定
+    ImGui::Begin("FPS曲线", &m_showFpsGraph,
+        ImGuiWindowFlags_NoCollapse);
+
+    // 统计历史窗口内的平均/最低/最高帧率（vector 头尾为最早/最新采样）
+    float sum = 0.0f;
+    float minFps = std::numeric_limits<float>::max();
+    float maxFps = 0.0f;
+    for (float fps : m_fps_history) {
+        sum += fps;
+        minFps = std::min(minFps, fps);
+        maxFps = std::max(maxFps, fps);
+    }
+    const size_t count = m_fps_history.size();
+    const float avgFps = count > 0 ? sum / static_cast<float>(count) : 0.0f;
+    const float curFps = count > 0 ? m_fps_history.back() : 0.0f;
+    // 历史为空时用 0 占位，避免 minFps 初始值（float 最大值）暴露到界面
+    const float minFpsDisp = count > 0 ? minFps : 0.0f;
+
+    ImGui::Text("当前 %.1f   平均 %.1f   最低 %.1f   最高 %.1f", curFps, avgFps, minFpsDisp, maxFps);
+
+    if (count > 0) {
+        // Y 轴范围动态跟随曲线数据：按窗口内最小/最大值各留 10% 余量，
+        // 让曲线尽量填满绘图区高度，小幅波动也能明显看出
+        float scaleMin = minFps;
+        float scaleMax = maxFps;
+        const float span = scaleMax - scaleMin;
+        if (span >= 1.0f) {
+            scaleMin -= span * 0.1f;
+            scaleMax += span * 0.1f;
+        } else {
+            // 值域不足 1fps（曲线接近水平，如稳定 60）时人为撑开区间，避免除以零
+            scaleMin -= 1.0f;
+            scaleMax += 1.0f;
+        }
+        ImGui::PlotLines("##fps_curve", m_fps_history.data(), static_cast<int>(count),
+                         0, nullptr, scaleMin, scaleMax, ImVec2(-1.0f, 48.0f));
+    } else {
+        ImGui::Text("（暂无数据）");
     }
 
     ImGui::End();
@@ -1019,10 +1111,32 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
         m_renderer->SetShadowsEnabled(shadowsEnabled);
     }
 
-    // 后处理 tone mapping 开关（对比 Reinhard+gamma 与直通输出）
+    // 阴影 bias 缩放：正交范围自适应后自阴影痤疮随光照角度/范围变化，现场微调（1.0 = 原始公式）
+    float biasScale = m_renderer->GetShadowBiasScale();
+    if (ImGui::SliderFloat("阴影偏置 (Bias)", &biasScale, 0.0f, 5.0f, "%.2f")) {
+        m_renderer->SetShadowBiasScale(biasScale);
+    }
+
+    // 后处理 tone mapping 开关（对比 ACES+gamma 与直通输出）
     bool toneMapping = m_renderer->IsToneMappingEnabled();
     if (ImGui::Checkbox("Tone Mapping", &toneMapping)) {
         m_renderer->SetToneMappingEnabled(toneMapping);
+    }
+
+    // 曝光系数：tone mapping 前乘入 HDR 线性值，实时调整整体明暗
+    float exposure = m_renderer->GetExposure();
+    if (ImGui::SliderFloat("曝光 (Exposure)", &exposure, 0.1f, 4.0f, "%.2f")) {
+        m_renderer->SetExposure(exposure);
+    }
+
+    // 饱和度/对比度：tonemap+gamma 后统一调整，ACES 输出后按观感微调影调（默认 1.0 不调整）
+    float saturation = m_renderer->GetSaturation();
+    if (ImGui::SliderFloat("饱和度 (Saturation)", &saturation, 0.0f, 2.0f, "%.2f")) {
+        m_renderer->SetSaturation(saturation);
+    }
+    float contrast = m_renderer->GetContrast();
+    if (ImGui::SliderFloat("对比度 (Contrast)", &contrast, 0.5f, 2.0f, "%.2f")) {
+        m_renderer->SetContrast(contrast);
     }
 
     ImGui::Separator();

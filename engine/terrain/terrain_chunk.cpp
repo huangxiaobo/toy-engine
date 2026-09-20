@@ -5,6 +5,7 @@
 #include "../technique/technique_terrain.h"
 #include "../material/material.h"
 #include "../light/light.h"
+#include "../render_context.h"
 #include <glad/gl.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
@@ -52,19 +53,6 @@ void TerrainChunk::SetTexture(unsigned int textureID) {
     m_textureID = textureID;
     if (m_mesh) {
         m_mesh->SetTexture(textureID);
-    }
-}
-
-/*
- * 转发每帧阴影状态到地形技术（TechniqueTerrain）
- *
- * 把 Renderer 计算好的阴影启用标志、深度贴图纹理ID 与光源空间矩阵
- * 存入 TechniqueTerrain，供其绘制阶段（ApplyShadowState）自管阴影采样。
- * 若当前技术不是 TechniqueTerrain（如在调试/降级路径），则忽略。
- */
-void TerrainChunk::SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4& lightSpace) {
-    if (auto terrainTech = dynamic_cast<TechniqueTerrain*>(m_technique)) {
-        terrainTech->SetShadowState(enabled, depthTexture, lightSpace);
     }
 }
 
@@ -260,11 +248,7 @@ void TerrainChunk::CalculateNormals(std::vector<Vertex>& vertices,
  *
  * 无 LOD：直接绘制唯一的固定分辨率网格，无需按距离切换细节等级。
  */
-void TerrainChunk::Draw(long long elapsed,
-                        const glm::mat4& projection,
-                        const glm::mat4& view,
-                        const glm::vec3& cameraPos,
-                        const std::vector<Light*>& lights) {
+void TerrainChunk::Draw(const RenderContext &ctx) {
     // 检查网格是否已生成
     if (!m_mesh) {
         return;
@@ -274,12 +258,12 @@ void TerrainChunk::Draw(long long elapsed,
     if (m_technique && m_technique->GetType() == TechniqueTypeLight) {
         auto tech = dynamic_cast<TechniqueLight*>(m_technique);
         tech->Enable();
-        tech->SetLights(lights);
-        tech->SetUniform("gViewPos", cameraPos);
+        tech->SetLights(ctx.lights);
+        tech->SetUniform("gViewPos", ctx.camera);
 
         // 设置投影和视图矩阵
-        tech->SetProjectionMatrix(projection);
-        tech->SetViewMatrix(view);
+        tech->SetProjectionMatrix(ctx.projection);
+        tech->SetViewMatrix(ctx.view);
 
         // 模型矩阵（单位矩阵，因为顶点已在世界坐标）
         constexpr auto modelMatrix = glm::mat4(1.0f);
@@ -288,17 +272,17 @@ void TerrainChunk::Draw(long long elapsed,
         // 若使用地形专用技术 TechniqueTerrain，额外：
         //   1. 把地面漫反射纹理显式绑定到纹理单元0
         //   2. 应用阴影状态（绑定单元2 深度贴图 + 上传 shadowMap/lightSpace/gUseShadow）
-        // 地形自管阴影采样，不依赖 Mesh 全局静态阴影状态链
+        // 阴影状态直接取自 RenderContext.shadow，与模型共用同一条状态通道
         if (auto terrainTech = dynamic_cast<TechniqueTerrain*>(m_technique)) {
             if (m_textureID != 0) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, m_textureID);
                 terrainTech->SetGroundTexture(0);
             }
-            terrainTech->ApplyShadowState();
+            terrainTech->ApplyShadowState(ctx.shadow);
         }
     }
 
     // 绘制网格
-    m_mesh->Draw(elapsed, projection, view, glm::mat4(1.0f), cameraPos, lights);
+    m_mesh->Draw(ctx, glm::mat4(1.0f));
 }

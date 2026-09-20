@@ -4,6 +4,7 @@
 #include "technique_terrain.h"
 
 #include "../shader/shader.h"
+#include "../render_context.h"
 #include <iostream>
 
 /*
@@ -34,35 +35,26 @@ void TechniqueTerrain::SetGroundTexture(int unit) {
 }
 
 /*
- * 记录本帧阴影启用状态、深度贴图纹理ID 与光源空间矩阵
- *
- * 仅缓存到成员，不在本方法内设置 uniform/纹理，因为此时 Technique 尚未
- * Enable（shader 未激活），uniform 会落在错误的 program 上。真正的 GPU 应用
- * 推迟到绘制阶段由 ApplyShadowState() 执行。
- */
-void TechniqueTerrain::SetShadowState(bool enabled, unsigned int depthTexture, const glm::mat4 &lightSpace) {
-    m_useShadow = enabled ? 1u : 0u;
-    m_depthTexture = depthTexture;
-    m_lightSpace = lightSpace;
-}
-
-/*
  * 绘制阶段应用阴影状态（必须在 Enable() 之后、glDrawElements 之前调用）
  *
- * 显式激活纹理单元2 并重新绑定深度贴图，然后上传 shadowMap 采样器、
- * lightSpace 矩阵与 gUseShadow 开关。单元2 的反复显式绑定是防御性做法：
- * 当前渲染环其他对象（如天空穹/模型）的绘制可能覆盖了单元2 的纹理绑定，
- * 若依赖 Renderer 提前一次绑定，主 Pass 采样就会拿到错误的纹理。
+ * 阴影状态每帧由 Renderer 组装进 RenderContext.shadow，本方法直接读取，
+ * 与模型共用同一条状态通道。显式激活纹理单元2 并重新绑定深度贴图，
+ * 然后上传 shadowMap 采样器、lightSpace 矩阵与 gUseShadow 开关。
+ * 单元2 的反复显式绑定是防御性做法：当前渲染环其他对象（如天空穹/模型）
+ * 的绘制可能覆盖了单元2 的纹理绑定，若依赖 Renderer 提前一次绑定，
+ * 主 Pass 采样就会拿到错误的纹理。
  */
-void TechniqueTerrain::ApplyShadowState() {
-    // 激活单元2 并绑定本帧的阴影深度贴图（若未启用阴影则解绑为0，避免采样残留纹理）
+void TechniqueTerrain::ApplyShadowState(const ShadowState &shadow) {
+    // 激活单元2 并绑定本帧的阴影深度贴图（未启用阴影时为0，解绑避免采样残留纹理）
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_depthTexture);
+    glBindTexture(GL_TEXTURE_2D, shadow.depthTexture);
 
     // 通知着色器 shadowMap 采样器指向单元2
     this->SetShadowMap(2);
     // 上传光源空间矩阵（世界坐标 → 光源裁剪空间）
-    this->SetLightSpaceMatrix(m_lightSpace);
+    this->SetLightSpaceMatrix(shadow.lightSpace);
     // 上传阴影开关：沿用基类按名设置 int uniform
-    this->SetUniform("gUseShadow", static_cast<int>(m_useShadow));
+    this->SetUniform("gUseShadow", shadow.ready ? 1 : 0);
+    // 上传 bias 缩放系数（gShadowBiasScale，默认 1.0 保持原公式效果）
+    this->SetUniform("gShadowBiasScale", shadow.biasScale);
 }

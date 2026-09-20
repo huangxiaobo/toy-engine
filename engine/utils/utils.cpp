@@ -128,6 +128,12 @@ unsigned int Utils::LoadTextureFromFile(const std::string &path) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // 各向异性过滤：倾斜视角（俯视地面/远景）下缓解 mipmap 采样模糊，取 4x 与驱动上限较小值
+#ifdef GL_TEXTURE_MAX_ANISOTROPY_EXT
+        float anisoMax = 4.0f;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &anisoMax);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, (anisoMax < 4.0f) ? anisoMax : 4.0f);
+#endif
 
         stbi_image_free(data);
     } else {
@@ -178,6 +184,12 @@ unsigned int Utils::CreateCheckerboardTexture(int width, int height, int checkSi
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // 各向异性过滤（参数同 LoadTextureFromFile），棋盘格常被俯视观察
+#ifdef GL_TEXTURE_MAX_ANISOTROPY_EXT
+    float anisoMax = 4.0f;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &anisoMax);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, (anisoMax < 4.0f) ? anisoMax : 4.0f);
+#endif
 
     return textureID;
 }

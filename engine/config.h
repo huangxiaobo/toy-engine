@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "camera/camera.h" // 摄像机投影枚举（CameraConfig::Projection 使用）
+
 class WindowConfig {
 public:
     int WindowWidth;
@@ -28,6 +30,7 @@ public:
     glm::vec3 Position;
     glm::vec3 Target;
     glm::vec3 Up;
+    ProjectionType Projection = ProjectionType::Perspective; // 投影模式（perspective 透视 / orthographic 正交，默认透视）
 };
 
 class PointLightConfig {
@@ -149,6 +152,8 @@ public:
     int Stacks = 16;
     glm::vec3 HorizonColor = glm::vec3(0.6f, 0.7f, 0.9f);
     glm::vec3 ZenithColor = glm::vec3(0.1f, 0.2f, 0.5f);
+    // 地面雾色（下半球），默认取地平线色 0.6 倍（暗化大气色）
+    glm::vec3 GroundColor = glm::vec3(0.36f, 0.42f, 0.54f);
 };
 
 /*

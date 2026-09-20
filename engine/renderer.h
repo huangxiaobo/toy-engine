@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <map>
 #include "config.h"
+#include "camera/camera.h" // ProjectionType 为相机属性，枚举定义随相机头文件
 
 class Model;
 class Axis;
@@ -21,11 +22,6 @@ class ShadowFramebuffer;
 class SceneFramebuffer;
 class DebugDraw;
 class OrbitManipulator;
-
-enum class ProjectionType {
-    Perspective,
-    Orthographic
-};
 
 // 运行时可切换的模型渲染风格（RenderStyle）
 // 对应 resource/shader 下的四套标准着色器（unlit/textured/lit/toon）。
@@ -123,7 +119,7 @@ public:
     // 切换到指定索引的摄像机
     void SwitchCamera(int index);
 
-    // 切换视角
+    // 切换当前摄像机的投影模式（透视/正交）：写入相机属性并立即重算投影矩阵
     void SetProjectionType(ProjectionType type);
 
     ProjectionType GetProjectionType() const;
@@ -143,9 +139,23 @@ public:
     // 获取本帧光源（阴影）摄像机参数（供 ImGui 阴影属性面板展示与调试）
     const ShadowCameraParams &GetShadowCameraParams() const { return m_shadow_camera; }
 
-    // 后处理 tone mapping 开关：关闭时全屏 Pass 直通输出（调试用），开启时做 Reinhard+gamma
+    // 后处理 tone mapping 开关：关闭时全屏 Pass 直通输出（调试用），开启时做 ACES+gamma
     void SetToneMappingEnabled(bool enabled) { m_tone_mapping_enabled = enabled; }
     bool IsToneMappingEnabled() const { return m_tone_mapping_enabled; }
+
+    // 后处理曝光系数（>1 提亮 / <1 压暗），ACES 映射前乘入 HDR 线性值，运行时可调
+    void SetExposure(float exposure) { m_exposure = exposure; }
+    float GetExposure() const { return m_exposure; }
+
+    // 后处理饱和度/对比度（在 tonemap+gamma 后调整），默认 1.0 不调整，运行时可调
+    void SetSaturation(float sat) { m_saturation = sat; }
+    float GetSaturation() const { return m_saturation; }
+    void SetContrast(float contrast) { m_contrast = contrast; }
+    float GetContrast() const { return m_contrast; }
+
+    // 阴影 bias 缩放系数（1.0 = 原默认），阴影范围自适应后需现场微调痤疮表现
+    void SetShadowBiasScale(float scale) { m_shadow_bias_scale = scale; }
+    float GetShadowBiasScale() const { return m_shadow_bias_scale; }
 
     // 光源调试可视化（DebugDraw gizmo）开关：禁用时跳过 gizmo 顶点收集与绘制
     void SetDebugDrawEnabled(bool enabled) { m_debug_draw_enabled = enabled; }
@@ -200,6 +210,8 @@ private:
     void DrawGrid();
     // 收集模型法线线段到 DebugDraw（将顶点世界坐标与法线变换到世界空间）
     void CollectModelNormals();
+    // 计算场景世界空间 AABB（地形范围 + 全部模型几何），供阴影正交范围自适应
+    void computeSceneBounds(glm::vec3 &outMin, glm::vec3 &outMax) const;
 
 private:
     int width{};
@@ -208,12 +220,7 @@ private:
     // 世界矩阵
     glm::mat4 m_projection_matrix{};
     glm::mat4 m_view_matrix{};
-    glm::mat4 m_model_matrix{};
-    glm::mat4 m_mvp_matrix{};
     glm::vec3 m_eye_pos{};
-
-    ProjectionType m_projection_type = ProjectionType::Perspective;
-
 
     std::unique_ptr<FPSCounter> m_fps_counter;
     std::unique_ptr<Axis> m_axis;
@@ -279,6 +286,8 @@ private:
     bool m_shadow_map_ready = false;
     // 阴影是否启用（禁用时直接跳过深度 Pass，也不绑定阴影贴图）
     bool m_shadows_enabled = true;
+    // 阴影 bias 缩放系数（默认 1.0，见 SetShadowBiasScale）
+    float m_shadow_bias_scale = 1.0f;
 
     // 本帧光源（阴影）摄像机参数，深度 Pass 计算后保存，供 ImGui 面板展示
     ShadowCameraParams m_shadow_camera;
@@ -292,6 +301,12 @@ private:
     unsigned int m_post_vao = 0;
     // tone mapping 是否启用（见 SetToneMappingEnabled）
     bool m_tone_mapping_enabled = true;
+    // 后处理曝光系数（默认 1.0，见 SetExposure）
+    float m_exposure = 1.0f;
+    // 后处理饱和度（默认 1.0 不调整，见 SetSaturation）
+    float m_saturation = 1.0f;
+    // 后处理对比度（默认 1.0 不调整，见 SetContrast）
+    float m_contrast = 1.0f;
 
     // ---- 拾取高亮状态 ----
     // 鼠标拾取结果的线框高亮盒（世界空间 AABB），draw 末尾用 DebugDraw 叠加绘制
