@@ -73,18 +73,18 @@ void ToyEngineMainWindow::MouseButtonCallback(GLFWwindow* window, int button, in
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
             self->OnMouseLeftButtonDown();
-            self->m_mouseLeftPressed = true;
+            self->m_mouse_left_pressed = true;
         } else {
             self->OnMouseLeftButtonUp();
-            self->m_mouseLeftPressed = false;
+            self->m_mouse_left_pressed = false;
         }
     } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
         if (action == GLFW_PRESS) {
             self->OnMouseRightButtonDown();
-            self->m_mouseRightPressed = true;
+            self->m_mouse_right_pressed = true;
         } else {
             self->OnMouseRightButtonUp();
-            self->m_mouseRightPressed = false;
+            self->m_mouse_right_pressed = false;
         }
     }
 }
@@ -97,18 +97,18 @@ void ToyEngineMainWindow::CursorPosCallback(GLFWwindow* window, double xpos, dou
     if (!self) return;
 
     // 计算并更新鼠标增量基线
-    double deltaX = xpos - self->m_currentMouseX;
-    double deltaY = ypos - self->m_currentMouseY;
-    self->m_currentMouseX = xpos;
-    self->m_currentMouseY = ypos;
+    double deltaX = xpos - self->m_current_mouse_x;
+    double deltaY = ypos - self->m_current_mouse_y;
+    self->m_current_mouse_x = xpos;
+    self->m_current_mouse_y = ypos;
 
     // ImGui 正在捕获鼠标时，不驱动相机，并重置相机交互状态避免残留
     if (ImGui::GetIO().WantCaptureMouse) {
-        self->m_cameraPanning = false;
+        self->m_camera_panning = false;
         return;
     }
 
-    if (self->m_mouseLeftPressed || self->m_mouseRightPressed) {
+    if (self->m_mouse_left_pressed || self->m_mouse_right_pressed) {
         self->OnMouseMove(deltaX, deltaY);
     }
 }
@@ -160,15 +160,15 @@ bool ToyEngineMainWindow::Initialize() {
     // 从配置文件读取窗口尺寸
     try {
         gConfig = Config::LoadFromYaml("./resource/world.yaml");
-        m_windowWidth = gConfig->Window.WindowWidth;
-        m_windowHeight = gConfig->Window.WindowHeight;
+        m_window_width = gConfig->Window.WindowWidth;
+        m_window_height = gConfig->Window.WindowHeight;
     } catch (...) {
-        m_windowWidth = 1280;
-        m_windowHeight = 720;
+        m_window_width = 1280;
+        m_window_height = 720;
         std::cerr << "Warning: Failed to load config file, using default window size" << std::endl;
     }
 
-    m_window = glfwCreateWindow(m_windowWidth, m_windowHeight, "Toy Engine", nullptr, nullptr);
+    m_window = glfwCreateWindow(m_window_width, m_window_height, "Toy Engine", nullptr, nullptr);
     if (!m_window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -180,7 +180,7 @@ bool ToyEngineMainWindow::Initialize() {
     glfwSetWindowUserPointer(m_window, this);
 
     // 初始化鼠标位置基线，供 CursorPosCallback 计算增量
-    glfwGetCursorPos(m_window, &m_currentMouseX, &m_currentMouseY);
+    glfwGetCursorPos(m_window, &m_current_mouse_x, &m_current_mouse_y);
 
     // 初始化ImGui
     IMGUI_CHECKVERSION();
@@ -221,9 +221,9 @@ bool ToyEngineMainWindow::Initialize() {
 
     // 初始化渲染器（unique_ptr 自管，析构自动释放）
     m_renderer = std::make_unique<Renderer>();
-    m_renderer->init(m_windowWidth, m_windowHeight);
+    m_renderer->init(m_window_width, m_window_height);
 
-    m_lastTime = static_cast<float>(glfwGetTime());
+    m_last_time = static_cast<float>(glfwGetTime());
     return true;
 }
 
@@ -252,15 +252,15 @@ void ToyEngineMainWindow::ProcessInput() {
  */
 void ToyEngineMainWindow::RenderFrame() {
     float currentTime = static_cast<float>(glfwGetTime());
-    m_deltaTime = currentTime - m_lastTime;
-    m_lastTime = currentTime;
+    m_delta_time = currentTime - m_last_time;
+    m_last_time = currentTime;
 
     // FPS 曲线采样：按 kFpsSampleIntervalSec（1/15 秒）结算一次窗口平均帧率
     // （帧数/流逝时间），比逐帧瞬时值平滑、又比低频采样更灵敏；
     // 结算后清零累加器进入下一个窗口
-    if (m_deltaTime > 0.0f) {
+    if (m_delta_time > 0.0f) {
         m_fps_sample_frames++;
-        m_fps_sample_elapsed += m_deltaTime;
+        m_fps_sample_elapsed += m_delta_time;
         if (m_fps_sample_elapsed >= kFpsSampleIntervalSec) {
             if (m_fps_history.size() >= kFpsHistoryCapacity) {
                 m_fps_history.erase(m_fps_history.begin());
@@ -271,7 +271,7 @@ void ToyEngineMainWindow::RenderFrame() {
         }
     }
 
-    m_renderer->update(static_cast<long long>(m_deltaTime * 1000));
+    m_renderer->update(static_cast<long long>(m_delta_time * 1000));
 
     // 获取实际 framebuffer 像素尺寸（Retina 下通常为窗口 points 尺寸的 2 倍）。
     int fbWidth = 0, fbHeight = 0;
@@ -282,7 +282,7 @@ void ToyEngineMainWindow::RenderFrame() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // 创建/渲染 DockSpace，并将中央节点矩形写入 m_viewportX/Y/Width/Height
+    // 创建/渲染 DockSpace，并将中央节点矩形写入 m_viewport_x/Y/Width/Height
     CreateDockSpace();
 
     // 将中央节点矩形从 ImGui 逻辑坐标（左上原点、Y 向下）换算为
@@ -291,10 +291,10 @@ void ToyEngineMainWindow::RenderFrame() {
     const float xScale = (displaySize.x > 0.0f) ? static_cast<float>(fbWidth) / displaySize.x : 1.0f;
     const float yScale = (displaySize.y > 0.0f) ? static_cast<float>(fbHeight) / displaySize.y : 1.0f;
 
-    const int viewportX = static_cast<int>(m_viewportX * xScale);
-    const int viewportY = static_cast<int>(static_cast<float>(fbHeight) - (m_viewportY + m_viewportHeight) * yScale);
-    const int viewportW = static_cast<int>(m_viewportWidth * xScale);
-    const int viewportH = static_cast<int>(m_viewportHeight * yScale);
+    const int viewportX = static_cast<int>(m_viewport_x * xScale);
+    const int viewportY = static_cast<int>(static_cast<float>(fbHeight) - (m_viewport_y + m_viewport_height) * yScale);
+    const int viewportW = static_cast<int>(m_viewport_width * xScale);
+    const int viewportH = static_cast<int>(m_viewport_height * yScale);
 
     // 中央节点尺寸异常（首帧布局尚未完成）时回退到全窗口视口
     if (viewportW <= 0 || viewportH <= 0) {
@@ -304,12 +304,12 @@ void ToyEngineMainWindow::RenderFrame() {
         m_renderer->resize(viewportW, viewportH);
         glViewport(viewportX, viewportY, viewportW, viewportH);
     }
-    m_renderer->draw(static_cast<long long>(m_deltaTime * 1000));
+    m_renderer->draw(static_cast<long long>(m_delta_time * 1000));
 
     // 恢复完整 framebuffer 视口给 ImGui 使用
     glViewport(0, 0, fbWidth, fbHeight);
 
-    // 绘制面板（资源列表/属性面板停靠于 DockSpace 左右节点，状态条浮动于视口底部）
+    // 绘制面板（资源列表/属性面板停靠于 DockSpace 左右节点）
     CreateUI();
 
     // 在视口左下角叠加屏幕空间坐标轴 gizmo：
@@ -322,8 +322,8 @@ void ToyEngineMainWindow::RenderFrame() {
 
     // 截图请求处理：等待本帧完整绘制（场景+后处理+ImGui+轴gizmo）之后、
     // 缓冲交换之前执行，确保捕获的是用户看到的完整一帧
-    if (m_screenshotPending) {
-        m_screenshotPending = false;
+    if (m_screenshot_pending) {
+        m_screenshot_pending = false;
         SaveScreenshot();
     }
 
@@ -340,14 +340,14 @@ void ToyEngineMainWindow::RenderFrame() {
  *
  * 仅首帧执行 DockBuilder 初始化；此后 DockSpace 完全接管布局，用户可自由
  * 拖拽/浮动/调整各面板。每帧结束时将中央节点矩形记录到 m_viewport* 成员，
- * 供 RenderFrame 换算 glViewport 以及状态条定位使用。
+ * 供 RenderFrame 换算 glViewport 使用。
  */
 void ToyEngineMainWindow::CreateDockSpace() {
     ImGuiID dockspaceId = ImGui::GetID("ToyEngineDockSpace");
 
     // 首次运行时用 DockBuilder 建立初始布局（之后保留用户调整结果）
-    if (!m_dockspaceInitialized) {
-        m_dockspaceInitialized = true;
+    if (!m_dock_space_initialized) {
+        m_dock_space_initialized = true;
 
         // 清空可能的残留节点，重新创建 DockSpace 根节点
         ImGui::DockBuilderRemoveNode(dockspaceId);
@@ -409,10 +409,10 @@ void ToyEngineMainWindow::CreateDockSpace() {
     // 记录中央节点矩形（ImGui 逻辑坐标，左上原点、Y 向下），供 RenderFrame 换算
     ImGuiDockNode* centralNode = ImGui::DockBuilderGetCentralNode(dockspaceId);
     if (centralNode) {
-        m_viewportX = centralNode->Pos.x;
-        m_viewportY = centralNode->Pos.y;
-        m_viewportWidth = centralNode->Size.x;
-        m_viewportHeight = centralNode->Size.y;
+        m_viewport_x = centralNode->Pos.x;
+        m_viewport_y = centralNode->Pos.y;
+        m_viewport_width = centralNode->Size.x;
+        m_viewport_height = centralNode->Size.y;
     }
 }
 
@@ -438,12 +438,12 @@ void ToyEngineMainWindow::CreateMenuBar() {
         // 面板：子菜单收纳所有可开关面板；MenuItem 的第四个参数为选中状态
         // 指针（bool*），点击时自动切换并显示勾选标记，与面板可见性绑定
         if (ImGui::BeginMenu("面板")) {
-            ImGui::MenuItem("资源", nullptr, &m_showResourceList);
-            ImGui::MenuItem("属性", nullptr, &m_showProperties);
-            ImGui::MenuItem("阴影属性", nullptr, &m_showShadowProperties);
-            ImGui::MenuItem("调试属性", nullptr, &m_showDebugProperties);
-            ImGui::MenuItem("FPS曲线", nullptr, &m_showFpsGraph);
-            ImGui::MenuItem("阴影深度贴图", nullptr, &m_showShadowDepthMap);
+            ImGui::MenuItem("资源", nullptr, &m_show_resource_list);
+            ImGui::MenuItem("属性", nullptr, &m_show_properties);
+            ImGui::MenuItem("阴影属性", nullptr, &m_show_shadow_properties);
+            ImGui::MenuItem("调试属性", nullptr, &m_show_debug_properties);
+            ImGui::MenuItem("FPS曲线", nullptr, &m_show_fps_graph);
+            ImGui::MenuItem("阴影深度贴图", nullptr, &m_show_shadow_depth_map);
             ImGui::EndMenu();
         }
 
@@ -452,7 +452,7 @@ void ToyEngineMainWindow::CreateMenuBar() {
         // 确保截取到包含全部 UI 叠加的完整一帧
         if (ImGui::BeginMenu("工具")) {
             if (ImGui::MenuItem("截图")) {
-                m_screenshotPending = true;
+                m_screenshot_pending = true;
             }
             ImGui::EndMenu();
         }
@@ -470,37 +470,32 @@ void ToyEngineMainWindow::CreateMenuBar() {
  */
 void ToyEngineMainWindow::CreateUI() {
     // 资源列表面板：停靠于左节点
-    if (m_showResourceList) {
+    if (m_show_resource_list) {
         CreateResourceListPanel();
     }
 
     // 属性面板：停靠于右节点
-    if (m_showProperties) {
+    if (m_show_properties) {
         CreatePropertiesPanel();
     }
 
     // 阴影属性面板：停靠于右节点（属性面板下方）
-    if (m_showShadowProperties) {
+    if (m_show_shadow_properties) {
         ShowShadowPropertiesPanel();
     }
 
     // 调试属性面板：停靠于左节点（资源列表下方），承载渲染调试开关
-    if (m_showDebugProperties) {
+    if (m_show_debug_properties) {
         ShowDebugPropertiesPanel();
     }
 
-    // 视口底部浮动状态条（窗口尺寸/投影方式）
-    if (m_showViewportStatusBar) {
-        ShowViewportStatusBar();
-    }
-
     // 停靠于视口底部的 FPS 曲线面板（15 次/秒的窗口平均帧率折线）
-    if (m_showFpsGraph) {
+    if (m_show_fps_graph) {
         ShowFpsGraph();
     }
 
     // 阴影深度贴图可视化调试面板（把深度图作为纹理显示）
-    if (m_showShadowDepthMap) {
+    if (m_show_shadow_depth_map) {
         ShowShadowDepthMapPanel();
     }
 }
@@ -519,7 +514,7 @@ void ToyEngineMainWindow::CreateUI() {
 void ToyEngineMainWindow::CreateResourceListPanel() {
     // 停靠于 DockSpace 左节点：不能带 NoMove/NoResize，否则无法被 DockBuilder 停靠
     // 与用户拖拽调整
-    ImGui::Begin("资源列表", &m_showResourceList,
+    ImGui::Begin("资源列表", &m_show_resource_list,
         ImGuiWindowFlags_NoCollapse);
 
     // ---- 摄像机 ----
@@ -529,13 +524,13 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
             const auto& camera = cameras[i];
             std::string displayName = camera->GetName().empty()
                 ? "Camera " + std::to_string(i) : camera->GetName();
-            bool isSelected = (m_selectedObject == camera.get()
-                && m_selectedObjectType == "Camera"
-                && m_currentCameraIndex == static_cast<int>(i));
+            bool isSelected = (m_selected_object == camera.get()
+                && m_selected_object_type == "Camera"
+                && m_current_camera_index == static_cast<int>(i));
 
             if (ImGui::Selectable(displayName.c_str(), isSelected)) {
                 m_renderer->SwitchCamera(static_cast<int>(i));
-                m_currentCameraIndex = static_cast<int>(i);
+                m_current_camera_index = static_cast<int>(i);
                 SelectObject(m_renderer->GetCamera(), "Camera");
             }
         }
@@ -549,7 +544,7 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
             const auto& light = lights[i];
             if (light == nullptr) continue;
             std::string nodeName = light->GetName() + "##light" + std::to_string(i);
-            bool isSelected = (m_selectedObject == light.get() && m_selectedObjectType == "Light");
+            bool isSelected = (m_selected_object == light.get() && m_selected_object_type == "Light");
             if (ImGui::Selectable(nodeName.c_str(), isSelected)) {
                 SelectObject(light.get(), "Light");
             }
@@ -564,7 +559,7 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
             const auto& model = models[i];
             if (model == nullptr) continue;
             std::string nodeName = model->GetName() + "##model" + std::to_string(i);
-            bool isSelected = (m_selectedObject == model.get() && m_selectedObjectType == "Model");
+            bool isSelected = (m_selected_object == model.get() && m_selected_object_type == "Model");
             if (ImGui::Selectable(nodeName.c_str(), isSelected)) {
                 SelectObject(model.get(), "Model");
             }
@@ -574,7 +569,7 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
 
     // ---- 地形（单例） ----
     if (auto terrain = m_renderer->GetTerrainManager()) {
-        bool isSelected = (m_selectedObjectType == "Terrain");
+        bool isSelected = (m_selected_object_type == "Terrain");
         if (ImGui::Selectable("地形", isSelected)) {
             SelectObject(terrain, "Terrain");
         }
@@ -582,7 +577,7 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
 
     // ---- 天空穹（单例） ----
     if (auto sky = m_renderer->GetSkyDome()) {
-        bool isSelected = (m_selectedObjectType == "SkyDome");
+        bool isSelected = (m_selected_object_type == "SkyDome");
         if (ImGui::Selectable("天空穹", isSelected)) {
             SelectObject(sky, "SkyDome");
         }
@@ -597,11 +592,11 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
                 if (emitter == nullptr) continue;
                 // 使用发射器位置作为显示名
                 std::string displayName = "Particle " + std::to_string(i);
-                bool isSelected = (m_selectedObjectType == "Particle"
-                    && m_selectedParticleIndex == static_cast<int>(i));
+                bool isSelected = (m_selected_object_type == "Particle"
+                    && m_selected_particle_index == static_cast<int>(i));
                 if (ImGui::Selectable(displayName.c_str(), isSelected)) {
                     SelectObject(particles[i].get(), "Particle");
-                    m_selectedParticleIndex = static_cast<int>(i);
+                    m_selected_particle_index = static_cast<int>(i);
                 }
             }
             ImGui::TreePop();
@@ -620,26 +615,26 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
  */
 void ToyEngineMainWindow::CreatePropertiesPanel() {
     // 停靠于 DockSpace 右节点：与资源列表面板同理，不设 NoMove/NoResize
-    ImGui::Begin("属性", &m_showProperties,
+    ImGui::Begin("属性", &m_show_properties,
         ImGuiWindowFlags_NoCollapse);
 
-    if (m_selectedObject == nullptr) {
+    if (m_selected_object == nullptr) {
         ImGui::Text("请选择一个资源来编辑属性");
         ImGui::End();
         return;
     }
 
-    if (m_selectedObjectType == "Model") {
+    if (m_selected_object_type == "Model") {
         ShowModelProperties();
-    } else if (m_selectedObjectType == "Light") {
+    } else if (m_selected_object_type == "Light") {
         ShowLightProperties();
-    } else if (m_selectedObjectType == "Camera") {
+    } else if (m_selected_object_type == "Camera") {
         ShowCameraProperties();
-    } else if (m_selectedObjectType == "Terrain") {
+    } else if (m_selected_object_type == "Terrain") {
         ShowTerrainProperties();
-    } else if (m_selectedObjectType == "SkyDome") {
+    } else if (m_selected_object_type == "SkyDome") {
         ShowSkyDomeProperties();
-    } else if (m_selectedObjectType == "Particle") {
+    } else if (m_selected_object_type == "Particle") {
         ShowParticleProperties();
     }
 
@@ -649,7 +644,7 @@ void ToyEngineMainWindow::CreatePropertiesPanel() {
 // ---- 模型属性编辑器 ----
 // 可编辑：名称（只读）、位置、缩放、旋转；以及材质属性（环境光、漫反射、镜面反射、光泽度）
 void ToyEngineMainWindow::ShowModelProperties() {
-    Model* model = static_cast<Model*>(m_selectedObject);
+    Model* model = static_cast<Model*>(m_selected_object);
 
     ImGui::Text("类型: 模型");
     ImGui::Separator();
@@ -675,9 +670,15 @@ void ToyEngineMainWindow::ShowModelProperties() {
         model->SetScale(scale);
     }
 
-    float rotation = model->GetRotation();
-    if (ImGui::DragFloat("旋转 (度)", &rotation, 1.0f)) {
-        model->SetRotate(rotation);
+    float rotX = model->GetRotationX();
+    float rotY = model->GetRotationY();
+    float rotZ = model->GetRotationZ();
+    bool rotChanged = false;
+    rotChanged |= ImGui::DragFloat("旋转 X (度)", &rotX, 1.0f);
+    rotChanged |= ImGui::DragFloat("旋转 Y (度)", &rotY, 1.0f);
+    rotChanged |= ImGui::DragFloat("旋转 Z (度)", &rotZ, 1.0f);
+    if (rotChanged) {
+        model->SetRotation(rotX, rotY, rotZ);
     }
 
     // ---- 材质属性 ----
@@ -735,7 +736,7 @@ void ToyEngineMainWindow::ShowModelProperties() {
 // 可编辑：名称（只读）、位置、颜色、环境光、漫反射、镜面反射、衰减参数
 // 根据灯光实际类型显示对应的可编辑属性
 void ToyEngineMainWindow::ShowLightProperties() {
-    Light* light = static_cast<Light*>(m_selectedObject);
+    Light* light = static_cast<Light*>(m_selected_object);
 
     ImGui::Text("类型: %s", light->GetLightTypeName().c_str());
     ImGui::Separator();
@@ -849,7 +850,7 @@ void ToyEngineMainWindow::ShowLightProperties() {
 // 可编辑：名称（只读）、投影模式（透视/正交）、轨道参数（中心/半径/水平角/俯仰角）。
 // 相机交互由 OrbitManipulator 承载，故轨道参数编辑的是操控器状态而非相机本体。
 void ToyEngineMainWindow::ShowCameraProperties() {
-    Camera* camera = static_cast<Camera*>(m_selectedObject);
+    Camera* camera = static_cast<Camera*>(m_selected_object);
     OrbitManipulator* manipulator = m_renderer->GetManipulator();
 
     ImGui::Text("类型: 摄像机");
@@ -895,7 +896,7 @@ void ToyEngineMainWindow::ShowCameraProperties() {
 // ---- 地形属性编辑器 ----
 // 显示只读统计信息和配置参数（平面尺寸、网格分辨率、高度缩放等）
 void ToyEngineMainWindow::ShowTerrainProperties() {
-    TerrainManager* terrain = static_cast<TerrainManager*>(m_selectedObject);
+    TerrainManager* terrain = static_cast<TerrainManager*>(m_selected_object);
 
     ImGui::Text("类型: 地形");
     ImGui::Separator();
@@ -915,7 +916,7 @@ void ToyEngineMainWindow::ShowTerrainProperties() {
 // ---- 天空穹属性编辑器 ----
 // 可编辑：地平线颜色、天顶颜色、地面雾色；只读：半径、分段数
 void ToyEngineMainWindow::ShowSkyDomeProperties() {
-    SkyDome* sky = static_cast<SkyDome*>(m_selectedObject);
+    SkyDome* sky = static_cast<SkyDome*>(m_selected_object);
 
     ImGui::Text("类型: 天空穹");
     ImGui::Separator();
@@ -946,13 +947,13 @@ void ToyEngineMainWindow::ShowSkyDomeProperties() {
 // ---- 粒子系统属性编辑器 ----
 // 可编辑：发射器位置、发射速率、最大粒子数、生命周期、大小、速度、颜色、重力、阻力
 void ToyEngineMainWindow::ShowParticleProperties() {
-    if (m_selectedParticleIndex < 0
-        || m_selectedParticleIndex >= static_cast<int>(m_renderer->GetParticleSystems().size())) {
+    if (m_selected_particle_index < 0
+        || m_selected_particle_index >= static_cast<int>(m_renderer->GetParticleSystems().size())) {
         ImGui::Text("无效的粒子系统选择");
         return;
     }
 
-    ParticleSystem* ps = m_renderer->GetParticleSystems()[m_selectedParticleIndex].get();
+    ParticleSystem* ps = m_renderer->GetParticleSystems()[m_selected_particle_index].get();
     ParticleEmitter* emitter = ps->GetEmitter();
     if (emitter == nullptr) {
         ImGui::Text("粒子发射器未初始化");
@@ -960,7 +961,7 @@ void ToyEngineMainWindow::ShowParticleProperties() {
     }
 
     ImGui::Text("类型: 粒子系统");
-    ImGui::Text("索引: %d", m_selectedParticleIndex);
+    ImGui::Text("索引: %d", m_selected_particle_index);
     ImGui::Separator();
 
     // 位置
@@ -1028,24 +1029,6 @@ void ToyEngineMainWindow::ShowParticleProperties() {
     ImGui::DragFloat("阻力", &emitter->Drag, 0.01f, 0.0f, 1.0f);
 }
 
-// ---- 中格视口底部状态条 ----
-// 以悬浮条覆盖在中间 3D 视口底部，不占用独立网格行，保持 3x1 网格布局
-void ToyEngineMainWindow::ShowViewportStatusBar() {
-    const float barHeight = ImGui::GetFrameHeight() + 8.0f;
-    // 状态条悬浮于中央节点（3D 视口）底部，位置随 DockSpace 布局动态跟随
-    ImGui::SetNextWindowPos(ImVec2(m_viewportX, m_viewportY + m_viewportHeight - barHeight), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(m_viewportWidth, barHeight), ImGuiCond_Always);
-
-    ImGui::Begin("##ViewportStatusBar", &m_showViewportStatusBar,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground);
-
-    // 帧率已由底部 FPS 曲线面板展示，状态条不再重复显示数值
-    ImGui::Text("%dx%d", m_windowWidth, m_windowHeight);
-
-    ImGui::End();
-}
-
 // ---- 停靠于视口底部的 FPS 曲线面板 ----
 // 由 DockBuilder 停靠在中央 3D 视口下方的横条槽位，绘制最近
 // kFpsHistoryCapacity 个窗口平均帧率采样（15 次/秒）的折线图，
@@ -1053,7 +1036,7 @@ void ToyEngineMainWindow::ShowViewportStatusBar() {
 void ToyEngineMainWindow::ShowFpsGraph() {
     // 窗口标题与 DockBuilderDockWindow 的停靠目标一致（见 CreateDockSpace），
     // 停靠窗口的位置/尺寸由 DockSpace 节点管理，无需也不应手动指定
-    ImGui::Begin("FPS曲线", &m_showFpsGraph,
+    ImGui::Begin("FPS曲线", &m_show_fps_graph,
         ImGuiWindowFlags_NoCollapse);
 
     // 统计历史窗口内的平均/最低/最高帧率（vector 头尾为最早/最新采样）
@@ -1103,7 +1086,7 @@ void ToyEngineMainWindow::ShowFpsGraph() {
  * 停靠于右节点（属性面板下方），通过菜单「面板 → 阴影属性」控制显示。
  */
 void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
-    ImGui::Begin("阴影属性", &m_showShadowProperties, ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin("阴影属性", &m_show_shadow_properties, ImGuiWindowFlags_NoCollapse);
 
     // 阴影开关：禁用时跳过深度 Pass，也不绑定阴影贴图
     bool shadowsEnabled = m_renderer->IsShadowsEnabled();
@@ -1151,7 +1134,7 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
         ImGui::TextWrapped("深度贴图已就绪。");
         // 点击打开深度贴图可视化面板
         if (ImGui::Button("查看深度贴图")) {
-            m_showShadowDepthMap = true;
+            m_show_shadow_depth_map = true;
         }
     }
 
@@ -1204,7 +1187,7 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
  * 后续新增调试项统一补充到这里。
  */
 void ToyEngineMainWindow::ShowDebugPropertiesPanel() {
-    ImGui::Begin("调试属性", &m_showDebugProperties, ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin("调试属性", &m_show_debug_properties, ImGuiWindowFlags_NoCollapse);
 
     // ---- 光源调试可视化 ----
     bool debugDraw = m_renderer->IsDebugDrawEnabled();
@@ -1330,7 +1313,7 @@ void ToyEngineMainWindow::ShowShadowDepthMapPanel() {
     const unsigned int srcTex = m_renderer->GetShadowDepthTexture();
     const bool ready = m_renderer->IsShadowMapReady();
 
-    ImGui::Begin("阴影深度贴图", &m_showShadowDepthMap, ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin("阴影深度贴图", &m_show_shadow_depth_map, ImGuiWindowFlags_NoCollapse);
 
     if (srcTex == 0) {
         ImGui::TextWrapped("阴影 FBO 未创建（阴影可能未启用）。");
@@ -1340,17 +1323,17 @@ void ToyEngineMainWindow::ShowShadowDepthMapPanel() {
         // 显示宽度：预览纹理与源深度贴图同尺寸，这里仅决定 ImGui 显示多大
         const int displayW = static_cast<int>(ImGui::GetContentRegionAvail().x);
         // 仅当源纹理变化时才重新读回/重建缓存，避免每帧 CPU 拷贝
-        if (m_shadowDepthPreviewTex == 0 || srcTex != m_lastDisplayedDepthTex) {
+        if (m_shadow_depth_preview_tex == 0 || srcTex != m_last_displayed_depth_tex) {
             RebuildShadowDepthPreview(srcTex);
         }
 
-        if (m_shadowDepthPreviewTex != 0) {
+        if (m_shadow_depth_preview_tex != 0) {
             // 用预览纹理的宽高比自适应缩放显示，保持内容不被拉伸
-            const float aspect = static_cast<float>(m_shadowDepthPreviewW) /
-                                static_cast<float>(m_shadowDepthPreviewH);
+            const float aspect = static_cast<float>(m_shadow_depth_preview_w) /
+                                static_cast<float>(m_shadow_depth_preview_h);
             const float maxW = (float)displayW;
             ImVec2 displaySize(maxW, maxW / aspect);
-            ImGui::Image((ImTextureID)(intptr_t)m_shadowDepthPreviewTex, displaySize);
+            ImGui::Image((ImTextureID)(intptr_t)m_shadow_depth_preview_tex, displaySize);
             ImGui::TextWrapped("近处=黑，远处=白。空白区域 = 无深度（未写入）或边界外被照亮。");
         }
     }
@@ -1362,7 +1345,7 @@ void ToyEngineMainWindow::ShowShadowDepthMapPanel() {
  * 重建阴影深度预览纹理
  *
  * 从源深度纹理读回深度数据，归一化为灰度（近→黑，远→白）后上传到
- * 一张缓存复用（m_shadowDepthPreviewTex）的 RGBA8 纹理。深度纹理内部
+ * 一张缓存复用（m_shadow_depth_preview_tex）的 RGBA8 纹理。深度纹理内部
  * 格式为 GL_DEPTH_COMPONENT/GL_FLOAT，故用 GL_FLOAT 读回原始 [0,1] 深度。
  */
 void ToyEngineMainWindow::RebuildShadowDepthPreview(unsigned int srcTex) {
@@ -1407,13 +1390,13 @@ void ToyEngineMainWindow::RebuildShadowDepthPreview(unsigned int srcTex) {
     // 之前曾误用「面板可用宽度」作为预览纹理尺寸，导致向更小的纹理上传
     // 完整的 2048×2048 子图触发 GL_INVALID_VALUE、上传失败，预览恒为全黑。
     // 现在预览纹理与源同尺寸，显示时再由 ImGui::Image 按面板宽度缩放。
-    if (m_shadowDepthPreviewTex == 0 ||
-        m_shadowDepthPreviewW != texW || m_shadowDepthPreviewH != texH) {
-        if (m_shadowDepthPreviewTex != 0) {
-            glDeleteTextures(1, &m_shadowDepthPreviewTex);
+    if (m_shadow_depth_preview_tex == 0 ||
+        m_shadow_depth_preview_w != texW || m_shadow_depth_preview_h != texH) {
+        if (m_shadow_depth_preview_tex != 0) {
+            glDeleteTextures(1, &m_shadow_depth_preview_tex);
         }
-        glGenTextures(1, &m_shadowDepthPreviewTex);
-        glBindTexture(GL_TEXTURE_2D, m_shadowDepthPreviewTex);
+        glGenTextures(1, &m_shadow_depth_preview_tex);
+        glBindTexture(GL_TEXTURE_2D, m_shadow_depth_preview_tex);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1423,9 +1406,9 @@ void ToyEngineMainWindow::RebuildShadowDepthPreview(unsigned int srcTex) {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texW, texH, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    m_shadowDepthPreviewW = texW;
-    m_shadowDepthPreviewH = texH;
-    m_lastDisplayedDepthTex = srcTex;
+    m_shadow_depth_preview_w = texW;
+    m_shadow_depth_preview_h = texH;
+    m_last_displayed_depth_tex = srcTex;
 }
 
 // ---- 视口角落的屏幕空间坐标轴 gizmo ----
@@ -1435,7 +1418,7 @@ void ToyEngineMainWindow::RebuildShadowDepthPreview(unsigned int srcTex) {
 // 位置固定在视口右上角，避开属性面板与边缘。
 void ToyEngineMainWindow::DrawViewportAxisGizmo() {
     // 首帧 DockSpace 布局未完成时视口尺寸无效，跳过绘制
-    if (m_viewportWidth <= 0.0f || m_viewportHeight <= 0.0f) {
+    if (m_viewport_width <= 0.0f || m_viewport_height <= 0.0f) {
         return;
     }
 
@@ -1450,8 +1433,8 @@ void ToyEngineMainWindow::DrawViewportAxisGizmo() {
     const float gizmoRadius = axis->GetScale() * 256.0f * 0.5f;
     const float margin = gizmoRadius * 0.5f;
     const ImVec2 center{
-        m_viewportX + m_viewportWidth - gizmoRadius - margin,
-        m_viewportY + gizmoRadius + margin
+        m_viewport_x + m_viewport_width - gizmoRadius - margin,
+        m_viewport_y + gizmoRadius + margin
     };
 
     axis->Draw(camera->GetViewMatrix(), center);
@@ -1554,14 +1537,14 @@ static bool RaySphereIntersect(
 
 // ---- 选择管理 ----
 void ToyEngineMainWindow::SelectObject(void* obj, const std::string& type) {
-    m_selectedObject = obj;
-    m_selectedObjectType = type;
+    m_selected_object = obj;
+    m_selected_object_type = type;
 }
 
 void ToyEngineMainWindow::ClearSelection() {
-    m_selectedObject = nullptr;
-    m_selectedObjectType.clear();
-    m_selectedParticleIndex = -1;
+    m_selected_object = nullptr;
+    m_selected_object_type.clear();
+    m_selected_particle_index = -1;
 }
 
 /*
@@ -1579,7 +1562,7 @@ void ToyEngineMainWindow::ClearSelection() {
  */
 void ToyEngineMainWindow::PerformPick() {
     // 渲染器或视口尚未就绪（首帧 DockSpace 布局未完成）时无法拾取
-    if (!m_renderer || m_viewportWidth <= 0.0f || m_viewportHeight <= 0.0f) {
+    if (!m_renderer || m_viewport_width <= 0.0f || m_viewport_height <= 0.0f) {
         return;
     }
 
@@ -1589,8 +1572,8 @@ void ToyEngineMainWindow::PerformPick() {
     glfwGetCursorPos(m_window, &cursorX, &cursorY);
 
     // 屏幕像素坐标 → NDC：先归一化到 [0,1]，再映射到 [-1,1]（NDC 的 Y 轴向上）
-    const float ndcX = static_cast<float>((cursorX - m_viewportX) / m_viewportWidth) * 2.0f - 1.0f;
-    const float ndcY = 1.0f - static_cast<float>((cursorY - m_viewportY) / m_viewportHeight) * 2.0f;
+    const float ndcX = static_cast<float>((cursorX - m_viewport_x) / m_viewport_width) * 2.0f - 1.0f;
+    const float ndcY = 1.0f - static_cast<float>((cursorY - m_viewport_y) / m_viewport_height) * 2.0f;
 
     // 拾取必须使用与渲染完全一致的投影/视图矩阵（当前相机 + 当前宽高比）
     const glm::mat4 invViewProj = glm::inverse(
@@ -1715,7 +1698,7 @@ void ToyEngineMainWindow::PerformPick() {
 
     SelectObject(hitObject, hitType);
     if (hitType == "Particle") {
-        m_selectedParticleIndex = hitParticleIndex;
+        m_selected_particle_index = hitParticleIndex;
     }
 
     // 计算命中对象的包围盒用于线框高亮：
@@ -1789,7 +1772,7 @@ static constexpr double kClickDragThresholdPx = 5.0;
 
 void ToyEngineMainWindow::OnMouseLeftButtonDown() {
     // 记录左键按下位置，供松开时判断是否为"点击"（位移 < 阈值）
-    glfwGetCursorPos(m_window, &m_mouseDownX, &m_mouseDownY);
+    glfwGetCursorPos(m_window, &m_mouse_down_x, &m_mouse_down_y);
 }
 
 void ToyEngineMainWindow::OnMouseLeftButtonUp() {
@@ -1798,26 +1781,26 @@ void ToyEngineMainWindow::OnMouseLeftButtonUp() {
     double cx = 0.0, cy = 0.0;
     glfwGetCursorPos(m_window, &cx, &cy);
 
-    const double dx = cx - m_mouseDownX;
-    const double dy = cy - m_mouseDownY;
+    const double dx = cx - m_mouse_down_x;
+    const double dy = cy - m_mouse_down_y;
     if (dx * dx + dy * dy < kClickDragThresholdPx * kClickDragThresholdPx) {
         PerformPick();
     }
 }
 
 void ToyEngineMainWindow::OnMouseRightButtonDown() {
-    m_cameraPanning = true;
+    m_camera_panning = true;
 }
 
 void ToyEngineMainWindow::OnMouseRightButtonUp() {
-    m_cameraPanning = false;
+    m_camera_panning = false;
 }
 
 void ToyEngineMainWindow::OnMouseMove(double deltaX, double deltaY) {
     if (!m_renderer) return;
 
     // 相机绕轨道中心旋转（鼠标左键拖动）：交互交给操控器，相机只接收结果
-    if (m_mouseLeftPressed) {
+    if (m_mouse_left_pressed) {
         auto *manipulator = m_renderer->GetManipulator();
         if (manipulator) {
             float sensitivity = 0.5f;
@@ -1828,7 +1811,7 @@ void ToyEngineMainWindow::OnMouseMove(double deltaX, double deltaY) {
     }
 
     // 相机平移（鼠标右键拖动）：轨道中心沿视图右/上方向移动
-    if (m_cameraPanning) {
+    if (m_camera_panning) {
         auto *manipulator = m_renderer->GetManipulator();
         if (manipulator) {
             float panSpeed = 0.01f;

@@ -6,3 +6,5 @@ Ka 0.25 0.25 0.25
 Kd 0.45 0.45 0.45
 Ks 1.0 1.0 1.0
 Ns 15
+# 程序生成毛皮贴图（引擎手工 MTL 解析忽略 map_Kd，assimp 侧读取用于贴图采样）
+map_Kd bunny_fur.png

@@ -375,7 +375,28 @@ Config *Config::LoadFromYaml(const std::string &filename) {
                 model_node["position"]["y"].as<float>(),
                 model_node["position"]["z"].as<float>()
             );
-            modelConfig.Rotation = model_node["rotation"].as<float>();
+            // 旋转支持三种写法，按优先级覆盖：
+            // 1) rotation: 0       —— 旧标量形式，只设 Y 轴
+            // 2) rotation: {x,y,z} —— 映射形式，三轴
+            // 3) rotation_x/y/z     —— 独立键，可单独重写某一轴
+            modelConfig.Rotation = glm::vec3(0.0f);
+            const auto &rot_node = model_node["rotation"];
+            if (rot_node && rot_node.IsScalar()) {
+                modelConfig.Rotation.y = rot_node.as<float>();
+            } else if (rot_node && rot_node.IsMap()) {
+                modelConfig.Rotation.x = rot_node["x"].as<float>(0.0f);
+                modelConfig.Rotation.y = rot_node["y"].as<float>(0.0f);
+                modelConfig.Rotation.z = rot_node["z"].as<float>(0.0f);
+            }
+            if (model_node["rotation_x"]) {
+                modelConfig.Rotation.x = model_node["rotation_x"].as<float>();
+            }
+            if (model_node["rotation_y"]) {
+                modelConfig.Rotation.y = model_node["rotation_y"].as<float>();
+            }
+            if (model_node["rotation_z"]) {
+                modelConfig.Rotation.z = model_node["rotation_z"].as<float>();
+            }
             modelConfig.Scale = glm::vec3(
                 model_node["scale"]["x"].as<float>(),
                 model_node["scale"]["y"].as<float>(),

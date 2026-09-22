@@ -107,26 +107,6 @@ void Renderer::init(int w, int h) {
     // 具体绘制见 mainwindow.cpp RenderFrame 中的 ApplyViewportAxisGizmo 调用
     m_axis = std::make_unique<Axis>();
 
-    // Create Plane：使用标准管线 ① 纯顶点颜色 shader（unlit，无光照）
-    auto *plane_effect = new Technique("plane",
-                                       "./resource/shader/unlit.vert",
-                                       "./resource/shader/unlit.frag");
-    auto plane_mesh = Mesh::CreatePlaneMesh();
-    for (const auto &m : plane_mesh) {
-        m->SetEffect(plane_effect);
-    }
-
-    auto *plane = new Model("plane");
-    plane->SetScale(glm::vec3(5.0f, 5.0f, 5.0f));
-    // mesh 所有权随 SetMeshes 转移给 Model，着色器由 m_techniques 统一释放
-    plane->SetMeshes(std::move(plane_mesh));
-    m_techniques.push_back(std::unique_ptr<Technique>(plane_effect));
-
-    // 平面为纯顶点颜色辅助网格（无材质），初始风格登记为 Unlit，供属性面板回显
-    m_model_styles[plane] = RenderStyle::Unlit;
-
-    m_models.push_back(std::unique_ptr<Model>(plane));
-
     // 创建地形管理器（固定尺寸网格平面，无 LOD）
     m_terrain_manager = std::make_unique<TerrainManager>();
     TerrainConfig terrainConfig;
@@ -378,6 +358,22 @@ void Renderer::init(int w, int h) {
         for (const auto &m: model_obj->GetMeshes()) {
             m->SetEffect(effect);
         }
+        // 模型贴图（漫反射/法线）登记到 m_textures 统一释放；
+        // 多个 mesh 可能共享同一纹理 ID，需去重防止重复 glDeleteTextures
+        for (const auto &m: model_obj->GetMeshes()) {
+            for (unsigned int texId: {m->GetTexture(), m->GetNormalMap()}) {
+                if (texId != 0 && std::find(m_textures.begin(), m_textures.end(), texId) == m_textures.end()) {
+                    m_textures.push_back(texId);
+                }
+            }
+        }
+        // 【调试】一次性打印每个模型的贴图 ID，验证 assimp 是否成功加载漫反射/法线贴图
+        //（0 表示未加载；若加载了但渲染色黑，则为纹理上传/采样问题）
+        for (const auto &m: model_obj->GetMeshes()) {
+            std::cout << "[texture] model=" << modelConfig.Name
+                      << " diffuse=" << m->GetTexture()
+                      << " normal=" << m->GetNormalMap() << std::endl;
+        }
         // 模型材质与着色器交由渲染器统一管理释放
         m_materials.push_back(std::unique_ptr<Material>(material));
         m_techniques.push_back(std::unique_ptr<Technique>(effect));
@@ -400,7 +396,7 @@ void Renderer::init(int w, int h) {
 
         model_obj->SetScale(modelConfig.Scale);
         model_obj->SetTranslate(modelConfig.Position);
-        model_obj->SetRotate(modelConfig.Rotation);
+        model_obj->SetRotation(modelConfig.Rotation.x, modelConfig.Rotation.y, modelConfig.Rotation.z);
 
         m_models.push_back(std::unique_ptr<Model>(model_obj));
     }
@@ -955,11 +951,9 @@ void Renderer::CollectModelNormals() {
         if (model == nullptr) {
             continue;
         }
-        // 构造与 Model::Draw 相同的模型矩阵：translate * scale * rotate(Y)
-        glm::mat4 modelMat = glm::mat4(1.0f);
-        modelMat = glm::translate(modelMat, model->GetPosition());
-        modelMat = glm::scale(modelMat, model->GetScale());
-        modelMat = glm::rotate(modelMat, glm::radians(model->GetRotation()), glm::vec3(0.0f, 1.0f, 0.0f));
+        // 模型矩阵直接复用 GetWorldMatrix()，保证与渲染几何一致
+        // （含三轴欧拉角旋转，不再手动重建仅绕 Y 的矩阵）
+        glm::mat4 modelMat = model->GetWorldMatrix();
 
         // 法线矩阵 = 模型矩阵的逆转置，用于把模型空间的法线变换到世界空间，
         // 保证非均匀缩放时法线方向正确（scale=1 时等价于 modelMat 的旋转部分）

@@ -131,6 +131,13 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal) {
 }
 
 /*
+ * 镜面高光累计器：所有光源的 specular 分量单独累加到这里，
+ * 不进入返回值 —— 高光不该被 groundColor（地面贴图）调制，
+ * 否则高光会被贴图染色压暗。main() 开头清零。
+ */
+vec3 gSpecularAccum = vec3(0.0);
+
+/*
  * 统一的 Blinn-Phong 单光源光照计算
  *
  * 参数语义（手动光源：AmbientIntensity / DiffuseIntensity / SpecularIntensity）：
@@ -138,13 +145,15 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal) {
  *   - DiffuseIntensity：漫反射权重，公式 LightColor * 材质Diffuse * DiffuseIntensity * dot(N, -L)
  *   - SpecularIntensity：镜面权重，公式 LightColor * 材质Specular * SpecularIntensity * pow(dot, Shininess)
  *   - Shadow：阴影系数，1.0 完全遮蔽（漫反射/镜面反射乘 (1.0 - Shadow)，环境光不受阴影影响）
+ *   - SpecularScale：镜面乘数（方向光 1.0；点光/聚光 1.0/atten 含锥角系数），
+ *     因为镜面走 gSpecularAccum 不随返回值除衰减，须在调用前算好衰减传入
  *
  * 注意：gMaterial.Shininess 只作高光聚敛指数（pow 的幂次），绝不能再乘到颜色上，
  * 否则高光强度会被错误放大到快门级数值，这是历史遗留 bug 的修复点。
  */
 vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal,
                        float AmbientIntensity, float DiffuseIntensity, float SpecularIntensity,
-                       float Shadow) {
+                       float Shadow, float SpecularScale) {
     // 归一化光照方向（从光源指向片段的单位向量）。
     // 【重要】方向光的 gDirectionLight.Direction 来自 world.yaml 且未在上传前归一化
     // （technique_light.cpp 直接上传原始值），只有恰好为单位向量时 dot 结果才正确。
@@ -157,7 +166,6 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal,
     float DiffuseFactor = dot(Normal, -LightDirection);
 
     vec4 DiffuseColor = vec4(0, 0, 0, 0);
-    vec4 SpecularColor = vec4(0, 0, 0, 0);
 
     if (DiffuseFactor > 0) {
         // 漫反射：遮蔽区域阴影系数为1时完全不做漫反射，环境光不受阴影影响
@@ -165,24 +173,27 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 Normal,
 
         // 计算眼睛观察方向
         vec3 VertexToEye = normalize(gViewPos - v2f.WorldPos0);
-        // 计算反射光方向
+        // 计算反射光方向（Phong：入射方向为光源→片元，reflect 约定正确）
         vec3 LightReflect = normalize(reflect(LightDirection, Normal));
         // 计算反射光与观测方向的夹角
         float SpecularFactor = dot(VertexToEye, LightReflect);
         // 计算镜面反射强度（Shininess 仅作聚敛指数，不再乘入颜色）
         if (SpecularFactor > 0) {
             SpecularFactor = pow(SpecularFactor, gMaterial.Shininess);
-            SpecularColor = vec4(LightColor * gMaterial.SpecularColor * SpecularIntensity * SpecularFactor * (1.0 - Shadow), 1.0f);
+            // 高光不进返回值，单独累计：合成时不被 groundColor 调制，
+            // SpecularScale 由各光源传入，保证高光同样受距离衰减/锥角约束
+            gSpecularAccum += LightColor * gMaterial.SpecularColor * SpecularIntensity * SpecularFactor * (1.0 - Shadow) * SpecularScale;
         }
     }
 
-    return (AmbientColor + DiffuseColor + SpecularColor);
+    return (AmbientColor + DiffuseColor);
 }
 
 vec4 CalcDirectionLight(vec3 Normal, float Shadow) {
-    // 方向光：三个强度分量全部来自配置，可独立调节
+    // 方向光：三个强度分量全部来自配置，可独立调节；无距离衰减，SpecularScale 固定 1.0
     return CalcLightInternal(gDirectionLight.Color, gDirectionLight.Direction, Normal,
-                             gDirectionLight.AmbientIntensity, gDirectionLight.DiffuseIntensity, gDirectionLight.SpecularIntensity, Shadow);
+                             gDirectionLight.AmbientIntensity, gDirectionLight.DiffuseIntensity,
+                             gDirectionLight.SpecularIntensity, Shadow, 1.0);
 }
 
 vec4 CalcPointLight(int Index, vec3 Normal)
@@ -191,11 +202,14 @@ vec4 CalcPointLight(int Index, vec3 Normal)
     float Distance = length(LightDirection);
     LightDirection = normalize(LightDirection);
 
+    // 衰减先算好：漫反射由 Color/Attenuation 处理，镜面经 SpecularScale 传入核内
+    float Attenuation = gPointLights[Index].AttenuationConstant + gPointLights[Index].AttenuationLinear * Distance + gPointLights[Index].AttenuationExp * Distance * Distance;
+
     // 点光源结构体没有 SpecularIntensity 字段，镜面强度固定取 1.0，由其颜色亮度天然控制镜面强弱；
     // 点光源暂不参与阴影，Shadow 传 0.0
     vec4 Color = CalcLightInternal(gPointLights[Index].Color, LightDirection, Normal,
-                                   gPointLights[Index].AmbientIntensity, gPointLights[Index].DiffuseIntensity, 1.0, 0.0);
-    float Attenuation = gPointLights[Index].AttenuationConstant + gPointLights[Index].AttenuationLinear * Distance + gPointLights[Index].AttenuationExp * Distance * Distance;
+                                   gPointLights[Index].AmbientIntensity, gPointLights[Index].DiffuseIntensity,
+                                   1.0, 0.0, 1.0 / Attenuation);
 
     return Color / Attenuation;
 }
@@ -207,22 +221,29 @@ vec4 CalcSpotLight(int Index, vec3 Normal) {
     float CosCutoff = cos(radians(gSpotLights[Index].Cutoff));
     float CosOuterCutoff = cos(radians(gSpotLights[Index].OuterCutoff));
 
-    float Distance = length(v2f.WorldPos0 - gSpotLights[Index].Position);
-    float Attenuation = gSpotLights[Index].AttenuationConstant + gSpotLights[Index].AttenuationLinear * Distance + gSpotLights[Index].AttenuationExp * Distance * Distance;
-
-    // 聚光灯：三个强度全量传入；暂不参与阴影，Shadow 传 0.0
-    vec4 Color = CalcLightInternal(gSpotLights[Index].Color, LightToPixel, Normal,
-                                   gSpotLights[Index].AmbientIntensity, gSpotLights[Index].DiffuseIntensity, gSpotLights[Index].SpecularIntensity, 0.0) / Attenuation;
-
+    // 外锥之外完全无光——必须在调用光照核之前返回，
+    // 否则镜面已在核内累计进 gSpecularAccum，锥外片元会漏出高光
     if (SpotFactor <= CosOuterCutoff) {
         return vec4(0, 0, 0, 0);
     }
 
+    float Distance = length(v2f.WorldPos0 - gSpotLights[Index].Position);
+    float Attenuation = gSpotLights[Index].AttenuationConstant + gSpotLights[Index].AttenuationLinear * Distance + gSpotLights[Index].AttenuationExp * Distance * Distance;
     float SmoothFactor = clamp((SpotFactor - CosOuterCutoff) / (CosCutoff - CosOuterCutoff), 0.0f, 1.0f);
+
+    // 聚光灯：三个强度全量传入；暂不参与阴影，Shadow 传 0.0
+    // 镜面比例系数 = 距离衰减 x 锥角平滑，与漫反射保持一致
+    vec4 Color = CalcLightInternal(gSpotLights[Index].Color, LightToPixel, Normal,
+                                   gSpotLights[Index].AmbientIntensity, gSpotLights[Index].DiffuseIntensity,
+                                   gSpotLights[Index].SpecularIntensity, 0.0, 1.0 / Attenuation * SmoothFactor) / Attenuation;
+
     return Color * SmoothFactor;
 }
 
 void main() {
+    // 每帧清零镜面累计器（块变量按帧复用，必须重置）
+    gSpecularAccum = vec3(0.0);
+
     // 地面漫反射采样：world.yaml 中 terrain.texture 若给出有效路径则为真实纹理，
     // 否则替换为棋盘格纹理（两色交替，便于观察地形平面铺展）。
     // 贴图为 sRGB 编码，采样后解码到线性空间参与光照（避免整体发灰）
@@ -248,8 +269,8 @@ void main() {
     // 方向光（阴影只作用于方向光）
     Color += CalcDirectionLight(v2f.Normal0, Shadow);
 
-    // 漫反射颜色由纹理控制（地面着色），叠加光照后的 Lambert 明暗，
-    // 使地形的起伏在光照下产生明暗对比，而整体颜色仍来自地面纹理。
+    // 漫反射/环境光由地面纹理调制（地形着色 + Lambert 明暗），
+    // 镜面高光直接叠加、不乘贴图——高光是光源色泽，乘入会被地面纹理染脏压暗。
     // 阴影已在 CalcDirectionLight 内部按 (1.0 - Shadow) 调暗漫反射/镜面，此处不再重复处理
-    color = groundColor * Color;
+    color = vec4(groundColor.rgb * Color.rgb + gSpecularAccum, groundColor.a * Color.a);
 }

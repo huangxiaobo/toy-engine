@@ -139,6 +139,10 @@ unsigned int Utils::LoadTextureFromFile(const std::string &path) {
     } else {
         std::cerr << "Texture failed to load at path: " << path << std::endl;
         stbi_image_free(data);
+        // 加载失败时不能返回刚生成的悬空纹理 ID：mesh 会据此置 gHasTexture=1，
+        // 着色器采样未填充的空纹理得到纯黑（黑墙症状）。返回 0 让调用方按无贴图处理。
+        glDeleteTextures(1, &textureID);
+        return 0;
     }
 
     return textureID;

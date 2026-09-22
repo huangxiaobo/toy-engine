@@ -57,9 +57,9 @@ world:
       id: "a1000000-0000-0000-0000-000000000001"
       enabled: true
       direction:
-        x: 0
+        x: 10
         y: -10
-        z: 0
+        z: 10
       color:
         r: 0.3
         g: 0.3
@@ -69,7 +69,7 @@ world:
           r: 1.0
           g: 1.0
           b: 1.0
-        intensity: 1.5
+        intensity: 0.75
       ambient:
         color:
           r: 0.1
@@ -87,9 +87,9 @@ world:
       id: "b1000000-0000-0000-0000-000000000001"
       enabled: true
       position:
-        x: 20.0
-        y: 20.0
-        z: 0.0
+        x: 10.0
+        y: 10.0
+        z: 10.0
       color:
         r: 0.3
         g: 0.0
@@ -99,7 +99,7 @@ world:
           r: 1.0
           g: 0.5
           b: 0.0
-        intensity: 2.0
+        intensity: 5.0
       ambient:
         color:
           r: 1.0
@@ -121,9 +121,9 @@ world:
       id: "b1000000-0000-0000-0000-000000000002"
       enabled: true
       position:
-        x: 0.0
-        y: 20.0
-        z: 20.0
+        x: 15.0
+        y: 10.0
+        z: 6.0
         w: 1.0
       color:
         r: 0.0
@@ -134,7 +134,7 @@ world:
           r: 0.0
           g: 0.5
           b: 1.0
-        intensity: 2.0
+        intensity: 5.0
       ambient:
         color:
           r: 0.0
@@ -246,16 +246,16 @@ world:
       id: "9128d629-c651-4688-85ad-11bc3e6c2293"
       position:
         x: 0
-        y: 0
+        y: -3.3
         z: 0
       scale:
-        x: 15
-        y: 15
-        z: 15
-      rotation: 0
+        x: 150
+        y: 150
+        z: 150
+      rotation: {x: 0, y: 0, z: 0}
       mesh:
         name: bunny
-        file: "./resource/model/bunny/bunny_10k.obj"
+        file: "./resource/model/bunny/bunny_uv.obj"
       technique:
         technique:
           name: light
@@ -277,7 +277,7 @@ world:
         x: 1.0
         y: 1.0
         z: 1.0
-      rotation: 0
+      rotation: {x: 0, y: 0, z: 0}
       mesh:
         name: sphere
         file: "./resource/model/sphere/sphere.obj"
@@ -290,3 +290,27 @@ world:
       material:
         file: "./resource/model/sphere/sphere.mtl"
         name: "sphere_material"
+    - resource_class: Model
+      name: cube
+      id: "9128d629-c651-4688-85ad-11bc3e6c2295"
+      position:
+        x: 5
+        y: 5
+        z: 30
+      scale:
+        x: 30
+        y: 0.5
+        z: 30
+      rotation: {x: 0, y: 0, z: 0}
+      mesh:
+        name: cube
+        file: "./resource/model/cube/cube.obj"
+      technique:
+        technique:
+          name: light
+      shader:
+        vert: "./resource/model/cube/shader.vert"
+        frag: "./resource/model/cube/shader.frag"
+      material:
+        file: "./resource/model/cube/cube.mtl"
+        name: "cube_material"

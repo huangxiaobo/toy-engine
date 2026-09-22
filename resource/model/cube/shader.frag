@@ -141,7 +141,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 N) {
 /*
  * 镜面高光累计器：所有光源的 specular 分量单独累加到这里，
  * 不进入返回给 main() 的 total —— 因为高光是光源反射的色泽，
- * 不该被 albedo（漫反射贴图）调制，否则高光会被贴图染色、发暗发脏。
+ * 不该被 albedo（漫反射贴图/砖纹理颜色）调制，否则高光发暗发脏。
  * main() 开头清零，合成时与 albedo 调制后的 diffuse/ambient 相加。
  */
 vec3 gSpecularAccum = vec3(0.0);
@@ -186,11 +186,11 @@ vec4 CalcLightInternal(vec3 LightColor, vec3 LightDirection, vec3 N,
         vec3 V = normalize(gViewPos - v2f.WorldPos0);   // 观察方向
         // 半程向量：Blinn-Phong 约定 H = 片元→光源方向 + 片元→观察方向。
         // 本文件 L 是"光源→片元"方向（见上面漫反射 dot(N, -L)），故此处用 -L 翻转回标准约定，
-        // 否则竖直平面的 H 会被算错方向，导致镜面高光位置错乱甚至恒为 0。
+        // 否则竖直平面/地面的 H 会被算成水平方向，导致镜面高光恒为 0。
         vec3 H = normalize(-L + V);
         float spec = pow(max(dot(N, H), 0.0), gMaterial.Shininess);
         if (spec > 0.0) {
-            // 高光不进 result，单独累计：合成时不被 albedo 调制；
+            // 高光不进 result，单独累计：合成时不被 albedo（砖纹理）调制；
             // SpecularScale 由各光源传入，保证高光同样受距离衰减约束
             gSpecularAccum += LightColor * gMaterial.SpecularColor * SpecularIntensity * spec * (1.0 - Shadow) * SpecularScale;
         }
@@ -304,6 +304,6 @@ void main() {
     }
 
     // ---- 4. 合成：albedo 只调制环境/漫反射，镜面高光直接叠加 ----
-    // （高光若乘入 albedo 会被贴图颜色污染：亮斑发暗、贴图深色处高光被压黑）
+    // （高光若乘入 albedo 会被砖纹理颜色污染：亮斑发黄、砖缝处被压黑）
     color = vec4(total.rgb * albedo + gSpecularAccum, 1.0);
 }

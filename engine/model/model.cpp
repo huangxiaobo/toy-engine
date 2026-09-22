@@ -23,9 +23,12 @@ using namespace std;
 /*
  * 构造函数：初始化模型名称、位置/旋转/缩放默认值，并生成唯一 ID
  *
- * m_matrix 为累积变换矩阵，后续 SetScale/SetRotate/SetTranslate 都会叠加到它上面。
+ * m_matrix 为自定义旋转基准矩阵（默认单位阵），由 SetRotate(rotation, axis) 覆盖写入；
+ * 位置/旋转/缩放由 GetWorldMatrix() 从成员变量统一重建，各 setter 均为覆盖语义。
  */
-Model::Model(string name) : m_name(name), m_position(0.0f), m_rotation(0.0f), m_scale(1.0f) {
+Model::Model(string name) : m_name(name), m_position(0.0f),
+                            m_rotation_x(0.0f), m_rotation_y(0.0f), m_rotation_z(0.0f),
+                            m_scale(1.0f) {
     m_uuid = Utils::GenerateUUID();
     m_matrix = glm::mat4(1.0f);
 }
@@ -65,6 +68,7 @@ void Model::LoadModel(const string &path) {
     }
     // retrieve the directory path of the filepath
     auto directory = path.substr(0, path.find_last_of('/')); // 保存根目录
+    m_directory = directory;
 
     // process ASSIMP's root node recursively
     ProcessNode(scene->mRootNode, scene); // 处理结点
@@ -119,7 +123,8 @@ std::unique_ptr<Mesh> Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) 
         vector.y = ai_mesh->mVertices[i].y;
         vector.z = ai_mesh->mVertices[i].z;
         vertex.Position = vector; // 将该点数据存储在结构体中
-        vertex.Color = glm::normalize(vector);
+        // OBJ 不携带顶点色，固定为白色，避免光照链中 albedo 被位置衍生的颜色污染
+        vertex.Color = glm::vec3(1.0f, 1.0f, 1.0f);
         // normals
         if (ai_mesh->HasNormals()) // 同理存储法线（如果有的话）
         {
@@ -186,15 +191,22 @@ std::unique_ptr<Mesh> Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) 
     std::vector<Texture> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 
-    // return a mesh object created from the extracted mesh data
-    return std::make_unique<Mesh>(vertices, indices);
+    // 创建 mesh 并把材质贴图绑定到网格上（漫反射/法线贴图各自取第一张）
+    auto mesh = std::make_unique<Mesh>(vertices, indices);
+    for (const auto &tex: textures) {
+        if (tex.type == "texture_diffuse") {
+            mesh->SetTexture(tex.id);
+        } else if (tex.type == "texture_normal") {
+            mesh->SetNormalMap(tex.id);
+        }
+    }
+    return mesh;
 }
 
 // checks all material textures of a given type and loads the textures if they're not loaded yet.
 // the required info is returned as a Texture struct.
 vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type, string typeName) {
     vector<Texture> textures;
-    return textures;
     for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) // 检查储存在材质中(该类型)纹理的数量
     {
         aiString str;
@@ -209,15 +221,21 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
                 break;
             }
         }
-        // if (!skip)
-        // { // if texture hasn't been loaded already, load it
-        //     Texture texture;
-        //     texture.id = TextureFromFile(str.C_Str(), this->directory); // 将会（用stb_image.h）加载一个纹理并返回该纹理的ID。
-        //     texture.type = typeName;
-        //     texture.path = str.C_Str();
-        //     textures.push_back(texture);        // 在该容器中存储的只有id，类型和路径，对应特定的网络mesh
-        //     textures_loaded.push_back(texture); // 将其存储为整个模型加载的纹理，以确保我们不会不必要地加载重复的纹理。
-        // }
+        if (!skip) {
+            // if texture hasn't been loaded already, load it
+            Texture texture;
+            // 拼出模型目录下的完整路径，加载贴图并得到 GL 纹理 ID
+            const std::string resolved = m_directory + "/" + str.C_Str();
+            // 【调试】打印 assimp 给出的纹理路径与最终拼接结果，定位黑墙贴图加载失败根因
+            std::cout << "[texpath] type=" << typeName
+                      << " assimp_path=" << str.C_Str()
+                      << " resolved=" << resolved << std::endl;
+            texture.id = Utils::LoadTextureFromFile(resolved);
+            texture.type = typeName;
+            texture.path = str.C_Str();
+            textures.push_back(texture);
+            m_textures_loaded.push_back(texture);
+        }
     }
     return textures;
 }
@@ -234,48 +252,45 @@ void Model::SetMeshes(std::vector<std::unique_ptr<Mesh>> meshes) {
     }
 }
 
-/* 设置模型缩放：更新缩放分量并叠加到累积变换矩阵 */
+/* 设置模型缩放：覆盖式更新缩放分量
+ *
+ * 缩放只记录到成员 m_scale，由 GetWorldMatrix() 统一重建，不再累乘进 m_matrix。
+ * 旧实现把新缩放乘进累积矩阵，导致历史缩放无法通过面板还原。 */
 void Model::SetScale(glm::vec3 scale) {
     this->m_scale = scale;
-    m_matrix = glm::scale(m_matrix, scale);
 }
 
-/* 设置绕 Y 轴旋转角度：叠加旋转到累积变换矩阵 */
+/* 设置三轴欧拉角旋转（度）：覆盖式写入三个分量
+ *
+ * 旋转顺序固定为 Y → X → Z（由 GetWorldMatrix 统一重建），
+ * 三个分量均为覆盖式设置，与面板/配置的行为一致。 */
+void Model::SetRotation(glm::f32 x, glm::f32 y, glm::f32 z) {
+    m_rotation_x = x;
+    m_rotation_y = y;
+    m_rotation_z = z;
+}
+
+/* 仅绕 Y 轴旋转：兼容旧接口，等价于 SetRotation(0, rotation, 0) */
 void Model::SetRotate(glm::f32 rotation) {
-    m_rotation = rotation;
-    m_matrix = glm::rotate(m_matrix, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    m_rotation_y = rotation;
 }
 
-// 绕指定轴旋转
+/* 绕任意轴旋转：覆盖式写入自定义旋转基准矩阵
+ *
+ * 仅更新 m_matrix（模型空间内的一次旋转），不叠加历史矩阵，
+ * 也不改动 m_position/m_rotation_y；绕 Y 轴旋转请用单参版本。 */
 void Model::SetRotate(glm::f32 rotation, glm::vec3 axis) {
-    m_rotation = rotation;
-    // 先将模型平移到原点
-    glm::mat4 translateToOrigin = glm::translate(glm::mat4(1.0f), -m_position);
-    // 进行旋转操作
-    glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), glm::radians(rotation), axis);
-    // 再将模型平移回原来的位置
-    glm::mat4 translateBack = glm::translate(glm::mat4(1.0f), m_position);
-
-    // 组合变换矩阵
-    m_matrix = translateBack * rotate * translateToOrigin * m_matrix;
+    m_matrix = glm::rotate(glm::mat4(1.0f), glm::radians(rotation), axis);
 }
 
+/* 平移模型：覆盖式设置世界位置，等价于 SetPosition */
 void Model::SetTranslate(glm::vec3 position) {
-    // 先将模型平移到原点
-    m_matrix = glm::translate(m_matrix, -m_position);
-    // 更新位置
     m_position = position;
-    // 再将模型平移到新的位置
-    m_matrix = glm::translate(m_matrix, m_position);
 }
 
+/* 设置模型世界位置：覆盖式，与 SetTranslate 语义一致 */
 void Model::SetPosition(glm::vec3 position) {
-    // 先将模型平移到原点
-    m_matrix = glm::translate(m_matrix, -m_position);
-    // 更新位置
     m_position = position;
-    // 再将模型平移到新的位置
-    m_matrix = glm::translate(m_matrix, m_position);
 }
 
 // void Model::SetMaterial(Material *material)
@@ -300,16 +315,29 @@ glm::vec3 Model::GetScale() const {
     return m_scale;
 }
 
+glm::f32 Model::GetRotationX() const {
+    return m_rotation_x;
+}
+
+glm::f32 Model::GetRotationY() const {
+    return m_rotation_y;
+}
+
+glm::f32 Model::GetRotationZ() const {
+    return m_rotation_z;
+}
+
 glm::f32 Model::GetRotation() const {
-    return m_rotation;
+    return m_rotation_y;
 }
 
 /*
  * 计算模型世界变换矩阵
  *
- * 与 Draw() 保持同一份构建逻辑：T(position) × S(scale) × R(m_matrix, rotation)，
- * 返回由成员 m_position/m_scale/m_matrix/m_rotation 推导出的本地变换。
- * Draw() 内部也调用本方法（见下方重构），确保拾取与渲染使用的矩阵严格一致。
+ * 与 Draw() 保持同一份构建逻辑：T(position) × S(scale) × R(Y→X→Z 欧拉角)，
+ * 并把自定义旋转基准 m_matrix 乘到末尾。全部由成员变量覆盖式重建，
+ * 保证面板/加载设置的数值与渲染、法线、拾取、包围盒严格一致。
+ * 旋转顺序：先绕 Y、再绕 X（局部轴）、最后绕 Z（局部轴）。
  */
 glm::mat4 Model::GetWorldMatrix() const {
     auto model_local = glm::mat4(1.0f);
@@ -317,17 +345,19 @@ glm::mat4 Model::GetWorldMatrix() const {
     model_local = glm::translate(model_local, m_position);
     // 缩放：按 m_scale 缩放本地几何
     model_local = glm::scale(model_local, m_scale);
-    // 旋转：以累积变换 m_matrix 为基础绕 Y 轴旋转 m_rotation 度（与旧绘制逻辑一致）
-    model_local = glm::rotate(m_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+    // 三轴欧拉角：Y → X → Z（glm::rotate 逐次左乘，最终 R = Rz·Rx·Ry）
+    model_local = glm::rotate(model_local, glm::radians(m_rotation_y), glm::vec3(0.0f, 1.0f, 0.0f));
+    model_local = glm::rotate(model_local, glm::radians(m_rotation_x), glm::vec3(1.0f, 0.0f, 0.0f));
+    model_local = glm::rotate(model_local, glm::radians(m_rotation_z), glm::vec3(0.0f, 0.0f, 1.0f));
+    // 自定义旋转基准（SetRotate(rotation, axis) 写入，默认单位阵）
+    model_local = m_matrix * model_local;
     return model_local;
 }
 
 /*
  * 绘制模型：构建本地变换矩阵后逐个绘制子网格
  *
- * 变换组合顺序：model * Translate(position) * Scale(scale) * Rotate(m_rotation, Y轴)
- * 说明：旋转使用成员 m_matrix（初始为单位阵，可被外部直接修改）绕 Y 轴旋转 m_rotation 度，
- * 因此实际施加的顺序是"先绕 Y 旋转、再缩放、再平移"（逆序相乘）。
+ * 变换组合顺序：model * Translate(position) * Scale(scale) * Rotate(Y→X→Z 欧拉角) * m_matrix，
  * 本地变换矩阵统一由 GetWorldMatrix() 生成，与鼠标拾取共用同一份矩阵。
  */
 void Model::Draw(const RenderContext &ctx, const glm::mat4 &model) {

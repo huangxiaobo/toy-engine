@@ -152,7 +152,8 @@ vec4 CalcToonLightInternal(vec3 LightColor, vec3 LightDirection, vec3 N,
 
         // ---- 卡通高光：离散两级亮斑 ----
         vec3 V = normalize(gViewPos - v2f.WorldPos0);
-        vec3 H = normalize(L + V);   // Blinn 半程向量
+        // Blinn 半程向量：本文件 L 为"光源→片元"方向，须取反为"片元→光源"（-L）
+        vec3 H = normalize(-L + V);   // Blinn 半程向量
         float s = max(dot(N, H), 0.0);
         // step：硬边界 0/1。两级叠加得到三档高光：暗(hard 未命中)/中(soft 命中)/亮(两级都命中)
         float specLevel = step(uSpecularSoft, s) + step(uSpecularHard, s);

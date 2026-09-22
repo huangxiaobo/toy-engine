@@ -1,0 +1,9 @@
+# 砖块立方体材质（颜色供引擎 MtlParser 解析，贴图由 assimp 侧读取）
+# map_Kd 漫反射贴图；map_Bump 法线贴图（assimp 归入 HEIGHT，引擎按法线贴图处理）
+newmtl cube_material
+Ka 0.2 0.2 0.2
+Kd 0.8 0.8 0.8
+Ks 1.0 1.0 1.0
+Ns 160
+map_Kd brickwall.jpg
+map_Bump brickwall_normal.jpg

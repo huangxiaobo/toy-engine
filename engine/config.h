@@ -184,7 +184,8 @@ public:
     std::string ShaderFragFile;
 
     glm::vec3 Position;
-    glm::f32 Rotation;
+    // 三轴欧拉角（度）：x/y/z 分量分别对应绕 X/Y/Z 轴，旋转顺序 Y → X → Z
+    glm::vec3 Rotation;
     glm::vec3 Scale;
 
     MeshConfig Mesh;
