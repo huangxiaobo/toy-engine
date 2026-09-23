@@ -193,6 +193,69 @@ public:
     MaterialConfig Material;
 };
 
+/*
+ * 动画配置（AnimationConfig）
+ *
+ * 对应 world.yaml 的 animations 段，绑定一个已存在的模型或灯光做动画。
+ * 各通道（位移/缩放/旋转/颜色/强度）各自独立可选，未配置的通道保持对象原值：
+ *
+ *   - translate: 正弦振荡 position = center + amplitude * sin(2π·frequency·t)
+ *   - scale:     正弦振荡 scale      = base + amplitude * sin(2π·frequency·t)
+ *   - rotate:    非 spin 时正弦摆动；spin 模式下匀速旋转（speed 各轴度/秒）
+ *   - color:     灯光颜色正弦振荡（R,G,B 振幅）
+ *   - intensity: 灯光强度正弦振荡（振幅取 vec3.x，仅灯光可动画）
+ *
+ * ModelName/LightName 为引用的目标名（world.yaml models[].name / lights[].name），
+ * 由渲染器查找绑定；两字段最多填一个。
+ */
+class AnimationConfig {
+public:
+    std::string Name;
+    std::string ModelName;   // 绑定的模型名（与 LightName 二选一）
+    std::string LightName;   // 绑定的灯光名（与 ModelName 二选一）
+    bool Enabled = true;
+
+    // ---- 位移通道（可选）----
+    bool HasTranslate = false;
+    glm::vec3 TranslateCenter{};     // 振荡中心（世界位置）
+    glm::vec3 TranslateAmplitude{};  // 单侧振幅
+    float TranslateFrequency = 1.0f; // 频率（Hz）
+
+    // ---- 圆周轨道通道（可选）----
+    // 绕 Y 轴画圈：x/z 分量 90° 相位差（cos/sin），y 固定为轨道中心高度
+    // 点光源无朝向，"绕 Y 轴旋转"即此语义（ambient 同级字段，与 translate 二选一）
+    bool HasOrbit = false;
+    glm::vec3 OrbitCenter{};         // 轨道中心（世界位置）
+    glm::vec3 OrbitRadius{};         // 轨道半径（x/z 分量生效）
+    float OrbitFrequency = 1.0f;     // 角速度（圈/秒）
+
+    // ---- 缩放通道（可选）----
+    bool HasScale = false;
+    glm::vec3 ScaleBase{};           // 缩放中心
+    glm::vec3 ScaleAmplitude{};      // 单侧振幅
+    float ScaleFrequency = 1.0f;     // 频率（Hz）
+
+    // ---- 旋转通道（可选）----
+    bool HasRotate = false;
+    bool RotateSpin = false;         // true = 匀速旋转（用 speed），false = 正弦摆动
+    glm::vec3 RotateBase{};          // 旋转基准（欧拉角，度）
+    glm::vec3 RotateAmplitude{};     // 摆动振幅（欧拉角，度）
+    float RotateFrequency = 1.0f;    // 摆动频率（Hz）
+    glm::vec3 RotateSpeed{};         // 匀速旋转角速度（度/秒）
+
+    // ---- 灯光颜色通道（可选）----
+    bool HasColor = false;
+    glm::vec3 ColorCenter{};         // 颜色振荡中心（R,G,B）
+    glm::vec3 ColorAmplitude{};      // 各通道单侧振幅
+    float ColorFrequency = 1.0f;     // 频率（Hz）
+
+    // ---- 灯光强度通道（可选）----
+    bool HasIntensity = false;
+    glm::vec3 IntensityCenter{};     // 强度中心（取 x 分量）
+    glm::vec3 IntensityAmplitude{};  // 单侧振幅（取 x 分量）
+    float IntensityFrequency = 1.0f; // 频率（Hz）
+};
+
 class Config {
 public:
     Config();
@@ -211,6 +274,7 @@ public:
     std::vector<ParticleConfig> Particles;
     SkyDomeConfig SkyDome;
     std::vector<ModelConfig> Models;
+    std::vector<AnimationConfig> Animations;
 
     // 地形配置（程序化LOD地形）
     TerrainConfigCfg Terrain;

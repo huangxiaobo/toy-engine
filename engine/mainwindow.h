@@ -10,6 +10,7 @@
 class Renderer;
 class Model;
 class Light;
+class IAnimTarget;
 
 /*
  * 主窗口类（ToyEngineMainWindow）
@@ -47,6 +48,11 @@ private:
     void CreateUI();
     void CreateResourceListPanel();
     void CreatePropertiesPanel();
+    // 模型属性拆分为三个独立窗口（DockBuilder 停靠同节点后表现为右栏 tab）：
+    // 模型（类型/名称/变换）、材质（渲染风格+材质参数）、动画（绑定动画展示）
+    void CreateModelWindow();
+    void CreateMaterialWindow();
+    void CreateAnimationWindow();
     void DrawViewportAxisGizmo();            // 在视口左下角叠加屏幕空间坐标轴 gizmo（三色六轴 + X/Y/Z 标签）
     void ShowShadowDepthMapPanel();          // 绘制阴影深度贴图可视化调试面板（把深度图作为纹理显示）
     void ShowShadowPropertiesPanel();        // 绘制阴影属性面板（阴影开关、深度贴图预览等全局阴影设置）
@@ -57,6 +63,11 @@ private:
 
     // ---- 各资源类型的属性编辑器 ----
     void ShowModelProperties();
+    // Transform tab 内展示绑定到指定目标的动画（名称、启用开关、通道参数）
+    // 目标为通用接口：模型与灯光统一走该入口
+    void ShowAnimationProperties(IAnimTarget *target);
+    // 材质 tab：渲染风格切换 + 材质参数编辑
+    void ShowModelMaterialProperties(Model *model);
     void ShowLightProperties();
     void ShowCameraProperties();
     void ShowTerrainProperties();
@@ -105,6 +116,13 @@ private:
     // 面板显示控制
     bool m_show_resource_list = true;
     bool m_show_properties = true;
+    // 模型属性被拆为三个独立可停靠窗口（右栏 tab）：模型/材质/动画，
+    // 各自独立开关（右上角 X 关闭后可从「面板」菜单重新打开），受 m_show_properties 总开关控制
+    bool m_show_model_window = true;
+    bool m_show_material_window = true;
+    bool m_show_animation_window = true;
+    // 选中模型后置位：下一帧把「模型」tab 设为默认活动窗口（SetNextWindowFocus 后复位）
+    bool m_focus_model_window = false;
     // FPS 曲线悬浮面板开关（菜单「面板 → FPS曲线」控制，默认显示）
     bool m_show_fps_graph = true;
     // 阴影深度贴图可视化调试面板开关（把深度图作为纹理显示，辅助诊断阴影问题）

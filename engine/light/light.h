@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <string>
+#include "../animation/anim_target.h"
 
 enum LightType {
     LightTypeNone, // 未定义
@@ -18,7 +19,7 @@ const std::string LightTypeNameDirection = "方向光源";
 const std::string LightTypeNameSpot = "聚光灯";
 
 
-class Light {
+class Light : public IAnimTarget {
 public:
     Light();
 
@@ -28,7 +29,7 @@ public:
 
     virtual const std::string GetLightTypeName() const;
 
-    std::string GetName() const;
+    std::string GetName() const override;
 
     std::string GetUUID() const;
 
@@ -64,6 +65,11 @@ public:
     DirectionLight(const std::string &name);
 
     ~DirectionLight() override;
+
+    // ---- IAnimTarget（方向光）----
+    // 可动画属性：Rotation→朝向、LightColor→Color、LightIntensity→DiffuseIntensity
+    bool CanAnimate(AnimProperty prop) const override;
+    void SetAnimValue(AnimProperty prop, const glm::vec3 &value) override;
 
     glm::vec3 Direction;   // 光照方向（从光源指向场景）
     glm::vec3 Color;       // 光源基础颜色
@@ -106,6 +112,11 @@ public:
 
     ~PointLight() override;
 
+    // ---- IAnimTarget（点光源）----
+    // 可动画属性：Position→位置、LightColor→Color、LightIntensity→DiffuseIntensity
+    bool CanAnimate(AnimProperty prop) const override;
+    void SetAnimValue(AnimProperty prop, const glm::vec3 &value) override;
+
     void SetColor(glm::vec3 color);
 
     void SetAttenuation(glm::vec3 attenuation);
@@ -130,6 +141,11 @@ public:
     SpotLight(const std::string &name);
 
     ~SpotLight() override;
+
+    // ---- IAnimTarget（聚光灯）----
+    // 可动画属性：Position→位置、Rotation→朝向、LightColor→Color、LightIntensity→DiffuseIntensity
+    bool CanAnimate(AnimProperty prop) const override;
+    void SetAnimValue(AnimProperty prop, const glm::vec3 &value) override;
 
     glm::vec3 Position;    // 光源位置
     glm::vec3 Direction;   // 光照方向（从光源指向照射目标）

@@ -30,6 +30,8 @@
 #include "shadow/shadow_framebuffer.h"
 #include "postprocess/scene_framebuffer.h"
 #include "debug/debug_draw.h"
+#include "animation/animation.h"
+#include "animation/anim_target.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -401,6 +403,99 @@ void Renderer::init(int w, int h) {
         m_models.push_back(std::unique_ptr<Model>(model_obj));
     }
 
+    // ---- 通用动画：按 world.yaml animations 配置创建，绑定到模型或灯光 ----
+    // 目标对象按 light 优先、model 兜底解析；各配置通道统一打包为 AnimChannel 注册，
+    // 目标不支持的通道（如方向光不支持位移）只告警跳过，不中断其它通道的绑定。
+    for (const auto &animConfig: gConfig->Animations) {
+        IAnimTarget *target = animConfig.LightName.empty() ? nullptr : GetLight(animConfig.LightName);
+        if (target == nullptr) {
+            target = GetModel(animConfig.ModelName);
+        }
+        if (target == nullptr) {
+            const std::string &missing = animConfig.LightName.empty() ? animConfig.ModelName : animConfig.LightName;
+            std::cout << "[animation] skip " << animConfig.Name
+                      << ": model/light " << missing << " not found" << std::endl;
+            continue;
+        }
+        auto *anim = CreateAnimation(target);
+        anim->SetName(animConfig.Name);
+        anim->SetEnabled(animConfig.Enabled);
+
+        auto bind_channel = [&](AnimChannel ch, const char *ch_name) {
+            if (!target->CanAnimate(ch.property)) {
+                std::cout << "[animation] " << animConfig.Name << ": " << ch_name
+                          << " 通道不被目标 " << target->GetName() << " 支持，已跳过" << std::endl;
+                return;
+            }
+            anim->AddChannel(ch);
+        };
+
+        if (animConfig.HasTranslate) {
+            AnimChannel ch;
+            ch.property = AnimProperty::Position;
+            ch.curve = AnimCurveType::Sine;
+            ch.center = animConfig.TranslateCenter;
+            ch.amplitude = animConfig.TranslateAmplitude;
+            ch.frequency = animConfig.TranslateFrequency;
+            bind_channel(ch, "translate");
+        }
+        if (animConfig.HasOrbit) {
+            // 圆周轨道：同属 Position 通道，曲线类型换 Orbit（x/z 半径形成圆周）
+            AnimChannel ch;
+            ch.property = AnimProperty::Position;
+            ch.curve = AnimCurveType::Orbit;
+            ch.center = animConfig.OrbitCenter;
+            ch.amplitude = animConfig.OrbitRadius;
+            ch.frequency = animConfig.OrbitFrequency;
+            bind_channel(ch, "orbit");
+        }
+        if (animConfig.HasScale) {
+            AnimChannel ch;
+            ch.property = AnimProperty::Scale;
+            ch.curve = AnimCurveType::Sine;
+            ch.center = animConfig.ScaleBase;
+            ch.amplitude = animConfig.ScaleAmplitude;
+            ch.frequency = animConfig.ScaleFrequency;
+            bind_channel(ch, "scale");
+        }
+        if (animConfig.HasRotate) {
+            AnimChannel ch;
+            ch.property = AnimProperty::Rotation;
+            if (animConfig.RotateSpin) {
+                // 持续旋转：从基准角以各轴 speed 度/秒匀速推进
+                ch.curve = AnimCurveType::Spin;
+                ch.center = animConfig.RotateBase;
+                ch.speed = animConfig.RotateSpeed;
+            } else {
+                // 正弦摆动：围绕基准角以振幅/频率往复
+                ch.curve = AnimCurveType::Sine;
+                ch.center = animConfig.RotateBase;
+                ch.amplitude = animConfig.RotateAmplitude;
+                ch.frequency = animConfig.RotateFrequency;
+            }
+            bind_channel(ch, "rotate");
+        }
+        if (animConfig.HasColor) {
+            AnimChannel ch;
+            ch.property = AnimProperty::LightColor;
+            ch.curve = AnimCurveType::Sine;
+            ch.center = animConfig.ColorCenter;
+            ch.amplitude = animConfig.ColorAmplitude;
+            ch.frequency = animConfig.ColorFrequency;
+            bind_channel(ch, "color");
+        }
+        if (animConfig.HasIntensity) {
+            AnimChannel ch;
+            ch.property = AnimProperty::LightIntensity;
+            ch.curve = AnimCurveType::Sine;
+            ch.center = animConfig.IntensityCenter;
+            ch.amplitude = animConfig.IntensityAmplitude;
+            ch.frequency = animConfig.IntensityFrequency;
+            bind_channel(ch, "intensity");
+        }
+        std::cout << "[animation] " << animConfig.Name << " -> " << target->GetName() << std::endl;
+    }
+
     // ---- 渲染风格技术池（运行时切换，基础版：无参数调节）----
     // 为四套标准着色器（unlit/textured/lit/toon）各创建一个共享 Technique，
     // 运行时 SetModelStyle 遍历模型 mesh 换用对应技术，实现界面切换渲染风格。
@@ -766,10 +861,31 @@ void Renderer::update(long long elapsed) {
     
     // 地形为静态网格平面（无 LOD/无动态 chunk），无需每帧更新
     
+    // 更新配置的变换动画（单位换算成秒，与粒子系统一致）
+    for (const auto &anim: m_animations) {
+        anim->Update(elapsed / 1000.0f);
+    }
+
     // 更新配置的粒子系统
     for (const auto &ps: m_particle_systems) {
         ps->Update(elapsed / 1000.0f);
     }
+}
+
+/*
+ * 创建并登记绑定到指定目标对象（模型/灯光等）的通用动画
+ *
+ * 动画所有权存入 m_animations（unique_ptr 容器），返回裸指针
+ * 供调用方继续配置动画通道参数。目标指针仅为弱引用（不拥有）。
+ */
+Animation *Renderer::CreateAnimation(IAnimTarget *target) {
+    if (target == nullptr) {
+        return nullptr;
+    }
+    auto anim = std::make_unique<Animation>(target);
+    auto *raw = anim.get();
+    m_animations.push_back(std::move(anim));
+    return raw;
 }
 
 Model *Renderer::GetModel(const std::string &name) {
@@ -855,6 +971,15 @@ void Renderer::ClearPickHighlight() {
 Light *Renderer::GetLightByUUID(const std::string &uuid) const {
     for (const auto &light: m_lights) {
         if (light->GetUUID() == uuid) {
+            return light.get();
+        }
+    }
+    return nullptr;
+}
+
+Light *Renderer::GetLight(const std::string &name) {
+    for (const auto &light: m_lights) {
+        if (light->GetName() == name) {
             return light.get();
         }
     }

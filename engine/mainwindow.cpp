@@ -4,6 +4,8 @@
 #include "config.h"
 #include "renderer.h"
 #include "model/model.h"
+#include "animation/animation.h"
+#include "animation/anim_target.h"
 #include "light/light.h"
 #include "technique/technique_light.h"
 #include "material/material.h"
@@ -371,7 +373,12 @@ void ToyEngineMainWindow::CreateDockSpace() {
             rightNode, ImGuiDir_Down, 0.35f, nullptr, &rightNode);
         ImGui::DockBuilderDockWindow("资源列表", leftNode);
         ImGui::DockBuilderDockWindow("调试属性", leftBottomNode);
+        // 右节点停靠四个窗口：模型被选中时显示 模型/材质/动画（tab 切换），
+        // 其它类型或无选中时显示 属性；未渲染的窗口隐藏，但保留停靠位置
         ImGui::DockBuilderDockWindow("属性", rightNode);
+        ImGui::DockBuilderDockWindow("模型", rightNode);
+        ImGui::DockBuilderDockWindow("材质", rightNode);
+        ImGui::DockBuilderDockWindow("动画", rightNode);
         ImGui::DockBuilderDockWindow("阴影属性", rightBottomNode);
 
         // FPS 曲线面板停靠于中央节点下方（视口底部的横条，占中央高度 15%）
@@ -440,6 +447,9 @@ void ToyEngineMainWindow::CreateMenuBar() {
         if (ImGui::BeginMenu("面板")) {
             ImGui::MenuItem("资源", nullptr, &m_show_resource_list);
             ImGui::MenuItem("属性", nullptr, &m_show_properties);
+            ImGui::MenuItem("模型", nullptr, &m_show_model_window);
+            ImGui::MenuItem("材质", nullptr, &m_show_material_window);
+            ImGui::MenuItem("动画", nullptr, &m_show_animation_window);
             ImGui::MenuItem("阴影属性", nullptr, &m_show_shadow_properties);
             ImGui::MenuItem("调试属性", nullptr, &m_show_debug_properties);
             ImGui::MenuItem("FPS曲线", nullptr, &m_show_fps_graph);
@@ -474,9 +484,19 @@ void ToyEngineMainWindow::CreateUI() {
         CreateResourceListPanel();
     }
 
-    // 属性面板：停靠于右节点
+    // 右栏面板：模型属性拆为 模型/材质/动画 三个独立窗口（同节点 tab 切换）；
+    // 灯光选中时显示 属性 + 动画 两个窗口；其它类型或无选中时仍用单一「属性」窗口
     if (m_show_properties) {
-        CreatePropertiesPanel();
+        if (m_selected_object != nullptr && m_selected_object_type == "Model") {
+            CreateModelWindow();
+            CreateMaterialWindow();
+            CreateAnimationWindow();
+        } else if (m_selected_object != nullptr && m_selected_object_type == "Light") {
+            CreatePropertiesPanel();
+            CreateAnimationWindow();
+        } else {
+            CreatePropertiesPanel();
+        }
     }
 
     // 阴影属性面板：停靠于右节点（属性面板下方）
@@ -624,9 +644,7 @@ void ToyEngineMainWindow::CreatePropertiesPanel() {
         return;
     }
 
-    if (m_selected_object_type == "Model") {
-        ShowModelProperties();
-    } else if (m_selected_object_type == "Light") {
+    if (m_selected_object_type == "Light") {
         ShowLightProperties();
     } else if (m_selected_object_type == "Camera") {
         ShowCameraProperties();
@@ -641,23 +659,15 @@ void ToyEngineMainWindow::CreatePropertiesPanel() {
     ImGui::End();
 }
 
-// ---- 模型属性编辑器 ----
-// 可编辑：名称（只读）、位置、缩放、旋转；以及材质属性（环境光、漫反射、镜面反射、光泽度）
+// ---- 模型窗口内容（右栏「模型」tab）----
+// 只读信息（类型/名称）+ 变换属性（位置/缩放/旋转）；
+// 材质与动画分别独立成窗口，见 CreateMaterialWindow / CreateAnimationWindow
 void ToyEngineMainWindow::ShowModelProperties() {
     Model* model = static_cast<Model*>(m_selected_object);
 
     ImGui::Text("类型: 模型");
     ImGui::Separator();
     ImGui::Text("名称: %s", model->GetName().c_str());
-    ImGui::Separator();
-
-    // ---- 渲染风格（运行时切换，基础版：无参数调节）----
-    // 四套标准着色器：纯色 / 纹理 / 光照 / 卡通，顺序与 RenderStyle 枚举保持一致
-    static const char *kRenderStyleNames[] = {"纯色", "纹理", "光照", "卡通"};
-    int styleIdx = static_cast<int>(m_renderer->GetModelStyle(model));
-    if (ImGui::Combo("渲染风格", &styleIdx, kRenderStyleNames, IM_ARRAYSIZE(kRenderStyleNames))) {
-        m_renderer->SetModelStyle(model, static_cast<RenderStyle>(styleIdx));
-    }
     ImGui::Separator();
 
     glm::vec3 position = model->GetPosition();
@@ -680,17 +690,209 @@ void ToyEngineMainWindow::ShowModelProperties() {
     if (rotChanged) {
         model->SetRotation(rotX, rotY, rotZ);
     }
+}
 
-    // ---- 材质属性 ----
-    // 材质按模型单独登记（Renderer::m_model_materials），不读取共享风格技术的
-    // GetMaterial()：Lit/Toon 风格为多模型共用的享实例，其内部材质会被其它模型覆盖。
-    // 材质编辑与当前渲染风格解耦：选中模型即可查看/修改材质参数；仅当前生效技术为
-    // TechniqueLight（光照/卡通）时实时同步 GPU uniform，其它风格（纯色/纹理）下
-    // 的修改会在切回光照风格时由 SetModelStyle 重新应用。
+// ---- 模型窗口：类型/名称 + 变换 ----
+void ToyEngineMainWindow::CreateModelWindow() {
+    if (m_selected_object == nullptr || m_selected_object_type != "Model") {
+        return;
+    }
+    // 选中模型后首个帧把本窗口设为当前活动 tab（SetNextWindowFocus 作用于下个 Begin）
+    if (m_focus_model_window) {
+        ImGui::SetNextWindowFocus();
+        m_focus_model_window = false;
+    }
+    ImGui::Begin("模型", &m_show_model_window, ImGuiWindowFlags_NoCollapse);
+    ShowModelProperties();
+    ImGui::End();
+}
+
+// ---- 材质窗口：渲染风格 + 材质参数 ----
+void ToyEngineMainWindow::CreateMaterialWindow() {
+    if (m_selected_object == nullptr || m_selected_object_type != "Model") {
+        return;
+    }
+    ImGui::Begin("材质", &m_show_material_window, ImGuiWindowFlags_NoCollapse);
+    ShowModelMaterialProperties(static_cast<Model*>(m_selected_object));
+    ImGui::End();
+}
+
+// ---- 动画窗口：绑定到当前选中模型/灯光的动画展示 ----
+void ToyEngineMainWindow::CreateAnimationWindow() {
+    if (m_selected_object == nullptr) {
+        return;
+    }
+    if (m_selected_object_type != "Model" && m_selected_object_type != "Light") {
+        return;
+    }
+    ImGui::Begin("动画", &m_show_animation_window, ImGuiWindowFlags_NoCollapse);
+    // 按实际类型转换后隐式上转 IAnimTarget（void* 直接静态转换到子类偏移量不可靠）
+    IAnimTarget *target = nullptr;
+    if (m_selected_object_type == "Model") {
+        target = static_cast<Model*>(m_selected_object);
+    } else {
+        target = static_cast<Light*>(m_selected_object);
+    }
+    ShowAnimationProperties(target);
+    ImGui::End();
+}
+
+/* 
+ * 动画窗口内容
+ *
+ * 遍历渲染器登记的全部动画，筛选绑定到当前目标（模型或灯光）的部分；
+ * 每个动画节点默认展开：显示类型摘要、启用开关，以及各已配置通道
+ * （位移/缩放/旋转/颜色/强度）的参数编辑控件（实时写回动画通道）。
+ * 动画源数据来自 world.yaml animations 段，运行时由 Renderer 统一推进。
+ */
+
+// 由动画已配置通道拼出类型摘要，如 "位移 + 缩放"、"旋转(匀速) + 强度"
+static std::string build_animation_type_string(Animation *anim) {
+    std::vector<std::string> parts;
+    // Position 通道按曲线类型区分：正弦振荡=位移，圆周轨道=轨道旋转
+    if (AnimChannel *pos = anim->GetChannel(AnimProperty::Position)) {
+        parts.push_back(pos->curve == AnimCurveType::Orbit ? "轨道旋转" : "位移");
+    }
+    if (anim->HasChannel(AnimProperty::Scale)) {
+        parts.push_back("缩放");
+    }
+    // 旋转通道的曲线类型决定是匀速旋转还是正弦摆动
+    if (AnimChannel *rot = anim->GetChannel(AnimProperty::Rotation)) {
+        if (rot->curve == AnimCurveType::Spin) {
+            parts.push_back("旋转(匀速)");
+        } else {
+            parts.push_back("旋转(摆动)");
+        }
+    }
+    if (anim->HasChannel(AnimProperty::LightColor)) {
+        parts.push_back("颜色");
+    }
+    if (anim->HasChannel(AnimProperty::LightIntensity)) {
+        parts.push_back("强度");
+    }
+    if (parts.empty()) {
+        return "未配置";
+    }
+    std::string result;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) result += " + ";
+        result += parts[i];
+    }
+    return result;
+}
+
+void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
+    const auto &animations = m_renderer->GetAnimations();
+    bool has_any = false;
+    for (const auto &anim : animations) {
+        if (anim->GetTarget() != target) {
+            continue;
+        }
+        has_any = true;
+
+        // 用动画对象指针作 ID，避免同名（或未命名）动画的 TreeNode 冲突
+        ImGui::PushID(anim.get());
+        std::string title = anim->GetName().empty() ? "未命名动画" : anim->GetName();
+        const std::string label = title + "  [" + build_animation_type_string(anim.get()) + "]";
+        // 默认展开：新建动画节点默认展开，类型摘要直接挂在标题上
+        if (ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            // 总开关：关闭后 Update 直接返回，目标保持静态
+            bool enabled = anim->IsEnabled();
+            if (ImGui::Checkbox("启用##anim", &enabled)) {
+                anim->SetEnabled(enabled);
+            }
+
+            // 位移通道：中心/振幅/频率 可编辑，写回后立即生效
+            if (AnimChannel *tr = anim->GetChannel(AnimProperty::Position)) {
+                ImGui::Separator();
+                if (tr->curve == AnimCurveType::Orbit) {
+                    // 圆周轨道：中心/半径(取 x)/频率（绕 Y 轴画圈，y 固定为中心高度）
+                    ImGui::Text("轨道旋转");
+                    ImGui::DragFloat3("中心##pos", glm::value_ptr(tr->center), 0.1f);
+                    ImGui::DragFloat3("半径##pos", glm::value_ptr(tr->amplitude), 0.1f);
+                    ImGui::DragFloat("频率##pos", &tr->frequency, 0.01f, 0.0f, 100.0f);
+                } else {
+                    ImGui::Text("位移");
+                    // 控件标签带 ##pos 后缀：同动画多通道共享通用参数名，避免 ImGui ID 冲突
+                    ImGui::DragFloat3("中心##pos", glm::value_ptr(tr->center), 0.1f);
+                    ImGui::DragFloat3("振幅##pos", glm::value_ptr(tr->amplitude), 0.1f);
+                    ImGui::DragFloat("频率##pos", &tr->frequency, 0.01f, 0.0f, 100.0f);
+                }
+            }
+
+            // 缩放通道：基准/振幅/频率 可编辑（呼吸缩放）
+            if (AnimChannel *sc = anim->GetChannel(AnimProperty::Scale)) {
+                ImGui::Separator();
+                ImGui::Text("缩放");
+                ImGui::DragFloat3("基准##scl", glm::value_ptr(sc->center), 0.1f);
+                ImGui::DragFloat3("振幅##scl", glm::value_ptr(sc->amplitude), 0.1f);
+                ImGui::DragFloat("频率##scl", &sc->frequency, 0.01f, 0.0f, 100.0f);
+            }
+
+            // 旋转通道：匀速旋转与正弦摆动互斥，二选一；参数实时可编辑
+            if (AnimChannel *rot = anim->GetChannel(AnimProperty::Rotation)) {
+                ImGui::Separator();
+                if (rot->curve == AnimCurveType::Spin) {
+                    ImGui::Text("旋转 (匀速)");
+                    ImGui::DragFloat3("起始角##rot", glm::value_ptr(rot->center), 1.0f);
+                    ImGui::DragFloat3("角速度##rot", glm::value_ptr(rot->speed), 1.0f);
+                } else {
+                    ImGui::Text("旋转 (摆动)");
+                    ImGui::DragFloat3("基准##rot", glm::value_ptr(rot->center), 1.0f);
+                    ImGui::DragFloat3("振幅##rot", glm::value_ptr(rot->amplitude), 1.0f);
+                    ImGui::DragFloat("频率##rot", &rot->frequency, 0.01f, 0.0f, 100.0f);
+                }
+            }
+
+            // 灯光颜色通道：中心色/振幅/频率（颜色取 RGB 三通道）
+            if (AnimChannel *clr = anim->GetChannel(AnimProperty::LightColor)) {
+                ImGui::Separator();
+                ImGui::Text("灯光颜色");
+                ImGui::ColorEdit3("中心色##clr", glm::value_ptr(clr->center));
+                ImGui::DragFloat3("振幅##clr", glm::value_ptr(clr->amplitude), 0.01f, 0.0f, 1.0f);
+                ImGui::DragFloat("频率##clr", &clr->frequency, 0.01f, 0.0f, 100.0f);
+            }
+
+            // 灯光强度通道：中心/振幅/频率（标量，取 vec3.x）
+            if (AnimChannel *inten = anim->GetChannel(AnimProperty::LightIntensity)) {
+                ImGui::Separator();
+                ImGui::Text("灯光强度");
+                ImGui::DragFloat("中心##inten", &inten->center.x, 0.1f, 0.0f, 100.0f);
+                ImGui::DragFloat("振幅##inten", &inten->amplitude.x, 0.1f, 0.0f, 100.0f);
+                ImGui::DragFloat("频率##inten", &inten->frequency, 0.01f, 0.0f, 100.0f);
+            }
+
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+
+    if (!has_any) {
+        ImGui::TextDisabled("该对象未绑定动画");
+    }
+}
+
+/* 
+ * 材质窗口内容：渲染风格切换 + 材质参数编辑
+ *
+ * 材质按模型单独登记（Renderer::m_model_materials），不读取共享风格技术的
+ * GetMaterial()：Lit/Toon 风格为多模型共用的享实例，其内部材质会被其它模型覆盖。
+ * 材质编辑与当前渲染风格解耦：选中模型即可查看/修改材质参数；仅当前生效技术为
+ * TechniqueLight（光照/卡通）时实时同步 GPU uniform，其它风格（纯色/纹理）下
+ * 的修改会在切回光照风格时由 SetModelStyle 重新应用。
+ */
+void ToyEngineMainWindow::ShowModelMaterialProperties(Model *model) {
+    // ---- 渲染风格（运行时切换，基础版：无参数调节）----
+    // 四套标准着色器：纯色 / 纹理 / 光照 / 卡通，顺序与 RenderStyle 枚举保持一致
+    static const char *kRenderStyleNames[] = {"纯色", "纹理", "光照", "卡通"};
+    int styleIdx = static_cast<int>(m_renderer->GetModelStyle(model));
+    if (ImGui::Combo("渲染风格", &styleIdx, kRenderStyleNames, IM_ARRAYSIZE(kRenderStyleNames))) {
+        m_renderer->SetModelStyle(model, static_cast<RenderStyle>(styleIdx));
+    }
+    ImGui::Separator();
+
     Material* material = m_renderer->GetModelMaterial(model);
     if (material != nullptr) {
-        ImGui::Separator();
-        ImGui::Text("材质");
         if (!material->Name.empty()) {
             ImGui::Text("材质名称: %s", material->Name.c_str());
         }
@@ -1539,6 +1741,11 @@ static bool RaySphereIntersect(
 void ToyEngineMainWindow::SelectObject(void* obj, const std::string& type) {
     m_selected_object = obj;
     m_selected_object_type = type;
+
+    // 选中模型时置位：让「模型」tab 成为默认可视窗口（其它类型保持原活动 tab）
+    if (type == "Model") {
+        m_focus_model_window = true;
+    }
 }
 
 void ToyEngineMainWindow::ClearSelection() {

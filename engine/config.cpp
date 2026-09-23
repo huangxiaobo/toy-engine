@@ -406,6 +406,138 @@ Config *Config::LoadFromYaml(const std::string &filename) {
 
             config->Models.push_back(modelConfig);
         }
+
+        // animations（通用动画，绑定模型或灯光做程序化动画）
+        // 各通道各自可选；yaml 只写需要动画的通道，其余保持目标原值
+        const YAML::Node &animation_nodes = world_config["animations"];
+        if (animation_nodes && animation_nodes.IsSequence()) {
+            for (const auto &anim_node : animation_nodes) {
+                AnimationConfig animConfig;
+                animConfig.Name = anim_node["name"].as<std::string>();
+                // 目标对象：mode 或 light 二选一，均由渲染器按名字查找绑定
+                if (anim_node["light"]) {
+                    animConfig.LightName = anim_node["light"].as<std::string>();
+                } else {
+                    animConfig.ModelName = anim_node["model"].as<std::string>();
+                }
+                animConfig.Enabled = anim_node["enabled"] ? anim_node["enabled"].as<bool>() : true;
+
+                // 位移通道：center / amplitude / frequency
+                const auto &trs = anim_node["translate"];
+                if (trs) {
+                    animConfig.HasTranslate = true;
+                    animConfig.TranslateCenter = glm::vec3(
+                        trs["center"]["x"].as<float>(),
+                        trs["center"]["y"].as<float>(),
+                        trs["center"]["z"].as<float>()
+                    );
+                    animConfig.TranslateAmplitude = glm::vec3(
+                        trs["amplitude"]["x"].as<float>(),
+                        trs["amplitude"]["y"].as<float>(),
+                        trs["amplitude"]["z"].as<float>()
+                    );
+                    animConfig.TranslateFrequency = trs["frequency"] ? trs["frequency"].as<float>() : 1.0f;
+                }
+
+                // 缩放通道：base / amplitude / frequency
+                const auto &scl = anim_node["scale"];
+                if (scl) {
+                    animConfig.HasScale = true;
+                    animConfig.ScaleBase = glm::vec3(
+                        scl["base"]["x"].as<float>(),
+                        scl["base"]["y"].as<float>(),
+                        scl["base"]["z"].as<float>()
+                    );
+                    animConfig.ScaleAmplitude = glm::vec3(
+                        scl["amplitude"]["x"].as<float>(),
+                        scl["amplitude"]["y"].as<float>(),
+                        scl["amplitude"]["z"].as<float>()
+                    );
+                    animConfig.ScaleFrequency = scl["frequency"] ? scl["frequency"].as<float>() : 1.0f;
+                }
+
+                // 旋转通道：base / amplitude / frequency / spin
+                // spin=true 时用 speed（度/秒）匀速旋转，否则正弦摆动
+                const auto &rot = anim_node["rotate"];
+                if (rot) {
+                    animConfig.HasRotate = true;
+                    animConfig.RotateSpin = rot["spin"] ? rot["spin"].as<bool>() : false;
+                    animConfig.RotateBase = glm::vec3(
+                        rot["base"]["x"].as<float>(),
+                        rot["base"]["y"].as<float>(),
+                        rot["base"]["z"].as<float>()
+                    );
+                    if (animConfig.RotateSpin) {
+                        animConfig.RotateSpeed = glm::vec3(
+                            rot["speed"]["x"].as<float>(),
+                            rot["speed"]["y"].as<float>(),
+                            rot["speed"]["z"].as<float>()
+                        );
+                    } else {
+                        animConfig.RotateAmplitude = glm::vec3(
+                            rot["amplitude"]["x"].as<float>(),
+                            rot["amplitude"]["y"].as<float>(),
+                            rot["amplitude"]["z"].as<float>()
+                        );
+                        animConfig.RotateFrequency = rot["frequency"] ? rot["frequency"].as<float>() : 1.0f;
+                    }
+                }
+
+                // 灯光颜色通道：center / amplitude / frequency（RGB 正弦振荡）
+                const auto &clr = anim_node["color"];
+                if (clr) {
+                    animConfig.HasColor = true;
+                    animConfig.ColorCenter = glm::vec3(
+                        clr["center"]["x"].as<float>(),
+                        clr["center"]["y"].as<float>(),
+                        clr["center"]["z"].as<float>()
+                    );
+                    animConfig.ColorAmplitude = glm::vec3(
+                        clr["amplitude"]["x"].as<float>(),
+                        clr["amplitude"]["y"].as<float>(),
+                        clr["amplitude"]["z"].as<float>()
+                    );
+                    animConfig.ColorFrequency = clr["frequency"] ? clr["frequency"].as<float>() : 1.0f;
+                }
+
+                // 灯光强度通道：center / amplitude / frequency（取 vec3.x 分量）
+                const auto &intensity = anim_node["intensity"];
+                if (intensity) {
+                    animConfig.HasIntensity = true;
+                    animConfig.IntensityCenter = glm::vec3(
+                        intensity["center"]["x"].as<float>(),
+                        intensity["center"]["y"].as<float>(),
+                        intensity["center"]["z"].as<float>()
+                    );
+                    animConfig.IntensityAmplitude = glm::vec3(
+                        intensity["amplitude"]["x"].as<float>(),
+                        intensity["amplitude"]["y"].as<float>(),
+                        intensity["amplitude"]["z"].as<float>()
+                    );
+                    animConfig.IntensityFrequency = intensity["frequency"] ? intensity["frequency"].as<float>() : 1.0f;
+                }
+
+                // 圆周轨道通道：center / radius / frequency（绕 Y 轴画圈，x/z 半径生效）
+                // 与 translate 语义互斥：轨道是位置沿圆周匀速运动，而非正弦振荡
+                const auto &orbit = anim_node["orbit"];
+                if (orbit) {
+                    animConfig.HasOrbit = true;
+                    animConfig.OrbitCenter = glm::vec3(
+                        orbit["center"]["x"].as<float>(),
+                        orbit["center"]["y"].as<float>(),
+                        orbit["center"]["z"].as<float>()
+                    );
+                    animConfig.OrbitRadius = glm::vec3(
+                        orbit["radius"]["x"].as<float>(),
+                        orbit["radius"]["y"].as<float>(),
+                        orbit["radius"]["z"].as<float>()
+                    );
+                    animConfig.OrbitFrequency = orbit["frequency"] ? orbit["frequency"].as<float>() : 1.0f;
+                }
+
+                config->Animations.push_back(animConfig);
+            }
+        }
     } catch (const YAML::BadFile &e) {
         std::cerr << "Error loading world from yaml file: " << e.what() << std::endl;
     }

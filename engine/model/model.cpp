@@ -293,6 +293,37 @@ void Model::SetPosition(glm::vec3 position) {
     m_position = position;
 }
 
+/*
+ * 模型可动画属性：位置/缩放/旋转三类变换全部支持
+ */
+bool Model::CanAnimate(AnimProperty prop) const {
+    return prop == AnimProperty::Position
+        || prop == AnimProperty::Scale
+        || prop == AnimProperty::Rotation;
+}
+
+/*
+ * 写回动画求值结果：按属性枚举分发到自有 setter
+ *
+ * 动画核心（Animation::Update）只调 SetAnimValue，不知对象具体类型；
+ * 这里把"属性 + vec3 值"翻译成模型自己的 SetTranslate/SetScale/SetRotation。
+ */
+void Model::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
+    switch (prop) {
+        case AnimProperty::Position:
+            SetTranslate(value);
+            break;
+        case AnimProperty::Scale:
+            SetScale(value);
+            break;
+        case AnimProperty::Rotation:
+            SetRotation(value.x, value.y, value.z);
+            break;
+        default:
+            break;
+    }
+}
+
 // void Model::SetMaterial(Material *material)
 // {
 //     this->m_material = material;

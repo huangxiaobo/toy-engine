@@ -1,5 +1,6 @@
 #include "light.h"
 #include "../utils/utils.h"
+#include <glm/gtc/quaternion.hpp>
 
 // ---- 基类 Light ----
 
@@ -85,6 +86,36 @@ PointLight::PointLight(const std::string &name) : Light(name, LightTypePoint),
 PointLight::~PointLight() {
 }
 
+/*
+ * 点光源可动画属性：位置/颜色/强度
+ */
+bool PointLight::CanAnimate(AnimProperty prop) const {
+    return prop == AnimProperty::Position
+        || prop == AnimProperty::LightColor
+        || prop == AnimProperty::LightIntensity;
+}
+
+/*
+ * 写回点光源动画值：Position→位置，LightColor→Color，LightIntensity→漫反射强度
+ *
+ * 强度动画只取 vec3.x 分量（颜色通道用满三个分量，强度是标量）。
+ */
+void PointLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
+    switch (prop) {
+        case AnimProperty::Position:
+            Position = value;
+            break;
+        case AnimProperty::LightColor:
+            Color = value;
+            break;
+        case AnimProperty::LightIntensity:
+            DiffuseIntensity = value.x;
+            break;
+        default:
+            break;
+    }
+}
+
 
 
 /*
@@ -146,6 +177,40 @@ DirectionLight::DirectionLight(const std::string &name) : Light(name, LightTypeD
 DirectionLight::~DirectionLight() {
 }
 
+/*
+ * 方向光可动画属性：旋转（欧拉角驱动朝向）/颜色/强度
+ *
+ * 方向光没有位置概念，故不支持 Position 通道。
+ */
+bool DirectionLight::CanAnimate(AnimProperty prop) const {
+    return prop == AnimProperty::Rotation
+        || prop == AnimProperty::LightColor
+        || prop == AnimProperty::LightIntensity;
+}
+
+/*
+ * 写回方向光动画值：Rotation→朝向，LightColor→Color，LightIntensity→漫反射强度
+ *
+ * 旋转通道把欧拉角（度）作用到基准朝向 (0,-1,0)，重新归一化得到光照方向。
+ */
+void DirectionLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
+    switch (prop) {
+        case AnimProperty::Rotation: {
+            glm::quat q(glm::radians(value));
+            Direction = glm::normalize(q * glm::vec3(0.0f, -1.0f, 0.0f));
+            break;
+        }
+        case AnimProperty::LightColor:
+            Color = value;
+            break;
+        case AnimProperty::LightIntensity:
+            DiffuseIntensity = value.x;
+            break;
+        default:
+            break;
+    }
+}
+
 // ---- 聚光灯 SpotLight ----
 
 SpotLight::SpotLight(const std::string &name) : Light(name, LightTypeSpot),
@@ -163,4 +228,40 @@ SpotLight::SpotLight(const std::string &name) : Light(name, LightTypeSpot),
 }
 
 SpotLight::~SpotLight() {
+}
+
+/*
+ * 聚光灯可动画属性：位置/旋转（欧拉角驱动朝向）/颜色/强度
+ */
+bool SpotLight::CanAnimate(AnimProperty prop) const {
+    return prop == AnimProperty::Position
+        || prop == AnimProperty::Rotation
+        || prop == AnimProperty::LightColor
+        || prop == AnimProperty::LightIntensity;
+}
+
+/*
+ * 写回聚光灯动画值：Position→位置，Rotation→朝向，LightColor→Color，LightIntensity→漫反射强度
+ *
+ * 旋转通道与方向光一致：欧拉角（度）作用到基准朝向 (0,-1,0)。
+ */
+void SpotLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
+    switch (prop) {
+        case AnimProperty::Position:
+            Position = value;
+            break;
+        case AnimProperty::Rotation: {
+            glm::quat q(glm::radians(value));
+            Direction = glm::normalize(q * glm::vec3(0.0f, -1.0f, 0.0f));
+            break;
+        }
+        case AnimProperty::LightColor:
+            Color = value;
+            break;
+        case AnimProperty::LightIntensity:
+            DiffuseIntensity = value.x;
+            break;
+        default:
+            break;
+    }
 }

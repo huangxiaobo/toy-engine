@@ -13,6 +13,8 @@ class Axis;
 class Light;
 class Material;
 class Technique;
+class Animation;
+class IAnimTarget;
 class Camera;
 class FPSCounter;
 class TerrainManager;
@@ -113,11 +115,24 @@ public:
     // 获取屏幕空间坐标轴 gizmo（供 mainwindow 在 ImGui 绘制阶段叠加到视口角落）
     Axis *GetAxis() const { return m_axis.get(); }
     
-    // 获取所有摄像机配置
+    // 获取全部摄像机配置
     const std::vector<std::unique_ptr<Camera>> &GetCameras() const { return m_cameras; }
     
     // 切换到指定索引的摄像机
     void SwitchCamera(int index);
+
+    // ---- 通用动画 ----
+    // 创建并登记一个绑定到指定目标对象（模型/灯光等）的通用动画，
+    // 返回裸指针供配置动画通道。所有动画调 target->SetAnimValue 写回属性。
+    // （动画所有权归 Renderer，update() 每帧统一驱动）
+    Animation *CreateAnimation(IAnimTarget *target);
+
+    // 获取全部动画（供 ImGui 面板等查询 / 展示）
+    const std::vector<std::unique_ptr<Animation>> &GetAnimations() const { return m_animations; }
+
+    // ---- 灯光查询 ----
+    // 通过名字获取灯光（供动画按 world.yaml animations[].light 绑定目标）
+    Light *GetLight(const std::string &name);
 
     // 切换当前摄像机的投影模式（透视/正交）：写入相机属性并立即重算投影矩阵
     void SetProjectionType(ProjectionType type);
@@ -235,6 +250,9 @@ private:
     std::unique_ptr<SkyDome> m_sky_dome;
     std::vector<std::unique_ptr<ParticleSystem>> m_particle_systems;
     std::vector<std::unique_ptr<Model>> m_models;
+    // 动画容器：动画本身为绑定目标对象的"数据 + 每帧更新逻辑"，
+    // 由 update() 统一推进，不参与绘制
+    std::vector<std::unique_ptr<Animation>> m_animations;
     // 光源位置/范围调试可视化系统（DebugDraw，方案 B），独立于 Model 体系
     std::unique_ptr<DebugDraw> m_debug_draw;
     // 光源调试可视化是否启用（ImGui 可配置，见 SetDebugDrawEnabled）

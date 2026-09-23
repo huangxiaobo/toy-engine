@@ -128,7 +128,7 @@ world:
       color:
         r: 0.0
         g: 0.0
-        b: 0.3
+        b: 1.0
       diffuse:
         color:
           r: 0.0
@@ -314,3 +314,42 @@ world:
       material:
         file: "./resource/model/cube/cube.mtl"
         name: "cube_material"
+  animations:
+    # bunny 绕 Y 轴匀速旋转：初始 0 度，每秒 90 度
+    - name: "bunny_spin"
+      model: "bunny"
+      enabled: true
+      rotate:
+        spin: true
+        base: {x: 0, y: 0, z: 0}
+        speed: {x: 0, y: 15, z: 0}
+    # sphere 演示位移动画：绕 y=15 处上下往复（验证配置驱动链路）
+    - name: "sphere_bob"
+      model: "sphere"
+      enabled: true
+      translate:
+        center: {x: 15, y: 15, z: -15}
+        amplitude: {x: 0, y: 2, z: 0}
+        frequency: 0.5
+    # 点光源演示强度/颜色动画：红色点光随强度脉冲明暗呼吸，
+    # 颜色在红↔橙之间缓慢过渡（强度是标量，y/z 分量不使用）
+    - name: "point_red_flicker"
+      light: "point_light_red"
+      enabled: true
+      intensity:
+        center: {x: 5.0, y: 0, z: 0}
+        amplitude: {x: 3.0, y: 0, z: 0}
+        frequency: 0.5
+      color:
+        center: {x: 1.0, y: 0.4, z: 0.1}
+        amplitude: {x: 0.2, y: 0.2, z: 0.1}
+        frequency: 0.5
+    # 蓝色点光绕 Y 轴转圈：x/z 分量 90° 相位差形成圆周轨道，
+    # y 保持轨道中心高度 10（点光源无朝向，轨道即其"旋转"语义）
+    - name: "point_blue_orbit"
+      light: "point_light_blue"
+      enabled: true
+      orbit:
+        center: {x: 5.0, y: 30.0, z: 6.0}
+        radius: {x: 50.0, y: 0, z: 50.0}
+        frequency: 0.10

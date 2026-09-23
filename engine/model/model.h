@@ -9,6 +9,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include "../mesh/mesh.h"
+#include "../animation/anim_target.h"
 
 class Renderer;
 class Mesh;
@@ -17,7 +18,7 @@ class Light;
 class Material;
 struct RenderContext;
 
-class Model {
+class Model : public IAnimTarget {
 private:
     std::string m_uuid;
     std::string m_name;
@@ -97,8 +98,14 @@ public:
     // 兼容旧接口：返回绕 Y 轴角度
     glm::f32 GetRotation() const;
 
-    std::string GetName() const { return m_name; }
+    std::string GetName() const override { return m_name; }
     std::string GetUUID() const { return m_uuid; }
+
+    // ---- IAnimTarget：动画系统通过属性枚举驱动模型变换 ----
+    // 支持的属性为：位置/缩放/旋转（模型三类变换全部可动画）
+    bool CanAnimate(AnimProperty prop) const override;
+    // 写回动画求值结果：位置→SetTranslate，缩放→SetScale，旋转→SetRotation
+    void SetAnimValue(AnimProperty prop, const glm::vec3 &value) override;
 
     virtual void Draw(const RenderContext &ctx, const glm::mat4 &model);
 };
