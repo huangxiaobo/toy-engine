@@ -29,8 +29,8 @@ void SceneFramebuffer::Init(int width, int height) {
     m_height = height;
 
     // 1. 创建 RGBA16F HDR 颜色纹理（后处理 Pass 采样它做 tone mapping）
-    glGenTextures(1, &m_colorTex);
-    glBindTexture(GL_TEXTURE_2D, m_colorTex);
+    glGenTextures(1, &m_color_tex);
+    glBindTexture(GL_TEXTURE_2D, m_color_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_width, m_height,
                  0, GL_RGBA, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -39,16 +39,16 @@ void SceneFramebuffer::Init(int width, int height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     // 2. 创建离屏 Depth Renderbuffer，仅供场景 Pass 做深度测试
-    glGenRenderbuffers(1, &m_depthRbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_depthRbo);
+    glGenRenderbuffers(1, &m_depth_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, m_depth_rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, m_width, m_height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
     // 3. 创建 FBO：HDR 颜色附件 + Depth Renderbuffer 附件
     glGenFramebuffers(1, &m_fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_colorTex, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthRbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_color_tex, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depth_rbo);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -68,7 +68,7 @@ void SceneFramebuffer::Init(int width, int height) {
  * 调用方绘制完场景后必须调用 Unbind() 回到默认帧缓冲。
  */
 void SceneFramebuffer::BindForWrite() {
-    glGetIntegerv(GL_VIEWPORT, m_savedViewport);
+    glGetIntegerv(GL_VIEWPORT, m_saved_viewport);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
     glViewport(0, 0, m_width, m_height);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -78,7 +78,7 @@ void SceneFramebuffer::BindForWrite() {
 void SceneFramebuffer::Unbind() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     // 恢复 BindForWrite 时保存的主视口，保证后续绘制（后处理 Pass、ImGui）位置正确
-    glViewport(m_savedViewport[0], m_savedViewport[1], m_savedViewport[2], m_savedViewport[3]);
+    glViewport(m_saved_viewport[0], m_saved_viewport[1], m_saved_viewport[2], m_saved_viewport[3]);
 }
 
 void SceneFramebuffer::Destroy() {
@@ -86,13 +86,13 @@ void SceneFramebuffer::Destroy() {
         glDeleteFramebuffers(1, &m_fbo);
         m_fbo = 0;
     }
-    if (m_colorTex != 0) {
-        glDeleteTextures(1, &m_colorTex);
-        m_colorTex = 0;
+    if (m_color_tex != 0) {
+        glDeleteTextures(1, &m_color_tex);
+        m_color_tex = 0;
     }
-    if (m_depthRbo != 0) {
-        glDeleteRenderbuffers(1, &m_depthRbo);
-        m_depthRbo = 0;
+    if (m_depth_rbo != 0) {
+        glDeleteRenderbuffers(1, &m_depth_rbo);
+        m_depth_rbo = 0;
     }
     m_width = 0;
     m_height = 0;

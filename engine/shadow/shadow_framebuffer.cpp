@@ -8,13 +8,13 @@ ShadowFramebuffer::~ShadowFramebuffer() {
         glDeleteFramebuffers(1, &m_fbo);
         m_fbo = 0;
     }
-    if (m_depthTex != 0) {
-        glDeleteTextures(1, &m_depthTex);
-        m_depthTex = 0;
+    if (m_depth_tex != 0) {
+        glDeleteTextures(1, &m_depth_tex);
+        m_depth_tex = 0;
     }
-    if (m_depthRbo != 0) {
-        glDeleteRenderbuffers(1, &m_depthRbo);
-        m_depthRbo = 0;
+    if (m_depth_rbo != 0) {
+        glDeleteRenderbuffers(1, &m_depth_rbo);
+        m_depth_rbo = 0;
     }
 }
 
@@ -25,7 +25,7 @@ ShadowFramebuffer::~ShadowFramebuffer() {
  *   1. 生成一张 R32F 颜色纹理用于保存深度值（主 Pass 用它做手动深度比较）。
  *      这里故意不用 GL_DEPTH_COMPONENT 深度纹理，因为 macOS 上 sampler2D 采样
  *      GL_DEPTH_COMPONENT 并读 .r 不稳定（常返回 0），R32F 颜色附件采样 .r 才稳定。
- *   2. 深度缓冲本身交给一张离屏 Depth Renderbuffer（m_depthRbo）承担，
+ *   2. 深度缓冲本身交给一张离屏 Depth Renderbuffer（m_depth_rbo）承担，
  *      它只用于深度 Pass 的深度测试，不直接采样。深度值与写入 R32F 的
  *      gl_FragCoord.z 完全一致。
  *   3. 不开启 GL_TEXTURE_COMPARE_MODE（保持默认 GL_NONE）：着色器采用"手动比较"
@@ -42,8 +42,8 @@ void ShadowFramebuffer::Init(int width, int height) {
     m_height = height;
 
     // 1. 创建 R32F 颜色纹理（保存深度值，主 Pass 采样它）
-    glGenTextures(1, &m_depthTex);
-    glBindTexture(GL_TEXTURE_2D, m_depthTex);
+    glGenTextures(1, &m_depth_tex);
+    glBindTexture(GL_TEXTURE_2D, m_depth_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m_width, m_height,
                  0, GL_RED, GL_FLOAT, nullptr);
 
@@ -58,16 +58,16 @@ void ShadowFramebuffer::Init(int width, int height) {
     // 保持默认的 GL_NONE 采样模式：着色器手动比较获取原始深度（见上方注释说明）
 
     // 2. 创建离屏 Depth Renderbuffer，仅供深度 Pass 做深度测试
-    glGenRenderbuffers(1, &m_depthRbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_depthRbo);
+    glGenRenderbuffers(1, &m_depth_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, m_depth_rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, m_width, m_height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
     // 3. 创建 FBO：R32F 颜色附件 + Depth Renderbuffer 附件
     glGenFramebuffers(1, &m_fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_depthTex, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthRbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_depth_tex, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depth_rbo);
     // 显式声明写入目标为颜色附件 0（默认即为此值，显式声明更明确）
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glReadBuffer(GL_NONE);
@@ -88,6 +88,8 @@ void ShadowFramebuffer::Init(int width, int height) {
  * 调用方在完成深度 Pass 后必须调用 Unbind() 并恢复主视口大小。
  */
 void ShadowFramebuffer::BindForWrite() {
+    glGetIntegerv(GL_VIEWPORT, m_saved_viewport);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &m_saved_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
     glViewport(0, 0, m_width, m_height);
     // 颜色附件存深度值，深度附件做深度测试，两者都要清
@@ -96,5 +98,6 @@ void ShadowFramebuffer::BindForWrite() {
 }
 
 void ShadowFramebuffer::Unbind() {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(m_saved_framebuffer));
+    glViewport(m_saved_viewport[0], m_saved_viewport[1], m_saved_viewport[2], m_saved_viewport[3]);
 }

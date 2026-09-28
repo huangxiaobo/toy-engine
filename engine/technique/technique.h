@@ -38,8 +38,10 @@ public:
     Technique(const std::string &name, const std::string &vertexShader, const std::string &fragmentShader);
 
     virtual ~Technique();
+    Technique(const Technique &) = delete;
+    Technique &operator=(const Technique &) = delete;
 
-    std::string Id; // Technique 唯一标识符（UUID，构造时自动生成）
+    std::string m_id; // Technique 唯一标识符（UUID，构造时自动生成）
 
     virtual TechniqueType GetType() const { return m_type; };
 

@@ -18,12 +18,12 @@
  */
 TerrainChunk::TerrainChunk(float planeSize, int resolution,
                            const Noise* noise, float heightScale)
-    : m_planeSize(planeSize)
+    : m_plane_size(planeSize)
     , m_resolution(resolution)
     , m_noise(noise)
-    , m_heightScale(heightScale)
+    , m_height_scale(heightScale)
     , m_technique(nullptr)
-    , m_textureID(0) {
+    , m_texture_id(0) {
 }
 
 TerrainChunk::~TerrainChunk() {
@@ -50,7 +50,7 @@ void TerrainChunk::SetTechnique(Technique* tech) {
  * 会自动应用已绑定的纹理。
  */
 void TerrainChunk::SetTexture(unsigned int textureID) {
-    m_textureID = textureID;
+    m_texture_id = textureID;
     if (m_mesh) {
         m_mesh->SetTexture(textureID);
     }
@@ -94,8 +94,8 @@ void TerrainChunk::GenerateMesh() {
         mesh->SetEffect(m_technique);
     }
 
-    if (m_textureID != 0) {
-        mesh->SetTexture(m_textureID);
+    if (m_texture_id != 0) {
+        mesh->SetTexture(m_texture_id);
     }
 
     m_mesh.reset(mesh);
@@ -121,12 +121,12 @@ void TerrainChunk::GeneratePlaneVertices(std::vector<Vertex>& vertices,
     indices.clear();
 
     int resolution = m_resolution;
-    float halfSize = m_planeSize * 0.5f;
-    float cellSize = m_planeSize / resolution;
+    float halfSize = m_plane_size * 0.5f;
+    float cellSize = m_plane_size / resolution;
 
     // 纹理重复次数：每 20 世界单位平铺一次纹理
     // （与原 chunkSize=100、每 chunk 平铺 5 次 的纹理密度保持一致）
-    float textureRepeat = m_planeSize / 20.0f;
+    float textureRepeat = m_plane_size / 20.0f;
 
     // 生成顶点
     for (int z = 0; z <= resolution; z++) {
@@ -140,12 +140,12 @@ void TerrainChunk::GeneratePlaneVertices(std::vector<Vertex>& vertices,
             float texZ = static_cast<float>(z) / resolution * textureRepeat;
 
             Vertex vertex;
-            vertex.Position = glm::vec3(worldX, 0.0f, worldZ);
-            vertex.Color = glm::vec3(1.0f, 1.0f, 1.0f);
-            vertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
-            vertex.TexCoords = glm::vec2(texX, texZ);
-            vertex.Tangent = glm::vec3(1.0f, 0.0f, 0.0f);
-            vertex.Bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
+            vertex.m_position = glm::vec3(worldX, 0.0f, worldZ);
+            vertex.m_color = glm::vec3(1.0f, 1.0f, 1.0f);
+            vertex.m_normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            vertex.m_tex_coords = glm::vec2(texX, texZ);
+            vertex.m_tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+            vertex.m_bitangent = glm::vec3(0.0f, 0.0f, 1.0f);
 
             vertices.push_back(vertex);
         }
@@ -184,15 +184,15 @@ void TerrainChunk::ApplyHeightToVertices(std::vector<Vertex>& vertices) const {
     for (auto& vertex : vertices) {
         // 使用世界坐标采样噪声
         float height = m_noise->FBM(
-            vertex.Position.x * 0.01f,  // 缩放因子控制地形"密度"
-            vertex.Position.z * 0.01f,
+            vertex.m_position.x * 0.01f,  // 缩放因子控制地形"密度"
+            vertex.m_position.z * 0.01f,
             6,      // 6层噪声
             2.0f,   // 频率倍增
             0.5f    // 振幅衰减
         );
 
         // 映射到 [0, heightScale] 范围（heightScale=0 时地形保持平坦）
-        vertex.Position.y = (height * 0.5f + 0.5f) * m_heightScale;
+        vertex.m_position.y = (height * 0.5f + 0.5f) * m_height_scale;
     }
 }
 
@@ -207,7 +207,7 @@ void TerrainChunk::CalculateNormals(std::vector<Vertex>& vertices,
                                     const std::vector<unsigned int>& indices) const {
     // 重置所有法线
     for (auto& v : vertices) {
-        v.Normal = glm::vec3(0.0f);
+        v.m_normal = glm::vec3(0.0f);
     }
 
     // 遍历所有三角形
@@ -216,9 +216,9 @@ void TerrainChunk::CalculateNormals(std::vector<Vertex>& vertices,
         unsigned int i1 = indices[i + 1];
         unsigned int i2 = indices[i + 2];
 
-        glm::vec3& v0 = vertices[i0].Position;
-        glm::vec3& v1 = vertices[i1].Position;
-        glm::vec3& v2 = vertices[i2].Position;
+        glm::vec3& v0 = vertices[i0].m_position;
+        glm::vec3& v1 = vertices[i1].m_position;
+        glm::vec3& v2 = vertices[i2].m_position;
 
         // 计算两条边
         glm::vec3 edge1 = v1 - v0;
@@ -228,14 +228,14 @@ void TerrainChunk::CalculateNormals(std::vector<Vertex>& vertices,
         glm::vec3 faceNormal = glm::cross(edge1, edge2);
 
         // 累加到顶点法线
-        vertices[i0].Normal += faceNormal;
-        vertices[i1].Normal += faceNormal;
-        vertices[i2].Normal += faceNormal;
+        vertices[i0].m_normal += faceNormal;
+        vertices[i1].m_normal += faceNormal;
+        vertices[i2].m_normal += faceNormal;
     }
 
     // 归一化
     for (auto& v : vertices) {
-        v.Normal = glm::normalize(v.Normal);
+        v.m_normal = glm::normalize(v.m_normal);
     }
 }
 
@@ -258,12 +258,12 @@ void TerrainChunk::Draw(const RenderContext &ctx) {
     if (m_technique && m_technique->GetType() == TechniqueTypeLight) {
         auto tech = dynamic_cast<TechniqueLight*>(m_technique);
         tech->Enable();
-        tech->SetLights(ctx.lights);
-        tech->SetUniform("gViewPos", ctx.camera);
+        tech->SetLights(ctx.m_lights);
+        tech->SetUniform("gViewPos", ctx.m_camera);
 
         // 设置投影和视图矩阵
-        tech->SetProjectionMatrix(ctx.projection);
-        tech->SetViewMatrix(ctx.view);
+        tech->SetProjectionMatrix(ctx.m_projection);
+        tech->SetViewMatrix(ctx.m_view);
 
         // 模型矩阵（单位矩阵，因为顶点已在世界坐标）
         constexpr auto modelMatrix = glm::mat4(1.0f);
@@ -274,15 +274,15 @@ void TerrainChunk::Draw(const RenderContext &ctx) {
         //   2. 应用阴影状态（绑定单元2 深度贴图 + 上传 shadowMap/lightSpace/gUseShadow）
         // 阴影状态直接取自 RenderContext.shadow，与模型共用同一条状态通道
         if (auto terrainTech = dynamic_cast<TechniqueTerrain*>(m_technique)) {
-            if (m_textureID != 0) {
+            if (m_texture_id != 0) {
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, m_textureID);
+                glBindTexture(GL_TEXTURE_2D, m_texture_id);
                 terrainTech->SetGroundTexture(0);
             }
-            terrainTech->ApplyShadowState(ctx.shadow);
+            terrainTech->ApplyShadowState(ctx.m_shadow);
         }
     }
 
-    // 绘制网格
-    m_mesh->Draw(ctx, glm::mat4(1.0f));
+    // 绘制网格。传 nullptr：地形材质由 init 一次性上传到地形专属技术，该技术不跨模型共享
+    m_mesh->Draw(ctx, glm::mat4(1.0f), nullptr);
 }

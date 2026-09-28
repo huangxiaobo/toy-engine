@@ -37,7 +37,7 @@ void TechniqueTerrain::SetGroundTexture(int unit) {
 /*
  * 绘制阶段应用阴影状态（必须在 Enable() 之后、glDrawElements 之前调用）
  *
- * 阴影状态每帧由 Renderer 组装进 RenderContext.shadow，本方法直接读取，
+ * 阴影状态每帧由 Renderer 组装进 RenderContext.m_shadow，本方法直接读取，
  * 与模型共用同一条状态通道。显式激活纹理单元2 并重新绑定深度贴图，
  * 然后上传 shadowMap 采样器、lightSpace 矩阵与 gUseShadow 开关。
  * 单元2 的反复显式绑定是防御性做法：当前渲染环其他对象（如天空穹/模型）
@@ -47,14 +47,14 @@ void TechniqueTerrain::SetGroundTexture(int unit) {
 void TechniqueTerrain::ApplyShadowState(const ShadowState &shadow) {
     // 激活单元2 并绑定本帧的阴影深度贴图（未启用阴影时为0，解绑避免采样残留纹理）
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, shadow.depthTexture);
+    glBindTexture(GL_TEXTURE_2D, shadow.m_depth_texture);
 
     // 通知着色器 shadowMap 采样器指向单元2
     this->SetShadowMap(2);
     // 上传光源空间矩阵（世界坐标 → 光源裁剪空间）
-    this->SetLightSpaceMatrix(shadow.lightSpace);
+    this->SetLightSpaceMatrix(shadow.m_light_space);
     // 上传阴影开关：沿用基类按名设置 int uniform
-    this->SetUniform("gUseShadow", shadow.ready ? 1 : 0);
+    this->SetUniform("gUseShadow", shadow.m_ready ? 1 : 0);
     // 上传 bias 缩放系数（gShadowBiasScale，默认 1.0 保持原公式效果）
-    this->SetUniform("gShadowBiasScale", shadow.biasScale);
+    this->SetUniform("gShadowBiasScale", shadow.m_bias_scale);
 }

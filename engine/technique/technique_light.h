@@ -12,50 +12,50 @@ class Material;
 
 struct UniformAttenuation
 {
-    GLuint Constant;
-    GLuint Linear;
-    GLuint Exp;
+    GLuint m_constant;
+    GLuint m_linear;
+    GLuint m_exp;
 };
 struct UniformPointLight
 {
-    GLuint Color;
-    GLuint Position;
+    GLuint m_color;
+    GLuint m_position;
 
-    GLuint AmbientIntensity;
-    GLuint DiffuseIntensity;
-    GLuint SpecularIntensity;
-    GLuint AmbientColor;
-    GLuint DiffuseColor;
-    GLuint SpecularColor;
-    UniformAttenuation Atten;
+    GLuint m_ambient_intensity;
+    GLuint m_diffuse_intensity;
+    GLuint m_specular_intensity;
+    GLuint m_ambient_color;
+    GLuint m_diffuse_color;
+    GLuint m_specular_color;
+    UniformAttenuation m_atten;
 };
 
 struct UniformDirectionLight
 {
-    GLuint Direction;
-    GLuint Color;
-    GLuint AmbientIntensity;
-    GLuint DiffuseIntensity;
-    GLuint SpecularIntensity;
-    GLuint AmbientColor;
-    GLuint DiffuseColor;
-    GLuint SpecularColor;
+    GLuint m_direction;
+    GLuint m_color;
+    GLuint m_ambient_intensity;
+    GLuint m_diffuse_intensity;
+    GLuint m_specular_intensity;
+    GLuint m_ambient_color;
+    GLuint m_diffuse_color;
+    GLuint m_specular_color;
 };
 
 struct UniformSpotLight
 {
-    GLuint Position;
-    GLuint Direction;
-    GLuint Color;
-    GLuint AmbientIntensity;
-    GLuint DiffuseIntensity;
-    GLuint SpecularIntensity;
-    GLuint AmbientColor;
-    GLuint DiffuseColor;
-    GLuint SpecularColor;
-    UniformAttenuation Atten;
-    GLuint Cutoff;
-    GLuint OuterCutoff;
+    GLuint m_position;
+    GLuint m_direction;
+    GLuint m_color;
+    GLuint m_ambient_intensity;
+    GLuint m_diffuse_intensity;
+    GLuint m_specular_intensity;
+    GLuint m_ambient_color;
+    GLuint m_diffuse_color;
+    GLuint m_specular_color;
+    UniformAttenuation m_atten;
+    GLuint m_cutoff;
+    GLuint m_outer_cutoff;
 };
 
 class MaterialUniform
@@ -72,10 +72,10 @@ public:
     void Init(Shader *shader);
     void Apply(Shader *shader);
 
-    GLuint AmbientColor;  // 环境
-    GLuint DiffuseColor;  // 漫反射
-    GLuint SpecularColor; // 镜面反射
-    GLuint Shininess;     // 镜面反射光泽
+    GLuint m_ambient_color;  // 环境
+    GLuint m_diffuse_color;  // 漫反射
+    GLuint m_specular_color; // 镜面反射
+    GLuint m_shininess;     // 镜面反射光泽
 };
 
 class TechniqueLight : public Technique
@@ -94,26 +94,20 @@ public:
     void SetSpotLights(std::vector<SpotLight *> lights);
     virtual void SetMaterial(const Material *material);
 
-    /* 获取当前材质指针（用于属性面板显示/编辑） */
-    const Material *GetMaterial() const { return m_material; }
-
 private:
-    // 当前材质指针（由 SetMaterial 设置，仅引用不拥有生命周期）
-    const Material *m_material = nullptr;
-
     // 材质
-    MaterialUniform MaterialUniform;
+    MaterialUniform m_material_uniform;
 
     // 方向光
-    UniformDirectionLight DirectionLightUniform;
+    UniformDirectionLight m_direction_light_uniform;
 
     // 点光源
-    std::vector<UniformPointLight> PointLightUniforms;
-    GLuint PointLightCountUniform;
+    std::vector<UniformPointLight> m_point_light_uniforms;
+    GLuint m_point_light_count_uniform;
 
     // 聚光灯
-    std::vector<UniformSpotLight> SpotLightUniforms;
-    GLuint SpotLightCountUniform;
+    std::vector<UniformSpotLight> m_spot_light_uniforms;
+    GLuint m_spot_light_count_uniform;
 };
 
 #endif // __TECHNIQUE_LIGHT_H__

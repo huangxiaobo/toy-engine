@@ -20,7 +20,7 @@ Technique::Technique(const std::string &name, const std::string &vertex_shader,
                      const std::string &fragment_shader) : m_type(
     TechniqueType::TechniqueTypeBase) {
     // 构造时自动生成唯一 UUID
-    Id = Utils::GenerateUUID();
+    m_id = Utils::GenerateUUID();
 
     // 创建并编译着色器（Shader 由 unique_ptr 独占所有权，析构自动释放）
     this->m_shader = std::make_unique<Shader>(

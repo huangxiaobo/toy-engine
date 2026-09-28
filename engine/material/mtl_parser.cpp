@@ -70,12 +70,12 @@ std::vector<Material *> MtlParser::ParseFromFile(const std::string &filePath) {
             name = name.substr(n_start, n_end - n_start + 1);
 
             current = new Material();
-            current->Name = name;
+            current->m_name = name;
             // 默认值：与 OpenGL 常见默认一致，避免缺字段时出现未定义值
-            current->AmbientColor = glm::vec3(0.2f);
-            current->DiffuseColor = glm::vec3(0.8f);
-            current->SpecularColor = glm::vec3(0.0f);
-            current->Shininess = 0.0f;
+            current->m_ambient_color = glm::vec3(0.2f);
+            current->m_diffuse_color = glm::vec3(0.8f);
+            current->m_specular_color = glm::vec3(0.0f);
+            current->m_shininess = 0.0f;
             materials.push_back(current);
         } else if (current == nullptr) {
             // 尚未有 newmtl 声明的字段，忽略（非规范写法）
@@ -83,22 +83,22 @@ std::vector<Material *> MtlParser::ParseFromFile(const std::string &filePath) {
         } else if (key == "Ka") {
             glm::vec3 c;
             if (ParseColor(iss, c)) {
-                current->AmbientColor = c;
+                current->m_ambient_color = c;
             }
         } else if (key == "Kd") {
             glm::vec3 c;
             if (ParseColor(iss, c)) {
-                current->DiffuseColor = c;
+                current->m_diffuse_color = c;
             }
         } else if (key == "Ks") {
             glm::vec3 c;
             if (ParseColor(iss, c)) {
-                current->SpecularColor = c;
+                current->m_specular_color = c;
             }
         } else if (key == "Ns") {
             float s;
             if (iss >> s) {
-                current->Shininess = s;
+                current->m_shininess = s;
             }
         }
         // 其他 MTL 指令（map_Kd、d、Tr、illum 等）当前引擎不支持，直接忽略
@@ -115,7 +115,7 @@ Material *MtlParser::ParseSingle(const std::string &filePath, const std::string 
     // 按 newmtl 声明的名称精确匹配；找不到则返回 nullptr
     Material *result = nullptr;
     for (auto *mat : materials) {
-        if (mat->Name == materialName) {
+        if (mat->m_name == materialName) {
             result = mat;
             break;
         }

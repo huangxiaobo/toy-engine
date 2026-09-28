@@ -13,6 +13,7 @@
 #include "technique/technique_light.h"
 #include "technique/technique_terrain.h"
 #include "render_context.h"
+#include "utils/gl_state_guard.h"
 #include "model/model.h"
 #include "axis/axis.h"
 #include "terrain/terrain_manager.h"
@@ -39,6 +40,7 @@
 #include <glm/gtx/transform.hpp>
 
 #include <cmath>
+#include <cstdlib>
 
 Renderer::Renderer() : m_eye_pos(0) {
 }
@@ -56,12 +58,6 @@ Renderer::~Renderer() {
     if (!m_textures.empty()) {
         glDeleteTextures(static_cast<GLsizei>(m_textures.size()), m_textures.data());
         m_textures.clear();
-    }
-
-    // 释放后处理全屏三角形空 VAO
-    if (m_post_vao != 0) {
-        glDeleteVertexArrays(1, &m_post_vao);
-        m_post_vao = 0;
     }
 }
 
@@ -96,7 +92,7 @@ void Renderer::init(int w, int h) {
     height = h;
 
     // 视野角度以配置为初始值，运行时可经 SetFov 调整（调试面板滑块）
-    m_fov = gConfig->Clip.ClipFov;
+    m_fov = gConfig->m_clip.m_clip_fov;
 
     m_fps_counter = std::make_unique<FPSCounter>();
 
@@ -112,10 +108,10 @@ void Renderer::init(int w, int h) {
     // 创建地形管理器（固定尺寸网格平面，无 LOD）
     m_terrain_manager = std::make_unique<TerrainManager>();
     TerrainConfig terrainConfig;
-    terrainConfig.planeSize = gConfig->Terrain.PlaneSize;    // 平面尺寸 100×100 单位
-    terrainConfig.resolution = gConfig->Terrain.Resolution;  // 网格分辨率
-    terrainConfig.heightScale = gConfig->Terrain.HeightScale; // 最大高度（0 = 平坦）
-    terrainConfig.noiseSeed = gConfig->Terrain.NoiseSeed;     // 噪声种子
+    terrainConfig.m_plane_size = gConfig->m_terrain.m_plane_size;    // 平面尺寸 100×100 单位
+    terrainConfig.m_resolution = gConfig->m_terrain.m_resolution;  // 网格分辨率
+    terrainConfig.m_height_scale = gConfig->m_terrain.m_height_scale; // 最大高度（0 = 平坦）
+    terrainConfig.m_noise_seed = gConfig->m_terrain.m_noise_seed;     // 噪声种子
     m_terrain_manager->Init(terrainConfig);
 
     // 灯光为 unique_ptr 容器，收集非拥有指针视图供 SetLights 等接口使用
@@ -126,10 +122,10 @@ void Renderer::init(int w, int h) {
                                                "./resource/shader/terrain.vert",
                                                "./resource/shader/terrain.frag");
     Material *terrainMaterial = new Material();
-    terrainMaterial->AmbientColor = glm::vec3(0.3f, 0.3f, 0.3f);
-    terrainMaterial->DiffuseColor = glm::vec3(0.8f, 0.8f, 0.8f);
-    terrainMaterial->SpecularColor = glm::vec3(0.5f, 0.5f, 0.5f);
-    terrainMaterial->Shininess = 32.0f;
+    terrainMaterial->m_ambient_color = glm::vec3(0.3f, 0.3f, 0.3f);
+    terrainMaterial->m_diffuse_color = glm::vec3(0.8f, 0.8f, 0.8f);
+    terrainMaterial->m_specular_color = glm::vec3(0.5f, 0.5f, 0.5f);
+    terrainMaterial->m_shininess = 32.0f;
     terrainEffect->SetMaterial(terrainMaterial);
     terrainEffect->SetLights(lights_raw);
     m_terrain_manager->SetTechnique(terrainEffect);
@@ -142,71 +138,65 @@ void Renderer::init(int w, int h) {
     m_terrain_manager->SetTexture(m_terrain_texture);
 
     // ---- 初始化方向光阴影映射资源 ----
-    // 阴影贴图分辨率 2048×2048：越高越清晰但越耗显存/带宽
-    m_shadow_fbo = std::make_unique<ShadowFramebuffer>();
-    m_shadow_fbo->Init(2048, 2048);
-    // 深度 Pass 专用着色器，注册进 m_techniques 以便与其它技术统一释放
-    m_shadow_depth_tech = new Technique("shadow_depth",
-                                        "./resource/shader/depth.vert",
-                                        "./resource/shader/depth.frag");
-    m_techniques.push_back(std::unique_ptr<Technique>(m_shadow_depth_tech));
+    m_shadow_pass = std::make_unique<ShadowPass>();
+    m_shadow_pass->Init();
 
     // ---- 初始化 HDR 场景帧缓冲与后处理 Pass（多 Pass 渲染框架）----
     // 场景 Pass 画到 RGBA16F FBO，后处理全屏 Pass 采样它做 tone mapping 再画到默认缓冲
     m_scene_fbo = std::make_unique<SceneFramebuffer>();
     m_scene_fbo->Init(width, height);
-    // 后处理着色器注册进 m_techniques 统一释放
-    m_post_tech = new Technique("post",
-                                "./resource/shader/post.vert",
-                                "./resource/shader/post.frag");
-    m_techniques.push_back(std::unique_ptr<Technique>(m_post_tech));
-    // 空 VAO：全屏三角形坐标由顶点着色器 gl_VertexID 生成，无需顶点属性缓冲，
-    // 但 Core Profile 在未绑定 VAO 时绘制会报错，故创建空 VAO 占位
-    glGenVertexArrays(1, &m_post_vao);
+    m_post_process_pass = std::make_unique<PostProcessPass>();
+    m_post_process_pass->Init();
 
     m_sky_dome = std::make_unique<SkyDome>();
     m_sky_dome->Init(
-        gConfig->SkyDome.Radius,
-        gConfig->SkyDome.Sectors,
-        gConfig->SkyDome.Stacks
+        gConfig->m_sky_dome.m_radius,
+        gConfig->m_sky_dome.m_sectors,
+        gConfig->m_sky_dome.m_stacks
     );
-    m_sky_dome->SetHorizonColor(gConfig->SkyDome.HorizonColor);
-    m_sky_dome->SetZenithColor(gConfig->SkyDome.ZenithColor);
-    m_sky_dome->SetGroundColor(gConfig->SkyDome.GroundColor);
+    m_sky_dome->SetHorizonColor(gConfig->m_sky_dome.m_horizon_color);
+    m_sky_dome->SetZenithColor(gConfig->m_sky_dome.m_zenith_color);
+    m_sky_dome->SetGroundColor(gConfig->m_sky_dome.m_ground_color);
 
     // Create Particle Systems from config
-    for (const auto &particleConfig: gConfig->Particles) {
+    for (const auto &particleConfig: gConfig->m_particles) {
         auto ps = std::make_unique<ParticleSystem>();
-        ps->Init(particleConfig.Position);
+        ps->Init(particleConfig.m_position);
         
         // 应用配置
         auto *emitter = ps->GetEmitter();
-        emitter->SetMaxParticles(particleConfig.MaxParticles);
+        emitter->SetMaxParticles(particleConfig.m_max_particles);
         ps->ReallocateVBO();
-        emitter->EmitRate = particleConfig.EmitRate;
-        emitter->MinLife = particleConfig.MinLife;
-        emitter->MaxLife = particleConfig.MaxLife;
-        emitter->MinSize = particleConfig.MinSize;
-        emitter->MaxSize = particleConfig.MaxSize;
-        emitter->MinVelocity = particleConfig.MinVelocity;
-        emitter->MaxVelocity = particleConfig.MaxVelocity;
-        emitter->MinSizeEnd = particleConfig.MinSizeEnd;
-        emitter->MaxSizeEnd = particleConfig.MaxSizeEnd;
-        emitter->Gravity = particleConfig.Gravity;
-        emitter->Drag = particleConfig.Drag;
+        emitter->m_emit_rate = particleConfig.m_emit_rate;
+        emitter->m_min_life = particleConfig.m_min_life;
+        emitter->m_max_life = particleConfig.m_max_life;
+        emitter->m_min_size = particleConfig.m_min_size;
+        emitter->m_max_size = particleConfig.m_max_size;
+        emitter->m_min_velocity = particleConfig.m_min_velocity;
+        emitter->m_max_velocity = particleConfig.m_max_velocity;
+        emitter->m_min_size_end = particleConfig.m_min_size_end;
+        emitter->m_max_size_end = particleConfig.m_max_size_end;
+        emitter->m_gravity = particleConfig.m_gravity;
+        emitter->m_drag = particleConfig.m_drag;
         
         m_particle_systems.push_back(std::move(ps));
     }
 
-    for (const auto &cameraConfig: gConfig->Cameras) {
+    for (const auto &cameraConfig: gConfig->m_cameras) {
         auto camera = std::make_unique<Camera>(
-            cameraConfig.Position,
-            cameraConfig.Target,
-            cameraConfig.Up
+            cameraConfig.m_position,
+            cameraConfig.m_target,
+            cameraConfig.m_up
         );
-        camera->m_name = cameraConfig.Name;
-        camera->SetProjectionType(cameraConfig.Projection);
+        camera->m_name = cameraConfig.m_name;
+        camera->SetProjectionType(cameraConfig.m_projection);
         m_cameras.push_back(std::move(camera));
+    }
+    // 默认摄像机取配置里的第一台。m_camera 在 draw() 等处被无条件解引用，
+    // 一台都没配就跑不起来，所以不做兜底，直接报错退出，别用隐式默认视角掩盖配置错误
+    if (m_cameras.empty()) {
+        std::cerr << "[error] world.yaml 未配置任何摄像机（world.cameras），无法确定默认摄像机" << std::endl;
+        std::exit(EXIT_FAILURE);
     }
     // 复用 m_cameras 中的第一个摄像机作为当前摄像机，避免重复创建造成内存泄漏
     m_camera = m_cameras[0].get();
@@ -235,24 +225,24 @@ void Renderer::init(int w, int h) {
 
     int i = 0;
     // 创建方向光（平行光）
-    for (const auto &lightConfig: gConfig->DirectionLights) {
+    for (const auto &lightConfig: gConfig->m_direction_lights) {
         // 名称优先使用 world.yaml 中的 name，未配置时回退为自动生成的索引名
-        std::string dirName = lightConfig.Name.empty() ? std::format("dir-light-{}", i + 1) : lightConfig.Name;
+        std::string dirName = lightConfig.m_name.empty() ? std::format("dir-light-{}", i + 1) : lightConfig.m_name;
         auto light = new DirectionLight(dirName);
         // 若配置了 id，则覆盖默认自动生成的 UUID 用于稳定标识
-        if (!lightConfig.Id.empty()) {
-            light->SetUUID(lightConfig.Id);
+        if (!lightConfig.m_id.empty()) {
+            light->SetUUID(lightConfig.m_id);
         }
         // 应用 world.yaml 中的 enabled 配置（默认启用）
-        light->SetEnabled(lightConfig.Enabled);
-        light->Direction = lightConfig.Direction;
-        light->Color = lightConfig.Color;
-        light->AmbientColor = lightConfig.AmbientColor;
-        light->DiffuseColor = lightConfig.DiffuseColor;
-        light->SpecularColor = lightConfig.SpecularColor;
-        light->AmbientIntensity = lightConfig.AmbientIntensity;
-        light->DiffuseIntensity = lightConfig.DiffuseIntensity;
-        light->SpecularIntensity = lightConfig.SpecularIntensity;
+        light->SetEnabled(lightConfig.m_enabled);
+        light->m_direction = lightConfig.m_direction;
+        light->m_color = lightConfig.m_color;
+        light->m_ambient_color = lightConfig.m_ambient_color;
+        light->m_diffuse_color = lightConfig.m_diffuse_color;
+        light->m_specular_color = lightConfig.m_specular_color;
+        light->m_ambient_intensity = lightConfig.m_ambient_intensity;
+        light->m_diffuse_intensity = lightConfig.m_diffuse_intensity;
+        light->m_specular_intensity = lightConfig.m_specular_intensity;
         m_lights.push_back(std::unique_ptr<Light>(light));
         lights_raw.push_back(light);
 
@@ -260,24 +250,24 @@ void Renderer::init(int w, int h) {
     }
 
     // 创建点光源
-    for (const auto &lightConfig: gConfig->PointLights) {
+    for (const auto &lightConfig: gConfig->m_point_lights) {
         // 名称优先使用 world.yaml 中的 name，未配置时回退为自动生成的索引名
-        std::string pointName = lightConfig.Name.empty() ? std::format("light-{}", i + 1) : lightConfig.Name;
+        std::string pointName = lightConfig.m_name.empty() ? std::format("light-{}", i + 1) : lightConfig.m_name;
         auto light = new PointLight(pointName);
         // 若配置了 id，则覆盖默认自动生成的 UUID 用于稳定标识
-        if (!lightConfig.Id.empty()) {
-            light->SetUUID(lightConfig.Id);
+        if (!lightConfig.m_id.empty()) {
+            light->SetUUID(lightConfig.m_id);
         }
         // 应用 world.yaml 中的 enabled 配置（默认启用）
-        light->SetEnabled(lightConfig.Enabled);
-        light->Color = lightConfig.Color;
-        light->Position = lightConfig.Position;
-        light->AmbientColor = lightConfig.AmbientColor;
-        light->DiffuseColor = lightConfig.DiffuseColor;
-        light->SpecularColor = lightConfig.SpecularColor;
-        light->Attenuation.Constant = lightConfig.Attenuation.Constant;
-        light->Attenuation.Linear = lightConfig.Attenuation.Linear;
-        light->Attenuation.Exp = lightConfig.Attenuation.Exp;
+        light->SetEnabled(lightConfig.m_enabled);
+        light->m_color = lightConfig.m_color;
+        light->m_position = lightConfig.m_position;
+        light->m_ambient_color = lightConfig.m_ambient_color;
+        light->m_diffuse_color = lightConfig.m_diffuse_color;
+        light->m_specular_color = lightConfig.m_specular_color;
+        light->Attenuation.m_constant = lightConfig.Attenuation.m_constant;
+        light->Attenuation.m_linear = lightConfig.Attenuation.m_linear;
+        light->Attenuation.m_exp = lightConfig.Attenuation.m_exp;
         m_lights.push_back(std::unique_ptr<Light>(light));
         lights_raw.push_back(light);
 
@@ -286,30 +276,30 @@ void Renderer::init(int w, int h) {
     }
 
     // 创建聚光灯
-    for (const auto &lightConfig: gConfig->SpotLights) {
+    for (const auto &lightConfig: gConfig->m_spot_lights) {
         // 名称优先使用 world.yaml 中的 name，未配置时回退为自动生成的索引名
-        std::string spotName = lightConfig.Name.empty() ? std::format("spot-light-{}", i + 1) : lightConfig.Name;
+        std::string spotName = lightConfig.m_name.empty() ? std::format("spot-light-{}", i + 1) : lightConfig.m_name;
         auto light = new SpotLight(spotName);
         // 若配置了 id，则覆盖默认自动生成的 UUID 用于稳定标识
-        if (!lightConfig.Id.empty()) {
-            light->SetUUID(lightConfig.Id);
+        if (!lightConfig.m_id.empty()) {
+            light->SetUUID(lightConfig.m_id);
         }
         // 应用 world.yaml 中的 enabled 配置（默认启用）
-        light->SetEnabled(lightConfig.Enabled);
-        light->Position = lightConfig.Position;
-        light->Direction = lightConfig.Direction;
-        light->Color = lightConfig.Color;
-        light->AmbientColor = lightConfig.AmbientColor;
-        light->DiffuseColor = lightConfig.DiffuseColor;
-        light->SpecularColor = lightConfig.SpecularColor;
-        light->AmbientIntensity = lightConfig.AmbientIntensity;
-        light->DiffuseIntensity = lightConfig.DiffuseIntensity;
-        light->SpecularIntensity = lightConfig.SpecularIntensity;
-        light->Attenuation.Constant = lightConfig.Attenuation.Constant;
-        light->Attenuation.Linear = lightConfig.Attenuation.Linear;
-        light->Attenuation.Exp = lightConfig.Attenuation.Exp;
-        light->Cutoff = lightConfig.Cutoff;
-        light->OuterCutoff = lightConfig.OuterCutoff;
+        light->SetEnabled(lightConfig.m_enabled);
+        light->m_position = lightConfig.m_position;
+        light->m_direction = lightConfig.m_direction;
+        light->m_color = lightConfig.m_color;
+        light->m_ambient_color = lightConfig.m_ambient_color;
+        light->m_diffuse_color = lightConfig.m_diffuse_color;
+        light->m_specular_color = lightConfig.m_specular_color;
+        light->m_ambient_intensity = lightConfig.m_ambient_intensity;
+        light->m_diffuse_intensity = lightConfig.m_diffuse_intensity;
+        light->m_specular_intensity = lightConfig.m_specular_intensity;
+        light->Attenuation.m_constant = lightConfig.Attenuation.m_constant;
+        light->Attenuation.m_linear = lightConfig.Attenuation.m_linear;
+        light->Attenuation.m_exp = lightConfig.Attenuation.m_exp;
+        light->m_cutoff = lightConfig.m_cutoff;
+        light->m_outer_cutoff = lightConfig.m_outer_cutoff;
         m_lights.push_back(std::unique_ptr<Light>(light));
         lights_raw.push_back(light);
 
@@ -322,40 +312,39 @@ void Renderer::init(int w, int h) {
     // 这里在灯光全部创建完成后重新绑定，确保地形能正确接收光源
     terrainEffect->SetLights(lights_raw);
 
-    for (const auto &modelConfig: gConfig->Models) {
-        std::cout << "model name : " << modelConfig.Name << std::endl;
-        std::cout << "mesh name  : " << modelConfig.Mesh.Name << std::endl;
-        std::cout << "mesh file  : " << modelConfig.Mesh.File << std::endl;
-        if (modelConfig.Mesh.File.empty()) {
+    for (const auto &modelConfig: gConfig->m_models) {
+        std::cout << "model name : " << modelConfig.m_name << std::endl;
+        std::cout << "mesh name  : " << modelConfig.m_mesh.m_name << std::endl;
+        std::cout << "mesh file  : " << modelConfig.m_mesh.m_file << std::endl;
+        if (modelConfig.m_mesh.m_file.empty()) {
             continue;
         }
-        auto model_obj = new Model(modelConfig.Name);
-        model_obj->LoadModel(modelConfig.Mesh.File);
+        auto model_obj = new Model(modelConfig.m_name);
+        model_obj->LoadModel(modelConfig.m_mesh.m_file);
 
         // 材质改为从 MTL 文件加载（自定义 MtlParser 解析），不再内联在 yaml 中
         MtlParser mtlParser;
-        auto *material = mtlParser.ParseSingle(modelConfig.Material.File, modelConfig.Material.Name);
+        auto *material = mtlParser.ParseSingle(modelConfig.m_material.m_file, modelConfig.m_material.m_name);
         if (material == nullptr) {
             // MTL 解析失败或材质名未找到时，退回默认材质，避免后续空指针
             material = new Material();
-            material->Name = modelConfig.Material.Name;
-            material->AmbientColor = glm::vec3(0.2f);
-            material->DiffuseColor = glm::vec3(0.8f);
-            material->SpecularColor = glm::vec3(0.0f);
-            material->Shininess = 0.0f;
+            material->m_name = modelConfig.m_material.m_name;
+            material->m_ambient_color = glm::vec3(0.2f);
+            material->m_diffuse_color = glm::vec3(0.8f);
+            material->m_specular_color = glm::vec3(0.0f);
+            material->m_shininess = 0.0f;
         }
-        std::cout << "material loaded from mtl: " << material->Name
-                  << " (Ka " << material->AmbientColor.r << "," << material->AmbientColor.g << "," << material->AmbientColor.b
-                  << " Kd " << material->DiffuseColor.r << "," << material->DiffuseColor.g << "," << material->DiffuseColor.b
-                  << " Ks " << material->SpecularColor.r << "," << material->SpecularColor.g << "," << material->SpecularColor.b
-                  << " Ns " << material->Shininess << ")" << std::endl;
+        std::cout << "material loaded from mtl: " << material->m_name
+                  << " (Ka " << material->m_ambient_color.r << "," << material->m_ambient_color.g << "," << material->m_ambient_color.b
+                  << " Kd " << material->m_diffuse_color.r << "," << material->m_diffuse_color.g << "," << material->m_diffuse_color.b
+                  << " Ks " << material->m_specular_color.r << "," << material->m_specular_color.g << "," << material->m_specular_color.b
+                  << " Ns " << material->m_shininess << ")" << std::endl;
 
         auto *effect = new TechniqueLight(
             "default",
-            modelConfig.ShaderVertFile,
-            modelConfig.ShaderFragFile
+            modelConfig.m_shader_vert_file,
+            modelConfig.m_shader_frag_file
         );
-        effect->SetMaterial(material);
         effect->SetLights(lights_raw);
         for (const auto &m: model_obj->GetMeshes()) {
             m->SetEffect(effect);
@@ -372,21 +361,18 @@ void Renderer::init(int w, int h) {
         // 【调试】一次性打印每个模型的贴图 ID，验证 assimp 是否成功加载漫反射/法线贴图
         //（0 表示未加载；若加载了但渲染色黑，则为纹理上传/采样问题）
         for (const auto &m: model_obj->GetMeshes()) {
-            std::cout << "[texture] model=" << modelConfig.Name
+            std::cout << "[texture] model=" << modelConfig.m_name
                       << " diffuse=" << m->GetTexture()
                       << " normal=" << m->GetNormalMap() << std::endl;
         }
-        // 模型材质与着色器交由渲染器统一管理释放
-        m_materials.push_back(std::unique_ptr<Material>(material));
+        // 材质移交模型持有：材质是逐绘制状态，由 Model::Draw 交给各 Mesh 上传
+        model_obj->SetMaterial(std::unique_ptr<Material>(material));
         m_techniques.push_back(std::unique_ptr<Technique>(effect));
 
-        // 登记模型 → 材质映射：模型切换到共享风格技术(Lit/Toon)时，
-        // 共享技术的 GetMaterial() 会被其它模型覆盖，属性面板必须按模型查自己的材质
-        m_model_materials[model_obj] = material;
         // 记录模型初始渲染风格：按 world.yaml 指定的片元着色器文件名推断，
         // 供属性面板下拉框回显当前风格（与 GetModelStyle 的默认值 Lit 区分）
         RenderStyle initialStyle = RenderStyle::Lit;
-        const std::string &fragFile = modelConfig.ShaderFragFile;
+        const std::string &fragFile = modelConfig.m_shader_frag_file;
         if (fragFile.find("toon") != std::string::npos) {
             initialStyle = RenderStyle::Toon;
         } else if (fragFile.find("textured") != std::string::npos) {
@@ -396,9 +382,9 @@ void Renderer::init(int w, int h) {
         }
         m_model_styles[model_obj] = initialStyle;
 
-        model_obj->SetScale(modelConfig.Scale);
-        model_obj->SetTranslate(modelConfig.Position);
-        model_obj->SetRotation(modelConfig.Rotation.x, modelConfig.Rotation.y, modelConfig.Rotation.z);
+        model_obj->SetScale(modelConfig.m_scale);
+        model_obj->SetTranslate(modelConfig.m_position);
+        model_obj->SetRotation(modelConfig.m_rotation.x, modelConfig.m_rotation.y, modelConfig.m_rotation.z);
 
         m_models.push_back(std::unique_ptr<Model>(model_obj));
     }
@@ -406,100 +392,100 @@ void Renderer::init(int w, int h) {
     // ---- 通用动画：按 world.yaml animations 配置创建，绑定到模型或灯光 ----
     // 目标对象按 light 优先、model 兜底解析；各配置通道统一打包为 AnimChannel 注册，
     // 目标不支持的通道（如方向光不支持位移）只告警跳过，不中断其它通道的绑定。
-    for (const auto &animConfig: gConfig->Animations) {
-        IAnimTarget *target = animConfig.LightName.empty() ? nullptr : GetLight(animConfig.LightName);
+    for (const auto &animConfig: gConfig->m_animations) {
+        IAnimTarget *target = animConfig.m_light_name.empty() ? nullptr : GetLight(animConfig.m_light_name);
         if (target == nullptr) {
-            target = GetModel(animConfig.ModelName);
+            target = GetModel(animConfig.m_model_name);
         }
         if (target == nullptr) {
-            const std::string &missing = animConfig.LightName.empty() ? animConfig.ModelName : animConfig.LightName;
-            std::cout << "[animation] skip " << animConfig.Name
+            const std::string &missing = animConfig.m_light_name.empty() ? animConfig.m_model_name : animConfig.m_light_name;
+            std::cout << "[animation] skip " << animConfig.m_name
                       << ": model/light " << missing << " not found" << std::endl;
             continue;
         }
         auto *anim = CreateAnimation(target);
-        anim->SetName(animConfig.Name);
-        anim->SetEnabled(animConfig.Enabled);
+        anim->SetName(animConfig.m_name);
+        anim->SetEnabled(animConfig.m_enabled);
 
         auto bind_channel = [&](AnimChannel ch, const char *ch_name) {
-            if (!target->CanAnimate(ch.property)) {
-                std::cout << "[animation] " << animConfig.Name << ": " << ch_name
+            if (!target->CanAnimate(ch.m_property)) {
+                std::cout << "[animation] " << animConfig.m_name << ": " << ch_name
                           << " 通道不被目标 " << target->GetName() << " 支持，已跳过" << std::endl;
                 return;
             }
             anim->AddChannel(ch);
         };
 
-        if (animConfig.HasTranslate) {
+        if (animConfig.m_has_translate) {
             AnimChannel ch;
-            ch.property = AnimProperty::Position;
-            ch.curve = AnimCurveType::Sine;
-            ch.center = animConfig.TranslateCenter;
-            ch.amplitude = animConfig.TranslateAmplitude;
-            ch.frequency = animConfig.TranslateFrequency;
+            ch.m_property = AnimProperty::Position;
+            ch.m_curve = AnimCurveType::Sine;
+            ch.center = animConfig.translate_center;
+            ch.amplitude = animConfig.translate_amplitude;
+            ch.m_frequency = animConfig.m_translate_frequency;
             bind_channel(ch, "translate");
         }
-        if (animConfig.HasOrbit) {
+        if (animConfig.m_has_orbit) {
             // 圆周轨道：同属 Position 通道，曲线类型换 Orbit（x/z 半径形成圆周）
             AnimChannel ch;
-            ch.property = AnimProperty::Position;
-            ch.curve = AnimCurveType::Orbit;
-            ch.center = animConfig.OrbitCenter;
-            ch.amplitude = animConfig.OrbitRadius;
-            ch.frequency = animConfig.OrbitFrequency;
+            ch.m_property = AnimProperty::Position;
+            ch.m_curve = AnimCurveType::Orbit;
+            ch.center = animConfig.orbit_center;
+            ch.amplitude = animConfig.orbit_radius;
+            ch.m_frequency = animConfig.m_orbit_frequency;
             bind_channel(ch, "orbit");
         }
-        if (animConfig.HasScale) {
+        if (animConfig.m_has_scale) {
             AnimChannel ch;
-            ch.property = AnimProperty::Scale;
-            ch.curve = AnimCurveType::Sine;
-            ch.center = animConfig.ScaleBase;
-            ch.amplitude = animConfig.ScaleAmplitude;
-            ch.frequency = animConfig.ScaleFrequency;
+            ch.m_property = AnimProperty::Scale;
+            ch.m_curve = AnimCurveType::Sine;
+            ch.center = animConfig.scale_base;
+            ch.amplitude = animConfig.scale_amplitude;
+            ch.m_frequency = animConfig.m_scale_frequency;
             bind_channel(ch, "scale");
         }
-        if (animConfig.HasRotate) {
+        if (animConfig.m_has_rotate) {
             AnimChannel ch;
-            ch.property = AnimProperty::Rotation;
-            if (animConfig.RotateSpin) {
+            ch.m_property = AnimProperty::Rotation;
+            if (animConfig.m_rotate_spin) {
                 // 持续旋转：从基准角以各轴 speed 度/秒匀速推进
-                ch.curve = AnimCurveType::Spin;
-                ch.center = animConfig.RotateBase;
-                ch.speed = animConfig.RotateSpeed;
+                ch.m_curve = AnimCurveType::Spin;
+                ch.center = animConfig.rotate_base;
+                ch.speed = animConfig.rotate_speed;
             } else {
                 // 正弦摆动：围绕基准角以振幅/频率往复
-                ch.curve = AnimCurveType::Sine;
-                ch.center = animConfig.RotateBase;
-                ch.amplitude = animConfig.RotateAmplitude;
-                ch.frequency = animConfig.RotateFrequency;
+                ch.m_curve = AnimCurveType::Sine;
+                ch.center = animConfig.rotate_base;
+                ch.amplitude = animConfig.rotate_amplitude;
+                ch.m_frequency = animConfig.m_rotate_frequency;
             }
             bind_channel(ch, "rotate");
         }
-        if (animConfig.HasColor) {
+        if (animConfig.m_has_color) {
             AnimChannel ch;
-            ch.property = AnimProperty::LightColor;
-            ch.curve = AnimCurveType::Sine;
-            ch.center = animConfig.ColorCenter;
-            ch.amplitude = animConfig.ColorAmplitude;
-            ch.frequency = animConfig.ColorFrequency;
+            ch.m_property = AnimProperty::LightColor;
+            ch.m_curve = AnimCurveType::Sine;
+            ch.center = animConfig.color_center;
+            ch.amplitude = animConfig.color_amplitude;
+            ch.m_frequency = animConfig.m_color_frequency;
             bind_channel(ch, "color");
         }
-        if (animConfig.HasIntensity) {
+        if (animConfig.m_has_intensity) {
             AnimChannel ch;
-            ch.property = AnimProperty::LightIntensity;
-            ch.curve = AnimCurveType::Sine;
-            ch.center = animConfig.IntensityCenter;
-            ch.amplitude = animConfig.IntensityAmplitude;
-            ch.frequency = animConfig.IntensityFrequency;
+            ch.m_property = AnimProperty::LightIntensity;
+            ch.m_curve = AnimCurveType::Sine;
+            ch.center = animConfig.intensity_center;
+            ch.amplitude = animConfig.intensity_amplitude;
+            ch.m_frequency = animConfig.m_intensity_frequency;
             bind_channel(ch, "intensity");
         }
-        std::cout << "[animation] " << animConfig.Name << " -> " << target->GetName() << std::endl;
+        std::cout << "[animation] " << animConfig.m_name << " -> " << target->GetName() << std::endl;
     }
 
     // ---- 渲染风格技术池（运行时切换，基础版：无参数调节）----
     // 为四套标准着色器（unlit/textured/lit/toon）各创建一个共享 Technique，
     // 运行时 SetModelStyle 遍历模型 mesh 换用对应技术，实现界面切换渲染风格。
-    // 共享实例登记进 m_techniques 统一释放；材质按模型单独登记（见 m_model_materials）。
+    // 共享实例登记进 m_techniques 统一释放；材质由各 Model 自己持有，此处不再登记。
     auto *styleUnlit = new Technique("style_unlit",
                                      "./resource/shader/unlit.vert",
                                      "./resource/shader/unlit.frag");
@@ -552,139 +538,29 @@ void Renderer::draw(long long elapsed) {
     // 整帧不变的渲染参数统一装入 ctx，沿 SkyDome/Terrain/Model/Mesh/Particle 绘制链贯通，
     // 阴影状态（ctx.shadow）在下方深度 Pass 分段更新，场景 Pass 直接读取。
     RenderContext ctx;
-    ctx.elapsed = elapsed;
-    ctx.projection = m_projection_matrix;
-    ctx.view = m_view_matrix;
-    ctx.camera = m_eye_pos;
-    ctx.lights = scene_lights;
+    ctx.m_elapsed = elapsed;
+    ctx.m_projection = m_projection_matrix;
+    ctx.m_view = m_view_matrix;
+    ctx.m_camera = m_eye_pos;
+    ctx.m_lights = scene_lights;
     // bias 缩放系数跟随面板滑块，每帧统一写入上下文
-    ctx.shadow.biasScale = m_shadow_bias_scale;
+    ctx.m_shadow.m_bias_scale = m_shadow_pass->GetBiasScale();
 
     // ---- 方向光阴影深度 Pass ----
-    // 先用光源视角把场景写进深度贴图，主渲染 Pass 再采样它判定阴影。
-    // 仅在启用阴影且存在已启用的方向光时执行；否则本帧不启用阴影采样。
-    m_shadow_map_ready = false;
-    // 每帧先重置光源摄像机参数的有效标志：仅当本帧存在已启用的方向光时才置为有效
-    m_shadow_camera.available = false;
-    if (m_shadows_enabled && m_shadow_fbo != nullptr && m_shadow_depth_tech != nullptr) {
-        DirectionLight *dirLight = nullptr;
-        for (auto light: scene_lights) {
-            if (light->GetLightType() == LightTypeDirection && light->IsEnabled()) {
-                dirLight = static_cast<DirectionLight *>(light);
-                break;
-            }
-        }
-
-        if (dirLight != nullptr) {
-            // 保存当前主渲染视口（含 Dock 中央面板的偏移 origin），
-            // 阴影 Pass 会改写到 2048×2048，结束后必须原样恢复，否则场景会从(0,0)绘制导致画面偏移/被裁剪
-            GLint prevMainViewport[4];
-            glGetIntegerv(GL_VIEWPORT, prevMainViewport);
-
-            // 计算光源空间矩阵：平行光用正交投影（覆盖场景范围），保证阴影精度与覆盖平衡。
-            // 光照计算用 toLight = -Direction（光源在 -Direction 方向远处，即场景上方），
-            // 因此阴影深度 Pass 的光源"摄像机"也必须放在 -Direction 一侧并朝场景看，
-            // 否则深度贴图从相反方向生成，深度比较永远对不齐光照，阴影无法显示。
-            glm::vec3 lightDir = glm::normalize(dirLight->Direction);
-            // 光源摄像机参数统一存入 m_shadow_camera（供 ImGui 面板展示与矩阵计算共用同一来源），
-            // 后续 lightProjection/lightView 矩阵全部由这些字段构建，避免魔法数在计算处重复出现。
-            // 正交投影范围按场景 AABB 自适应（computeSceneBounds → 包围球半径 + 10% 边距 + 5 单位）：
-            // 旧实现固定 ±210 覆盖全部地形，sphere 直径 3 单位仅占 ~0.7% 像素、阴影明显像素化；
-            // 当前场景收紧到约 ±80，同分辨率下阴影精度提升近 3 倍，PCF 软阴影也更细腻。
-            // 近/远平面沿用 1/100：光源在场景中心上方 30 单位，最远角点距光源约 80，100 足够。
-            m_shadow_camera.direction = lightDir;
-
-            // 场景包围盒 → 中心 + 包围球半径，光源正交盒以 中心 ±(半径+边距) 覆盖，
-            // 用包围球而非 AABB 是因为光源视图有朝向旋转，球在任意旋转下都被正方形盒包含
-            glm::vec3 sceneMin, sceneMax;
-            computeSceneBounds(sceneMin, sceneMax);
-            const glm::vec3 sceneCenter = (sceneMin + sceneMax) * 0.5f;
-            const float sceneRadius = glm::length(sceneMax - sceneCenter);
-            const float span = sceneRadius * 1.1f + 5.0f; // 10% 边距 + 5 单位余量
-
-            m_shadow_camera.lookAt = sceneCenter;
-            m_shadow_camera.position = sceneCenter - lightDir * 30.0f; // 光源位于场景上方（-Direction 远处），向下照射
-            m_shadow_camera.orthoLeft = -span;
-            m_shadow_camera.orthoRight = span;
-            m_shadow_camera.orthoBottom = -span;
-            m_shadow_camera.orthoTop = span;
-
-            // 当光源恰好垂直位于场景正上方（如太阳方向 (0,-1,0) 纯直下）时，
-            // lookAt 的 look 向量与默认 up=(0,1,0) 完全平行，cross 得零向量，
-            // normalize 产生 NaN 导致所有顶点深度无效、深度贴图为空。
-            // 此时改用 Z 轴（0,0,-1）作 up，避免退化。
-            // 【说明】若用 X 轴(1,0,0) 作 up，光源视图坐标系会发生 90° 旋转：
-            //   世界 z → 光源 x、世界 x → 光源 y，导致阴影贴图采样坐标轴互换，
-            //   表现为纯垂直光下球体出现"沿 z=0 经线"的红/黑异常分界（用户报告的问题）。
-            // 改用 Z 轴后，光源视图 x 轴 = 世界 x、y 轴 = 世界 z，深度仍沿 -y，
-            // 坐标轴不再异常互换，阴影分界恢复为正确的水平纬线（顶部亮/底部暗）。
-            glm::vec3 lookDir = glm::normalize(m_shadow_camera.lookAt - m_shadow_camera.position);
-            glm::vec3 safeUp = (fabs(lookDir.y) > 0.999f)
-                                 ? glm::vec3(0.0f, 0.0f, 1.0f)
-                                 : glm::vec3(0.0f, 1.0f, 0.0f);
-            m_shadow_camera.up = safeUp;
-
-            // 视图/投影矩阵统一由 m_shadow_camera 字段构建（字段是唯一参数来源）
-            m_shadow_camera.lightView = glm::lookAt(m_shadow_camera.position, m_shadow_camera.lookAt, m_shadow_camera.up);
-            m_shadow_camera.lightProjection = glm::ortho(m_shadow_camera.orthoLeft, m_shadow_camera.orthoRight,
-                                                         m_shadow_camera.orthoBottom, m_shadow_camera.orthoTop,
-                                                         m_shadow_camera.nearPlane, m_shadow_camera.farPlane);
-            m_shadow_camera.available = true;
-
-            m_light_space = m_shadow_camera.lightProjection * m_shadow_camera.lightView;
-
-            // 绑定阴影 FBO 并清空深度，随后以"只写深度"方式重画场景（地形 + 模型），
-            // 生成光源视角的深度贴图供主 Pass 阴影判断使用
-            m_shadow_fbo->BindForWrite();
-            // 组装 ctx.shadow：置位 passActive 后，Mesh::Draw 会改走"只写深度"分支。
-            // 阴影状态统一经 RenderContext 下发，不再依赖 Mesh 静态全局量 / 地形逐层转发
-            ctx.shadow.depthTech = m_shadow_depth_tech;
-            ctx.shadow.lightSpace = m_light_space;
-            ctx.shadow.passActive = true;
-
-            // 深度 Pass 渲染时开启面片深度偏移(GL_POLYGON_OFFSET_FILL)：
-            // 把写入阴影贴图的深度统一推远，保证与主绘制采样做比较时留出余量，
-            // 从根本上消除平坦地面在倾斜方向光下的自阴影痤疮(acne)，且不依赖着色器内超大 bias
-            // （超大 bias 会让 bunny 等模型的阴影"飘浮/peter-panning"）。
-            glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(1.0f, 1.0f);
-
-            // m_terrain_manager->Draw(ctx);
-            for (const auto &m: m_models) {
-                m->Draw(ctx, glm::mat4(1.0f));
-            }
-
-            // 退出深度 Pass：关闭深度偏移并复位 passActive，恢复光照绘制。
-            // 必须关闭该 GL 状态，避免泄漏影响后续场景绘制
-            glDisable(GL_POLYGON_OFFSET_FILL);
-            ctx.shadow.passActive = false;
-            m_shadow_fbo->Unbind();
-            // 恢复之前保存的主渲染视口（阴影 Pass 改写过视口，不解绑/不恢复会残余错误大小与偏移）
-            glViewport(prevMainViewport[0], prevMainViewport[1], prevMainViewport[2], prevMainViewport[3]);
-
-
-            // 把阴影深度贴图绑定到纹理单元2（单元0/1 已被漫反射/法线贴图占用），
-            // 后续每个 Mesh::Draw 会通过 SetShadowMap(2) 通知着色器采样它
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, m_shadow_fbo->GetDepthTexture());
-            // 标记本帧已有阴影贴图：ctx.shadow.ready 供场景 Pass 的模型/地形启用阴影采样，
-            // m_shadow_map_ready 保留给调试面板展示
-            ctx.shadow.ready = true;
-            ctx.shadow.depthTexture = m_shadow_fbo->GetDepthTexture();
-            m_shadow_map_ready = true;
-        }
-    }
-    // 阴影不可用（开关关闭/无方向光）时 ctx.shadow.ready 保持 false，
-    // Mesh::Draw 与地形 ApplyShadowState 自动跳过阴影采样，无需再单独同步
+    // 计算光源摄像机并以光源视角重绘深度贴图，结果写入 ctx.shadow 供场景 Pass 采样
+    m_shadow_pass->Render(m_models, m_terrain_manager.get(), ctx);
 
     // ---- 场景 Pass：所有 3D 内容渲染到 HDR 场景 FBO ----
     // 原实现直接画进默认帧缓冲；现在先画到 RGBA16F 离屏 FBO（保留 HDR 精度），
     // 结束后由后处理 Pass 统一做 tone mapping 输出到默认缓冲
     m_scene_fbo->BindForWrite();
 
-    glDepthMask(GL_FALSE);
-    m_sky_dome->Draw(ctx);
-    glDepthMask(GL_TRUE);
+    {
+        // 天空穹最后绘制，关掉深度写入避免其遮住已绘制的几何
+        GLDepthWriteGuard sky_depth_write;
+        glDepthMask(GL_FALSE);
+        m_sky_dome->Draw(ctx);
+    }
 
     // 坐标轴 gizmo 不在 3D 场景中绘制：由 mainwindow 在 ImGui 绘制阶段
     // 以屏幕空间叠加方式渲染于视口角落（见 mainwindow.cpp 的 RenderFrame）
@@ -699,9 +575,12 @@ void Renderer::draw(long long elapsed) {
     //   face 的调用返回 GL_INVALID_ENUM 且状态不变。若恢复时分开设置 front/back，
     //   线框关闭后 GL_LINE 残留，连后处理全屏三角形也会退化为边线导致画面全黑。
     //   front/back 光栅化模式始终一致（本项目从未单面设置），故可直接取 front 值整体恢复。
-    GLint prevPolygonMode[2];
-    glGetIntegerv(GL_POLYGON_MODE, prevPolygonMode);
+    // guard 用 unique_ptr 持有：线框作用域结束处显式 reset 触发恢复，
+    // 不能直接用函数作用域对象，否则会一直保留到函数末尾，
+    // 连带后面的后处理全屏三角形也退化成线框、画面全黑。
+    std::unique_ptr<GLPolygonModeGuard> polygon_mode;
     if (m_wireframe_enabled) {
+        polygon_mode = std::make_unique<GLPolygonModeGuard>();
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
 
@@ -720,72 +599,12 @@ void Renderer::draw(long long elapsed) {
         ps->Draw(ctx, glm::mat4(1.0f));
     }
 
-    // 光源调试可视化（DebugDraw）：直接遍历灯光列表，把 gizmo 顶点收集进
-    // DebugDraw 后统一渲染。位置/朝向/衰减每帧从 Light 对象读取，
-    // 编辑器修改后自动跟随，无"先创建后绑定"的同步问题。
-    // 开关关闭时整段跳过，不收集也不提交（ImGui 阴影面板可配置）。
-    if (m_debug_draw_enabled) {
-        for (auto light: scene_lights) {
-            if (light == nullptr) {
-                continue;
-            }
-            switch (light->GetLightType()) {
-                case LightTypeSpot:
-                    m_debug_draw->DrawSpotLight(static_cast<SpotLight *>(light));
-                    break;
-                case LightTypeDirection:
-                    m_debug_draw->DrawDirectionLight(static_cast<DirectionLight *>(light));
-                    break;
-                case LightTypePoint:
-                    m_debug_draw->DrawPointLight(static_cast<PointLight *>(light));
-                    break;
-                default:
-                    break;
-            }
-        }
-        // 光照范围可视化：在 gizmo 基础上叠加更大的影响范围线框，
-        // 点光源为球形线框、聚光灯为锥体线框、方向光无影响范围概念跳过。
-        if (m_light_range_enabled) {
-            for (auto light: scene_lights) {
-                if (light == nullptr) {
-                    continue;
-                }
-                switch (light->GetLightType()) {
-                    case LightTypePoint: {
-                        auto *pointLight = static_cast<PointLight *>(light);
-                        const float radius = DebugDraw::ComputePointLightRadius(pointLight);
-                        m_debug_draw->DrawSphereWireframe(pointLight->Position, radius,
-                                                          glm::vec3(0.3f, 1.0f, 0.6f), 24);
-                        break;
-                    }
-                    case LightTypeSpot: {
-                        auto *spotLight = static_cast<SpotLight *>(light);
-                        // 用外锥角（OuterCutoff）绘制完整半影锥体范围
-                        m_debug_draw->DrawConeWireframe(spotLight->Position, spotLight->Direction,
-                                                        spotLight->OuterCutoff, 30.0f,
-                                                        glm::vec3(1.0f, 0.75f, 0.2f), 24);
-                        break;
-                    }
-                    default:
-                        break;
-                }
-            }
-        }
-        // 批量提交：上传本帧全部 gizmo 线段，一次 glDrawArrays(GL_LINES) 绘制（内部自动 Clear）
-        m_debug_draw->Render(m_projection_matrix, m_view_matrix);
+    if (m_debug_draw != nullptr) {
+        m_light_gizmo.Render(*m_debug_draw, scene_lights, m_projection_matrix, m_view_matrix);
     }
 
     // 绘制模型
     for (const auto &m: m_models) {
-        // 共享风格技术（lit/toon）的材质 uniform 会被绘制顺序在后的同技术模型覆盖：
-        // 每帧按模型重设材质，保证材质编辑与多模型共用风格技术时互不串色
-        if (!m->GetMeshes().empty()) {
-            auto matIt = m_model_materials.find(m.get());
-            Technique *effect = m->GetMeshes()[0]->GetEffect();
-            if (matIt != m_model_materials.end() && effect != nullptr && matIt->second != nullptr) {
-                effect->SetMaterial(matIt->second);
-            }
-        }
         m->Draw(ctx, glm::mat4(1.0f));
     }
 
@@ -805,43 +624,15 @@ void Renderer::draw(long long elapsed) {
         m_debug_draw->Render(m_projection_matrix, m_view_matrix);
     }
 
-    // 线框作用域结束：恢复进入场景 Pass 前的多边形光栅化模式（GL_FILL）。
-    // 必须整体用 GL_FRONT_AND_BACK 恢复（macOS Metal 兼容性，见上方线框模式注释）
-    if (m_wireframe_enabled) {
-        glPolygonMode(GL_FRONT_AND_BACK, prevPolygonMode[0]);
-    }
+    // 线框作用域结束：释放 guard 触发恢复，整体用 GL_FRONT_AND_BACK 写回
+    // （macOS Metal 兼容性要求，见上方线框模式注释）
+    polygon_mode.reset();
 
     // 场景 Pass 结束，回到默认帧缓冲（SceneFramebuffer 内部恢复主视口）
     m_scene_fbo->Unbind();
 
     // ---- 后处理 Pass：全屏三角形采样 HDR 场景纹理，做 tone mapping 后画到默认缓冲 ----
-    // 后处理是 2D 全屏操作，不需要深度测试与混合；
-    // 先保存再禁用、绘制后恢复。
-    const GLboolean depthTestWas = glIsEnabled(GL_DEPTH_TEST);
-    const GLboolean blendWas = glIsEnabled(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-
-    m_post_tech->Enable();
-    m_post_tech->SetUniform("sceneTex", 0);   // 场景 HDR 纹理绑定到纹理单元0
-    m_post_tech->SetUniform("toneMapMode", m_tone_mapping_enabled ? 1 : 0);
-    m_post_tech->SetUniform("exposure", m_exposure);   // 曝光系数（ACES 映射前乘入）
-    m_post_tech->SetUniform("saturation", m_saturation); // 饱和度（gamma 后调整）
-    m_post_tech->SetUniform("contrast", m_contrast);     // 对比度（gamma 后调整）
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_scene_fbo->GetColorTexture());
-
-    glBindVertexArray(m_post_vao);
-    glDrawArrays(GL_TRIANGLES, 0, 3);   // 全屏三角形：3 个顶点覆盖整个视口
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    if (depthTestWas) {
-        glEnable(GL_DEPTH_TEST);
-    }
-    if (blendWas) {
-        glEnable(GL_BLEND);
-    }
+    m_post_process_pass->Render(m_scene_fbo->GetColorTexture());
 }
 
 void Renderer::resize(int w, int h) {
@@ -911,9 +702,7 @@ Model *Renderer::GetModelByUUID(const std::string &uuid) {
  *
  * 思路（业界常见"共享技术池"做法）：四套标准着色器各持一个共享 Technique
  * （见 init 中 m_style_techniques），切换 = 把模型所有 mesh 的 effect 换成池中实例。
- * Mesh::Draw 每帧会重设变换矩阵/相机/灯光/阴影等 uniform，故切换后下一帧自动生效。
- * 材质是唯一的"隐性状态"，需在切换时立即随模型重设（见 m_model_materials），
- * 避免共享技术之间残留上一模型的材质 uniform。
+ * Mesh::Draw 每帧会重设变换矩阵/相机/灯光/阴影/材质等 uniform，故切换后下一帧自动生效。
  */
 void Renderer::SetModelStyle(Model *model, RenderStyle style) {
     if (model == nullptr) {
@@ -931,13 +720,6 @@ void Renderer::SetModelStyle(Model *model, RenderStyle style) {
         }
     }
     m_model_styles[model] = style;
-
-    // 同步材质：lit/toon 技术依赖材质 uniform，用本模型材质立即重设，
-    // 防止共享技术残留其它模型（或此前的默认材质）的 uniform 值
-    auto matIt = m_model_materials.find(model);
-    if (matIt != m_model_materials.end() && matIt->second != nullptr) {
-        it->second->SetMaterial(matIt->second);
-    }
 }
 
 RenderStyle Renderer::GetModelStyle(Model *model) const {
@@ -949,11 +731,7 @@ RenderStyle Renderer::GetModelStyle(Model *model) const {
 }
 
 Material *Renderer::GetModelMaterial(Model *model) const {
-    auto it = m_model_materials.find(model);
-    if (it != m_model_materials.end()) {
-        return it->second;
-    }
-    return nullptr;
+    return model == nullptr ? nullptr : model->GetMaterial();
 }
 
 /* 设置鼠标拾取结果的线框高亮盒（世界空间 AABB），draw 末尾叠加绘制 */
@@ -1020,14 +798,93 @@ ProjectionType Renderer::GetProjectionType() const {
 }
 
 unsigned int Renderer::GetShadowDepthTexture() const {
-    // 阴影 FBO 未创建（阴影禁用或初始化前）时返回 0，
-    // 供 ImGui 调试面板判断当前是否可显示深度贴图
-    return (m_shadow_fbo != nullptr) ? m_shadow_fbo->GetDepthTexture() : 0;
+    return (m_shadow_pass != nullptr) ? m_shadow_pass->GetDepthTexture() : 0;
 }
 
 bool Renderer::IsShadowMapReady() const {
-    // 本帧阴影深度 Pass 是否已执行并生成有效深度贴图
-    return m_shadow_map_ready;
+    return (m_shadow_pass != nullptr) && m_shadow_pass->IsMapReady();
+}
+
+void Renderer::SetShadowsEnabled(bool enabled) {
+    if (m_shadow_pass != nullptr) {
+        m_shadow_pass->SetEnabled(enabled);
+    }
+}
+
+bool Renderer::IsShadowsEnabled() const {
+    return (m_shadow_pass != nullptr) && m_shadow_pass->IsEnabled();
+}
+
+const ShadowCameraParams &Renderer::GetShadowCameraParams() const {
+    // 引用返回无"空值"，用 available=false 的静态哨兵表示阴影 Pass 尚未创建
+    static const ShadowCameraParams s_unavailable;
+    return (m_shadow_pass != nullptr) ? m_shadow_pass->GetCameraParams() : s_unavailable;
+}
+
+void Renderer::SetShadowBiasScale(float scale) {
+    if (m_shadow_pass != nullptr) {
+        m_shadow_pass->SetBiasScale(scale);
+    }
+}
+
+float Renderer::GetShadowBiasScale() const {
+    return (m_shadow_pass != nullptr) ? m_shadow_pass->GetBiasScale() : 1.0f;
+}
+
+void Renderer::SetToneMappingEnabled(bool enabled) {
+    if (m_post_process_pass != nullptr) {
+        m_post_process_pass->SetToneMappingEnabled(enabled);
+    }
+}
+
+bool Renderer::IsToneMappingEnabled() const {
+    return (m_post_process_pass != nullptr) && m_post_process_pass->IsToneMappingEnabled();
+}
+
+void Renderer::SetExposure(float exposure) {
+    if (m_post_process_pass != nullptr) {
+        m_post_process_pass->SetExposure(exposure);
+    }
+}
+
+float Renderer::GetExposure() const {
+    return (m_post_process_pass != nullptr) ? m_post_process_pass->GetExposure() : 1.0f;
+}
+
+void Renderer::SetSaturation(float sat) {
+    if (m_post_process_pass != nullptr) {
+        m_post_process_pass->SetSaturation(sat);
+    }
+}
+
+float Renderer::GetSaturation() const {
+    return (m_post_process_pass != nullptr) ? m_post_process_pass->GetSaturation() : 1.0f;
+}
+
+void Renderer::SetContrast(float contrast) {
+    if (m_post_process_pass != nullptr) {
+        m_post_process_pass->SetContrast(contrast);
+    }
+}
+
+float Renderer::GetContrast() const {
+    return (m_post_process_pass != nullptr) ? m_post_process_pass->GetContrast() : 1.0f;
+}
+
+void Renderer::SetDebugDrawEnabled(bool enabled) {
+    m_light_gizmo.SetEnabled(enabled);
+}
+
+bool Renderer::IsDebugDrawEnabled() const {
+    return m_light_gizmo.IsEnabled();
+}
+
+void Renderer::SetLightRangeEnabled(bool enabled) {
+    m_light_gizmo.SetRangeEnabled(enabled);
+}
+
+bool Renderer::IsLightRangeEnabled() const {
+    return m_light_gizmo.IsRangeEnabled();
 }
 
 void Renderer::SetFov(float fov) {
@@ -1043,7 +900,7 @@ void Renderer::SetFov(float fov) {
  * 地形范围 ±100 × 模型缩放 2.1 = ±210，故网格覆盖 ±200；
  * 间距 20 单位，共 21+21 条等距线段，肉眼可辨且开销极小。
  * 每条线仅两个调试顶点，通过 DebugDraw::DrawLine 收集后统一提交。
- * 网格仅与开关（m_grid_enabled）绑定，不受光源 gizmo 开关（m_debug_draw_enabled）影响。
+ * 网格仅与开关（m_grid_enabled）绑定，不受光源 gizmo 开关（SetDebugDrawEnabled）影响。
  */
 void Renderer::DrawGrid() {
     constexpr float kExtent = 200.0f; // 覆盖范围（半边长，略小于地形最远顶点 ±210）
@@ -1090,47 +947,12 @@ void Renderer::CollectModelNormals() {
                 continue;
             }
             for (const auto &vertex: mesh->GetVertices()) {
-                glm::vec3 worldPos = glm::vec3(modelMat * glm::vec4(vertex.Position, 1.0f));
-                glm::vec3 worldNormal = glm::normalize(normalMat * vertex.Normal);
+                glm::vec3 worldPos = glm::vec3(modelMat * glm::vec4(vertex.m_position, 1.0f));
+                glm::vec3 worldNormal = glm::normalize(normalMat * vertex.m_normal);
                 // 统一长度（世界空间固定值），所有模型法线视觉等长
                 m_debug_draw->DrawNormal(worldPos, worldNormal, m_normal_length);
             }
         }
-    }
-}
-
-void Renderer::computeSceneBounds(glm::vec3 &outMin, glm::vec3 &outMax) const {
-    // 先以地形地面范围为基准（原点为中心 planeSize×planeSize，高度 0~heightScale），
-    // 再并入所有模型网格世界坐标范围；两者都没有时回退旧默认 ±210 保证阴影覆盖取景范围
-    bool haveBounds = false;
-
-    if (m_terrain_manager != nullptr) {
-        const TerrainConfig &cfg = m_terrain_manager->GetConfig();
-        const float half = cfg.planeSize * 0.5f;
-        outMin = glm::vec3(-half, 0.0f, -half);
-        outMax = glm::vec3(half, cfg.heightScale, half);
-        haveBounds = true;
-    }
-
-    for (const auto &model : m_models) {
-        const glm::mat4 world = model->GetWorldMatrix();
-        for (const auto &mesh : model->GetMeshes()) {
-            for (const auto &vertex : mesh->vertices) {
-                const glm::vec3 p = glm::vec3(world * glm::vec4(vertex.Position, 1.0f));
-                if (!haveBounds) {
-                    outMin = outMax = p;
-                    haveBounds = true;
-                } else {
-                    outMin = glm::min(outMin, p);
-                    outMax = glm::max(outMax, p);
-                }
-            }
-        }
-    }
-
-    if (!haveBounds) {
-        outMin = glm::vec3(-210.0f);
-        outMax = glm::vec3(210.0f);
     }
 }
 
@@ -1143,8 +965,8 @@ void Renderer::calculateProjectMatrix(const int w, const int h) {
     if (projection == ProjectionType::Perspective) {
         const float fov = m_fov; // 视野角度（member，调试面板可调）
         const float aspectRatio = (float) w / (float) (1 * h); // 宽高比
-        const float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
-        const float farPlane = gConfig->Clip.ClipFar; // 远平面距离
+        const float nearPlane = gConfig->m_clip.m_clip_near; // 近平面距离
+        const float farPlane = gConfig->m_clip.m_clip_far; // 远平面距离
         m_projection_matrix = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane); // 透视
     } else {
         // 正交投影：范围按地形地面尺寸自适应（半尺寸 + 20% 边距），
@@ -1152,7 +974,7 @@ void Renderer::calculateProjectMatrix(const int w, const int h) {
         float sceneHalf = 60.0f; // 回退默认（地形管理器尚未创建时，对应默认 planeSize=100）
         if (m_terrain_manager != nullptr) {
             const TerrainConfig &cfg = m_terrain_manager->GetConfig();
-            sceneHalf = cfg.planeSize * 0.5f + cfg.planeSize * 0.2f;
+            sceneHalf = cfg.m_plane_size * 0.5f + cfg.m_plane_size * 0.2f;
         }
 
         // 垂直范围 = ±sceneHalf，水平范围按窗口宽高比放大（长边看更多地面）
@@ -1162,8 +984,8 @@ void Renderer::calculateProjectMatrix(const int w, const int h) {
         const float bottom = -sceneHalf;
         const float top = sceneHalf;
 
-        float nearPlane = gConfig->Clip.ClipNear; // 近平面距离
-        float farPlane = gConfig->Clip.ClipFar; // 远平面距离
+        float nearPlane = gConfig->m_clip.m_clip_near; // 近平面距离
+        float farPlane = gConfig->m_clip.m_clip_far; // 远平面距离
         m_projection_matrix = glm::ortho(left, right, bottom, top, nearPlane, farPlane);
     }
 }

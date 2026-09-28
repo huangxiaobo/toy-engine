@@ -4,18 +4,18 @@
 #include <glm/glm.hpp>
 
 struct Particle {
-    glm::vec3 Position;      // 位置
-    glm::vec3 Velocity;      // 速度
-    glm::vec3 Color;         // 颜色
-    glm::vec3 ColorEnd;      // 结束颜色（用于渐变）
-    float Size;              // 大小
-    float SizeEnd;           // 结束大小
-    float Life;              // 当前生命
-    float MaxLife;           // 最大生命
-    float Age;               // 已存活时间
+    glm::vec3 m_position;      // 位置
+    glm::vec3 m_velocity;      // 速度
+    glm::vec3 m_color;         // 颜色
+    glm::vec3 m_color_end;      // 结束颜色（用于渐变）
+    float m_size;              // 大小
+    float m_size_end;           // 结束大小
+    float m_life;              // 当前生命
+    float m_max_life;           // 最大生命
+    float m_age;               // 已存活时间
     
-    bool IsAlive() const { return Life > 0.0f; }
-    float GetLifeRatio() const { return Life / MaxLife; }
+    bool IsAlive() const { return m_life > 0.0f; }
+    float GetLifeRatio() const { return m_life / m_max_life; }
 };
 
 #endif

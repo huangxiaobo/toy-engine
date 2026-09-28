@@ -35,6 +35,8 @@ public:
     DebugDraw();
 
     ~DebugDraw();
+    DebugDraw(const DebugDraw &) = delete;
+    DebugDraw &operator=(const DebugDraw &) = delete;
 
     /*
      * 初始化：创建 VAO/VBO 顶点布局，并绑定调用方共享的调试着色器
@@ -114,8 +116,8 @@ private:
 private:
     // 调试顶点格式：位置 + 颜色，对应 debug.vert 的 location 0 / 1（轻量，不含法线/UV）
     struct DebugVertex {
-        glm::vec3 position;
-        glm::vec3 color;
+        glm::vec3 m_position;
+        glm::vec3 m_color;
     };
 
     Technique *m_effect = nullptr;        // 调试着色器（裸指针，只引用不拥有）

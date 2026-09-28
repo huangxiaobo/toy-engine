@@ -36,7 +36,7 @@ public:
     // lacunarity: 频率倍增因子（通常为2.0）
     // persistence: 振幅衰减因子（通常为0.5）
     float FBM(float x, float z, int octaves = 6,
-              float lacunarity = 2.0f, float persistence = 0.5f) const;
+              float m_lacunarity = 2.0f, float persistence = 0.5f) const;
 
 private:
     // 内部插值函数

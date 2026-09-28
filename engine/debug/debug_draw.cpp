@@ -48,12 +48,12 @@ void DebugDraw::Init(Technique *effect) {
 
     // position 属性（location 0）
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(DebugVertex),
-                          reinterpret_cast<void *>(offsetof(DebugVertex, position)));
+                          reinterpret_cast<void *>(offsetof(DebugVertex, m_position)));
     glEnableVertexAttribArray(0);
 
     // color 属性（location 1）
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(DebugVertex),
-                          reinterpret_cast<void *>(offsetof(DebugVertex, color)));
+                          reinterpret_cast<void *>(offsetof(DebugVertex, m_color)));
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
@@ -201,7 +201,7 @@ void DebugDraw::DrawPointLight(const PointLight *light) {
     if (light == nullptr) {
         return;
     }
-    const glm::vec3 &pos = light->Position;
+    const glm::vec3 &pos = light->m_position;
     const float radius = ComputePointLightRadius(light);
 
     // 点光源 gizmo 专属标识色：绿色。
@@ -243,12 +243,12 @@ void DebugDraw::DrawSpotLight(const SpotLight *light) {
 
     // 构造世界空间正交基：zAxis = 光照方向（本地 +Z 对齐 direction 的旋转语义）
     glm::vec3 xAxis, yAxis, zAxis;
-    BuildBasis(light->Direction, xAxis, yAxis, zAxis);
+    BuildBasis(light->m_direction, xAxis, yAxis, zAxis);
 
-    const glm::vec3 &apex = light->Position;
+    const glm::vec3 &apex = light->m_position;
     // 由半角弧度计算底面圆半径（锥长 * 正切）
-    const float innerRadius = length * std::tan(glm::radians(light->Cutoff));
-    const float outerRadius = length * std::tan(glm::radians(light->OuterCutoff));
+    const float innerRadius = length * std::tan(glm::radians(light->m_cutoff));
+    const float outerRadius = length * std::tan(glm::radians(light->m_outer_cutoff));
 
     // 生成 z=length 平面上分布 segments 个点的底面圆环（世界空间，逆时针）
     auto buildRing = [&](float radius) {
@@ -309,7 +309,7 @@ void DebugDraw::DrawDirectionLight(const DirectionLight *light) {
     DrawLine(glm::vec3(0.0f, 0.0f, -0.5f), glm::vec3(0.0f, 0.0f, 0.5f), dirColor);
 
     // 方向线：原点沿光照方向延伸（零向量兜底不绘制，避免退化线段）
-    const glm::vec3 dir = glm::normalize(light->Direction);
+    const glm::vec3 dir = glm::normalize(light->m_direction);
     if (glm::length(dir) > 1e-6f) {
         DrawLine(glm::vec3(0.0f), dir * length, dirColor);
     }
@@ -391,9 +391,9 @@ void DebugDraw::Clear() {
  *   - 无衰减（线性和二次都为零）：影响无限远，回退到场景默认尺度
  */
 float DebugDraw::ComputePointLightRadius(const PointLight *light, float threshold) {
-    const float Kc = light->Attenuation.Constant;
-    const float Kl = light->Attenuation.Linear;
-    const float Ke = light->Attenuation.Exp;
+    const float Kc = light->Attenuation.m_constant;
+    const float Kl = light->Attenuation.m_linear;
+    const float Ke = light->Attenuation.m_exp;
     const float target = 1.0f / threshold; // 衰减到阈值时分母的值
 
     if (std::fabs(Ke) > 1e-6f) {

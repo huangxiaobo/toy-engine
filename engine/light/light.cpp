@@ -73,14 +73,14 @@ std::string Light::GetUUID() const {
  *   - Attenuation     - 衰减系数（常量/线性/指数），定义于 light.h 的 Attenuation 结构体
  */
 PointLight::PointLight(const std::string &name) : Light(name, LightTypePoint),
-                                           Position(0, 0, 0),
-                                           Color(0, 0, 0),
-                                           AmbientColor(0, 0, 0),
-                                           DiffuseColor(0, 0, 0),
-                                           SpecularColor(0, 0, 0),
-                                           AmbientIntensity(0),
-                                           DiffuseIntensity(0),
-                                           SpecularIntensity(0) {
+                                           m_position(0, 0, 0),
+                                           m_color(0, 0, 0),
+                                           m_ambient_color(0, 0, 0),
+                                           m_diffuse_color(0, 0, 0),
+                                           m_specular_color(0, 0, 0),
+                                           m_ambient_intensity(0),
+                                           m_diffuse_intensity(0),
+                                           m_specular_intensity(0) {
 }
 
 PointLight::~PointLight() {
@@ -103,13 +103,13 @@ bool PointLight::CanAnimate(AnimProperty prop) const {
 void PointLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
     switch (prop) {
         case AnimProperty::Position:
-            Position = value;
+            m_position = value;
             break;
         case AnimProperty::LightColor:
-            Color = value;
+            m_color = value;
             break;
         case AnimProperty::LightIntensity:
-            DiffuseIntensity = value.x;
+            m_diffuse_intensity = value.x;
             break;
         default:
             break;
@@ -126,17 +126,17 @@ void PointLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
  * 而 DiffuseColor/SpecularColor 用于光照计算。
  */
 void PointLight::SetColor(glm::vec3 color) {
-    Color = color;
+    m_color = color;
 }
 
 /*
  * 设置光照衰减参数
  *
  * 注意：虽然参数名为 attenuation，但当前实现将值存入 AmbientColor。
- * 调用方若想设置衰减，应直接修改 Attenuation 结构体字段（详见 renderer.cpp 中 Attenuation.Constant 等）。
+ * 调用方若想设置衰减，应直接修改 Attenuation 结构体字段（详见 renderer.cpp 中 Attenuation.m_constant 等）。
  */
 void PointLight::SetAttenuation(glm::vec3 attenuation) {
-    AmbientColor = attenuation;
+    m_ambient_color = attenuation;
 }
 
 /*
@@ -146,32 +146,32 @@ void PointLight::SetAttenuation(glm::vec3 attenuation) {
  * 光源 gizmo 的呈现由 DebugDraw 每帧直接读取 Position 生成，无需显式同步。
  */
 void PointLight::SetPosition(glm::vec3 position) {
-    Position = position;
+    m_position = position;
 }
 
 void PointLight::SetAmbientColor(glm::vec3 direction) {
-    AmbientColor = direction;
+    m_ambient_color = direction;
 }
 
 void PointLight::SetDiffuseColor(glm::vec3 color) {
-    DiffuseColor = color;
+    m_diffuse_color = color;
 }
 
 void PointLight::SetSpecularColor(glm::vec3 color) {
-    SpecularColor = color;
+    m_specular_color = color;
 }
 
 // ---- 方向光 DirectionLight ----
 
 DirectionLight::DirectionLight(const std::string &name) : Light(name, LightTypeDirection),
-                                               Direction(0, -1, 0),
-                                               Color(0, 0, 0),
-                                               AmbientColor(0, 0, 0),
-                                               DiffuseColor(0, 0, 0),
-                                               SpecularColor(0, 0, 0),
-                                               AmbientIntensity(0),
-                                               DiffuseIntensity(0),
-                                               SpecularIntensity(0) {
+                                               m_direction(0, -1, 0),
+                                               m_color(0, 0, 0),
+                                               m_ambient_color(0, 0, 0),
+                                               m_diffuse_color(0, 0, 0),
+                                               m_specular_color(0, 0, 0),
+                                               m_ambient_intensity(0),
+                                               m_diffuse_intensity(0),
+                                               m_specular_intensity(0) {
 }
 
 DirectionLight::~DirectionLight() {
@@ -197,14 +197,14 @@ void DirectionLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
     switch (prop) {
         case AnimProperty::Rotation: {
             glm::quat q(glm::radians(value));
-            Direction = glm::normalize(q * glm::vec3(0.0f, -1.0f, 0.0f));
+            m_direction = glm::normalize(q * glm::vec3(0.0f, -1.0f, 0.0f));
             break;
         }
         case AnimProperty::LightColor:
-            Color = value;
+            m_color = value;
             break;
         case AnimProperty::LightIntensity:
-            DiffuseIntensity = value.x;
+            m_diffuse_intensity = value.x;
             break;
         default:
             break;
@@ -214,17 +214,17 @@ void DirectionLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
 // ---- 聚光灯 SpotLight ----
 
 SpotLight::SpotLight(const std::string &name) : Light(name, LightTypeSpot),
-                                        Position(0, 0, 0),
-                                        Direction(0, -1, 0),
-                                        Color(0, 0, 0),
-                                        AmbientColor(0, 0, 0),
-                                        DiffuseColor(0, 0, 0),
-                                        SpecularColor(0, 0, 0),
-                                        AmbientIntensity(0),
-                                        DiffuseIntensity(0),
-                                        SpecularIntensity(0),
-                                        Cutoff(12.5f),
-                                        OuterCutoff(17.5f) {
+                                        m_position(0, 0, 0),
+                                        m_direction(0, -1, 0),
+                                        m_color(0, 0, 0),
+                                        m_ambient_color(0, 0, 0),
+                                        m_diffuse_color(0, 0, 0),
+                                        m_specular_color(0, 0, 0),
+                                        m_ambient_intensity(0),
+                                        m_diffuse_intensity(0),
+                                        m_specular_intensity(0),
+                                        m_cutoff(12.5f),
+                                        m_outer_cutoff(17.5f) {
 }
 
 SpotLight::~SpotLight() {
@@ -248,18 +248,18 @@ bool SpotLight::CanAnimate(AnimProperty prop) const {
 void SpotLight::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
     switch (prop) {
         case AnimProperty::Position:
-            Position = value;
+            m_position = value;
             break;
         case AnimProperty::Rotation: {
             glm::quat q(glm::radians(value));
-            Direction = glm::normalize(q * glm::vec3(0.0f, -1.0f, 0.0f));
+            m_direction = glm::normalize(q * glm::vec3(0.0f, -1.0f, 0.0f));
             break;
         }
         case AnimProperty::LightColor:
-            Color = value;
+            m_color = value;
             break;
         case AnimProperty::LightIntensity:
-            DiffuseIntensity = value.x;
+            m_diffuse_intensity = value.x;
             break;
         default:
             break;

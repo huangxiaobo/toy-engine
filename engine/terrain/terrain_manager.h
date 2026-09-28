@@ -26,16 +26,18 @@ struct RenderContext;
 
 // 配置参数
 struct TerrainConfig {
-    float planeSize = 100.0f;    // 平面世界尺寸（长 = 宽，单位）
-    int resolution = 128;        // 网格分辨率（每边格子数，顶点数 = resolution+1）
-    float heightScale = 20.0f;   // 地形最大高度（噪声高度缩放因子，0 = 平坦）
-    unsigned int noiseSeed = 12345; // 噪声生成器随机种子，相同种子产生相同地形
+    float m_plane_size = 100.0f;    // 平面世界尺寸（长 = 宽，单位）
+    int m_resolution = 128;        // 网格分辨率（每边格子数，顶点数 = resolution+1）
+    float m_height_scale = 20.0f;   // 地形最大高度（噪声高度缩放因子，0 = 平坦）
+    unsigned int m_noise_seed = 12345; // 噪声生成器随机种子，相同种子产生相同地形
 };
 
 class TerrainManager {
 public:
     TerrainManager();
     ~TerrainManager();
+    TerrainManager(const TerrainManager &) = delete;
+    TerrainManager &operator=(const TerrainManager &) = delete;
 
     // 初始化地形：创建噪声生成器并生成单个固定分辨率平面网格
     void Init(const TerrainConfig& config = TerrainConfig());
@@ -72,7 +74,7 @@ private:
     Technique* m_technique;  // 不拥有
 
     // 地形纹理
-    unsigned int m_textureID;
+    unsigned int m_texture_id;
 };
 
 #endif // __TERRAIN_MANAGER_H__

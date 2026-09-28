@@ -28,6 +28,8 @@ private:
     std::vector<std::unique_ptr<Mesh>> m_meshes;
     // 已加载纹理缓存，避免重复加载
     std::vector<Texture> m_textures_loaded;
+    // 材质所有权归模型，逐绘制上传（原因见 Mesh::Draw 声明处）
+    std::unique_ptr<Material> m_material;
 
     glm::vec3 m_position;
     // 三轴欧拉角（度）：旋转顺序为 Y → X → Z（依次绕已旋转的局部轴）
@@ -42,6 +44,8 @@ public:
     Model(std::string name);
 
     virtual ~Model();
+    Model(const Model &) = delete;
+    Model &operator=(const Model &) = delete;
 
     void Init();
 
@@ -56,6 +60,10 @@ public:
     // 批量追加网格（所有权随 unique_ptr 转移给模型）
     void SetMeshes(std::vector<std::unique_ptr<Mesh>> meshes);
     void SetMesh(std::unique_ptr<Mesh> mesh);
+
+    // 移交材质所有权（按值传入 unique_ptr 即为转移）
+    void SetMaterial(std::unique_ptr<Material> material);
+    Material *GetMaterial() const;
 
     void SetScale(glm::vec3 scale);
 

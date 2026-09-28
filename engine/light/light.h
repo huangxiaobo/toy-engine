@@ -71,16 +71,16 @@ public:
     bool CanAnimate(AnimProperty prop) const override;
     void SetAnimValue(AnimProperty prop, const glm::vec3 &value) override;
 
-    glm::vec3 Direction;   // 光照方向（从光源指向场景）
-    glm::vec3 Color;       // 光源基础颜色
+    glm::vec3 m_direction;   // 光照方向（从光源指向场景）
+    glm::vec3 m_color;       // 光源基础颜色
 
-    glm::vec3 AmbientColor;   // 环境光颜色
-    glm::vec3 DiffuseColor;   // 漫反射颜色
-    glm::vec3 SpecularColor;  // 镜面反射颜色
+    glm::vec3 m_ambient_color;   // 环境光颜色
+    glm::vec3 m_diffuse_color;   // 漫反射颜色
+    glm::vec3 m_specular_color;  // 镜面反射颜色
 
-    float AmbientIntensity;   // 环境光强度
-    float DiffuseIntensity;   // 漫反射强度
-    float SpecularIntensity;  // 镜面反射强度
+    float m_ambient_intensity;   // 环境光强度
+    float m_diffuse_intensity;   // 漫反射强度
+    float m_specular_intensity;  // 镜面反射强度
 };
 
 // Atten参数参考表
@@ -90,21 +90,21 @@ public:
 // 600	    1.0	        0.007      0.0002
 class PointLight : public Light {
 public:
-    glm::vec3 Position;
-    glm::vec3 Color;
+    glm::vec3 m_position;
+    glm::vec3 m_color;
 
-    glm::vec3 AmbientColor;
-    glm::vec3 DiffuseColor;
-    glm::vec3 SpecularColor;
+    glm::vec3 m_ambient_color;
+    glm::vec3 m_diffuse_color;
+    glm::vec3 m_specular_color;
 
-    float AmbientIntensity;
-    float DiffuseIntensity;
-    float SpecularIntensity;
+    float m_ambient_intensity;
+    float m_diffuse_intensity;
+    float m_specular_intensity;
 
     struct {
-        float Constant;
-        float Linear;
-        float Exp;
+        float m_constant;
+        float m_linear;
+        float m_exp;
     } Attenuation{};
 
 public:
@@ -147,26 +147,26 @@ public:
     bool CanAnimate(AnimProperty prop) const override;
     void SetAnimValue(AnimProperty prop, const glm::vec3 &value) override;
 
-    glm::vec3 Position;    // 光源位置
-    glm::vec3 Direction;   // 光照方向（从光源指向照射目标）
-    glm::vec3 Color;       // 光源基础颜色
+    glm::vec3 m_position;    // 光源位置
+    glm::vec3 m_direction;   // 光照方向（从光源指向照射目标）
+    glm::vec3 m_color;       // 光源基础颜色
 
-    glm::vec3 AmbientColor;   // 环境光颜色
-    glm::vec3 DiffuseColor;   // 漫反射颜色
-    glm::vec3 SpecularColor;  // 镜面反射颜色
+    glm::vec3 m_ambient_color;   // 环境光颜色
+    glm::vec3 m_diffuse_color;   // 漫反射颜色
+    glm::vec3 m_specular_color;  // 镜面反射颜色
 
-    float AmbientIntensity;   // 环境光强度
-    float DiffuseIntensity;   // 漫反射强度
-    float SpecularIntensity;  // 镜面反射强度
+    float m_ambient_intensity;   // 环境光强度
+    float m_diffuse_intensity;   // 漫反射强度
+    float m_specular_intensity;  // 镜面反射强度
 
     struct {
-        float Constant;       // 衰减常数项
-        float Linear;         // 衰减线性项
-        float Exp;            // 衰减指数项
+        float m_constant;       // 衰减常数项
+        float m_linear;         // 衰减线性项
+        float m_exp;            // 衰减指数项
     } Attenuation{};
 
-    float Cutoff;          // 内锥角（度），全亮范围
-    float OuterCutoff;     // 外锥角（度），衰减到 0 的范围
+    float m_cutoff;          // 内锥角（度），全亮范围
+    float m_outer_cutoff;     // 外锥角（度），衰减到 0 的范围
 };
 
 #endif // __LIGHT_H__

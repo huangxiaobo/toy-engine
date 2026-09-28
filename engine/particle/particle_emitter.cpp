@@ -10,8 +10,8 @@
  *   - Update() 每帧推进粒子物理（重力/阻力/位置积分），并按 EmitRate 发射新粒子
  *
  * 颜色采用"烟花配色"方案（Emit 时绕过 Min/Max 色域，直接使用调色板）：
- *   - 出生色（p.Color）   = 调色板基色向白色混合 —— 模拟烟花引燃瞬间的炽热白核
- *   - 结束色（p.ColorEnd） = 同一基色按比例变暗 —— 模拟火花冷却熄灭，保持同色相渐变
+ *   - 出生色（p.m_color）   = 调色板基色向白色混合 —— 模拟烟花引燃瞬间的炽热白核
+ *   - 结束色（p.m_color_end） = 同一基色按比例变暗 —— 模拟火花冷却熄灭，保持同色相渐变
  *   - 每个粒子的色相独立随机，呈现出五彩斑斓的烟花效果
  */
 
@@ -33,26 +33,26 @@ static const glm::vec3 kFireworkPalette[] = {
 static const size_t kFireworkPaletteSize = sizeof(kFireworkPalette) / sizeof(kFireworkPalette[0]);
 
 ParticleEmitter::ParticleEmitter()
-    : Position(0.0f)
-    , EmitRate(100.0f)
-    , MaxParticles(1000)
-    , MinLife(1.0f)
-    , MaxLife(3.0f)
-    , MinSize(0.1f)
-    , MaxSize(0.5f)
-    , MinVelocity(-1.0f, 2.0f, -1.0f)
-    , MaxVelocity(1.0f, 5.0f, 1.0f)
-    , MinSizeEnd(0.0f)
-    , MaxSizeEnd(0.1f)
-    , Gravity(0.0f, -9.8f, 0.0f)
-    , Drag(0.98f)
-    , m_emitAccumulator(0.0f)
+    : m_position(0.0f)
+    , m_emit_rate(100.0f)
+    , m_max_particles(1000)
+    , m_min_life(1.0f)
+    , m_max_life(3.0f)
+    , m_min_size(0.1f)
+    , m_max_size(0.5f)
+    , m_min_velocity(-1.0f, 2.0f, -1.0f)
+    , m_max_velocity(1.0f, 5.0f, 1.0f)
+    , m_min_size_end(0.0f)
+    , m_max_size_end(0.1f)
+    , m_gravity(0.0f, -9.8f, 0.0f)
+    , m_drag(0.98f)
+    , m_emit_accumulator(0.0f)
     , m_gen(m_rd()) {
 
     // 预分配粒子池并全部标记为死亡（Life=0），供后续 Emit 复用
-    m_particles.resize(MaxParticles);
+    m_particles.resize(m_max_particles);
     for (auto& p : m_particles) {
-        p.Life = 0.0f;
+        p.m_life = 0.0f;
     }
 }
 
@@ -67,20 +67,20 @@ ParticleEmitter::~ParticleEmitter() {
  */
 void ParticleEmitter::SetMaxParticles(int maxParticles) {
     int oldSize = m_particles.size();
-    MaxParticles = maxParticles;
-    m_particles.resize(MaxParticles);
+    m_max_particles = maxParticles;
+    m_particles.resize(m_max_particles);
 
     // 初始化新添加的粒子
-    for (int i = oldSize; i < MaxParticles; i++) {
-        m_particles[i].Life = 0.0f;
-        m_particles[i].Age = 0.0f;
-        m_particles[i].Position = glm::vec3(0.0f);
-        m_particles[i].Velocity = glm::vec3(0.0f);
-        m_particles[i].Color = glm::vec3(0.0f);
-        m_particles[i].ColorEnd = glm::vec3(0.0f);
-        m_particles[i].Size = 0.0f;
-        m_particles[i].SizeEnd = 0.0f;
-        m_particles[i].MaxLife = 0.0f;
+    for (int i = oldSize; i < m_max_particles; i++) {
+        m_particles[i].m_life = 0.0f;
+        m_particles[i].m_age = 0.0f;
+        m_particles[i].m_position = glm::vec3(0.0f);
+        m_particles[i].m_velocity = glm::vec3(0.0f);
+        m_particles[i].m_color = glm::vec3(0.0f);
+        m_particles[i].m_color_end = glm::vec3(0.0f);
+        m_particles[i].m_size = 0.0f;
+        m_particles[i].m_size_end = 0.0f;
+        m_particles[i].m_max_life = 0.0f;
     }
 }
 
@@ -91,7 +91,7 @@ void ParticleEmitter::SetMaxParticles(int maxParticles) {
  *   1. 生命周期推进：Life 递减、Age 递增，死亡粒子（IsAlive=false）跳过物理
  *   2. 物理积分：速度 += 重力 * dt；速度 *= 阻力；位置 += 速度 * dt
  *      （显式欧拉积分，dt 为固定帧步长）
- *   3. 发射累积：m_emitAccumulator 累加 EmitRate*dt，累积满 1 就发射一个粒子。
+ *   3. 发射累积：m_emit_accumulator 累加 EmitRate*dt，累积满 1 就发射一个粒子。
  *      这样即使帧率波动，发射速率也能保持统计平均一致。
  */
 void ParticleEmitter::Update(float deltaTime) {
@@ -99,26 +99,26 @@ void ParticleEmitter::Update(float deltaTime) {
     for (auto& p : m_particles) {
         if (!p.IsAlive()) continue;
 
-        p.Life -= deltaTime;
-        p.Age += deltaTime;
+        p.m_life -= deltaTime;
+        p.m_age += deltaTime;
 
         if (p.IsAlive()) {
             // 应用重力
-            p.Velocity += Gravity * deltaTime;
+            p.m_velocity += m_gravity * deltaTime;
 
             // 应用阻力
-            p.Velocity *= Drag;
+            p.m_velocity *= m_drag;
 
             // 更新位置
-            p.Position += p.Velocity * deltaTime;
+            p.m_position += p.m_velocity * deltaTime;
         }
     }
 
     // 然后发射新粒子（现在有死粒子可复用）
-    m_emitAccumulator += EmitRate * deltaTime;
-    while (m_emitAccumulator >= 1.0f) {
+    m_emit_accumulator += m_emit_rate * deltaTime;
+    while (m_emit_accumulator >= 1.0f) {
         Emit();
-        m_emitAccumulator -= 1.0f;
+        m_emit_accumulator -= 1.0f;
     }
 }
 
@@ -137,8 +137,8 @@ void ParticleEmitter::Emit() {
     for (auto& p : m_particles) {
         if (!p.IsAlive()) {
             // 初始化粒子
-            p.Position = Position;
-            p.Velocity = RandomVec3(MinVelocity, MaxVelocity);
+            p.m_position = m_position;
+            p.m_velocity = RandomVec3(m_min_velocity, m_max_velocity);
 
             // ---- 烟花配色 ----
             // 1. 从调色板随机抽取一个高饱和基色（含 ±10% 明度抖动，避免千篇一律）
@@ -146,17 +146,17 @@ void ParticleEmitter::Emit() {
 
             // 2. 出生色 = 基色向白色混合 55%：模拟烟花引燃瞬间的炽热白光，
             //    再由片段着色器按生命比例平滑过渡到结束色
-            p.Color = glm::mix(base, glm::vec3(1.0f), 0.55f);
+            p.m_color = glm::mix(base, glm::vec3(1.0f), 0.55f);
 
             // 3. 结束色 = 基色压暗到 45%：模拟火花冷却熄灭。
             //    保持色相不变只降明度，避免 RGB 区间随机带来的浑浊混色
-            p.ColorEnd = base * 0.45f;
+            p.m_color_end = base * 0.45f;
 
-            p.Size = RandomFloat(MinSize, MaxSize);
-            p.SizeEnd = RandomFloat(MinSizeEnd, MaxSizeEnd);
-            p.MaxLife = RandomFloat(MinLife, MaxLife);
-            p.Life = p.MaxLife;
-            p.Age = 0.0f;
+            p.m_size = RandomFloat(m_min_size, m_max_size);
+            p.m_size_end = RandomFloat(m_min_size_end, m_max_size_end);
+            p.m_max_life = RandomFloat(m_min_life, m_max_life);
+            p.m_life = p.m_max_life;
+            p.m_age = 0.0f;
             return;
         }
     }

@@ -19,17 +19,17 @@ class Technique;
  */
 struct ShadowState {
     // 深度 Pass 专用着色器（depth.vert/depth.frag），passActive 时为 Mesh::Draw 的深度路径
-    Technique *depthTech = nullptr;
+    Technique *m_depth_tech = nullptr;
     // 光源空间矩阵（正交投影 × 光源视图），深度 Pass 与场景 Pass 共用
-    glm::mat4 lightSpace = glm::mat4(1.0f);
+    glm::mat4 m_light_space = glm::mat4(1.0f);
     // 当前是否处于阴影深度 Pass（Mesh::Draw 据此短路走只写深度分支）
-    bool passActive = false;
+    bool m_pass_active = false;
     // 本帧是否存在可采样的阴影深度贴图（场景 Pass 是否启用阴影采样）
-    bool ready = false;
+    bool m_ready = false;
     // 阴影深度贴图纹理ID（场景 Pass 绑定到纹理单元2）
-    unsigned int depthTexture = 0;
+    unsigned int m_depth_texture = 0;
     // 阴影 bias 缩放系数（1.0 = 着色器原始公式，随面板滑块调整）
-    float biasScale = 1.0f;
+    float m_bias_scale = 1.0f;
 };
 
 /*
@@ -45,12 +45,12 @@ struct ShadowState {
  * 因此不作为成员缓存，而是跟随本上下文实时更新。
  */
 struct RenderContext {
-    long long elapsed = 0;                  // 经过时间（毫秒，粒子动画用）
-    glm::mat4 projection = glm::mat4(1.0f); // 相机投影矩阵
-    glm::mat4 view = glm::mat4(1.0f);       // 相机视图矩阵
-    glm::vec3 camera = glm::vec3(0.0f);     // 相机世界位置
-    std::vector<Light *> lights;            // 本帧启用的灯光（非拥有）
-    ShadowState shadow;                     // 本帧阴影状态（Renderer 实时填充）
+    long long m_elapsed = 0;                  // 经过时间（毫秒，粒子动画用）
+    glm::mat4 m_projection = glm::mat4(1.0f); // 相机投影矩阵
+    glm::mat4 m_view = glm::mat4(1.0f);       // 相机视图矩阵
+    glm::vec3 m_camera = glm::vec3(0.0f);     // 相机世界位置
+    std::vector<Light *> m_lights;            // 本帧启用的灯光（非拥有）
+    ShadowState m_shadow;                     // 本帧阴影状态（Renderer 实时填充）
 };
 
 #endif // __RENDER_CONTEXT_H__

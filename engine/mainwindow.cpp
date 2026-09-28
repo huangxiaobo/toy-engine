@@ -16,6 +16,7 @@
 #include "particle/particle_system.h"
 #include "particle/particle_emitter.h"
 #include "axis/axis.h"
+#include "utils/gl_state_guard.h"
 
 // OpenGL函数由renderer.cpp提供
 
@@ -162,8 +163,8 @@ bool ToyEngineMainWindow::Initialize() {
     // 从配置文件读取窗口尺寸
     try {
         gConfig = Config::LoadFromYaml("./resource/world.yaml");
-        m_window_width = gConfig->Window.WindowWidth;
-        m_window_height = gConfig->Window.WindowHeight;
+        m_window_width = gConfig->m_window.m_window_width;
+        m_window_height = gConfig->m_window.m_window_height;
     } catch (...) {
         m_window_width = 1280;
         m_window_height = 720;
@@ -298,18 +299,20 @@ void ToyEngineMainWindow::RenderFrame() {
     const int viewportW = static_cast<int>(m_viewport_width * xScale);
     const int viewportH = static_cast<int>(m_viewport_height * yScale);
 
-    // 中央节点尺寸异常（首帧布局尚未完成）时回退到全窗口视口
-    if (viewportW <= 0 || viewportH <= 0) {
-        m_renderer->resize(fbWidth, fbHeight);
-        glViewport(0, 0, fbWidth, fbHeight);
-    } else {
-        m_renderer->resize(viewportW, viewportH);
-        glViewport(viewportX, viewportY, viewportW, viewportH);
+    // 3D 绘制期间把视口切到中央节点；guard 在离开作用域时恢复进入前的实际视口，
+    // 而不是硬编码全窗口尺寸
+    {
+        GLViewportGuard scene_viewport;
+        // 中央节点尺寸异常（首帧布局尚未完成）时回退到全窗口视口
+        if (viewportW <= 0 || viewportH <= 0) {
+            m_renderer->resize(fbWidth, fbHeight);
+            glViewport(0, 0, fbWidth, fbHeight);
+        } else {
+            m_renderer->resize(viewportW, viewportH);
+            glViewport(viewportX, viewportY, viewportW, viewportH);
+        }
+        m_renderer->draw(static_cast<long long>(m_delta_time * 1000));
     }
-    m_renderer->draw(static_cast<long long>(m_delta_time * 1000));
-
-    // 恢复完整 framebuffer 视口给 ImGui 使用
-    glViewport(0, 0, fbWidth, fbHeight);
 
     // 绘制面板（资源列表/属性面板停靠于 DockSpace 左右节点）
     CreateUI();
@@ -751,14 +754,14 @@ static std::string build_animation_type_string(Animation *anim) {
     std::vector<std::string> parts;
     // Position 通道按曲线类型区分：正弦振荡=位移，圆周轨道=轨道旋转
     if (AnimChannel *pos = anim->GetChannel(AnimProperty::Position)) {
-        parts.push_back(pos->curve == AnimCurveType::Orbit ? "轨道旋转" : "位移");
+        parts.push_back(pos->m_curve == AnimCurveType::Orbit ? "轨道旋转" : "位移");
     }
     if (anim->HasChannel(AnimProperty::Scale)) {
         parts.push_back("缩放");
     }
     // 旋转通道的曲线类型决定是匀速旋转还是正弦摆动
     if (AnimChannel *rot = anim->GetChannel(AnimProperty::Rotation)) {
-        if (rot->curve == AnimCurveType::Spin) {
+        if (rot->m_curve == AnimCurveType::Spin) {
             parts.push_back("旋转(匀速)");
         } else {
             parts.push_back("旋转(摆动)");
@@ -805,18 +808,18 @@ void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
             // 位移通道：中心/振幅/频率 可编辑，写回后立即生效
             if (AnimChannel *tr = anim->GetChannel(AnimProperty::Position)) {
                 ImGui::Separator();
-                if (tr->curve == AnimCurveType::Orbit) {
+                if (tr->m_curve == AnimCurveType::Orbit) {
                     // 圆周轨道：中心/半径(取 x)/频率（绕 Y 轴画圈，y 固定为中心高度）
                     ImGui::Text("轨道旋转");
                     ImGui::DragFloat3("中心##pos", glm::value_ptr(tr->center), 0.1f);
                     ImGui::DragFloat3("半径##pos", glm::value_ptr(tr->amplitude), 0.1f);
-                    ImGui::DragFloat("频率##pos", &tr->frequency, 0.01f, 0.0f, 100.0f);
+                    ImGui::DragFloat("频率##pos", &tr->m_frequency, 0.01f, 0.0f, 100.0f);
                 } else {
                     ImGui::Text("位移");
                     // 控件标签带 ##pos 后缀：同动画多通道共享通用参数名，避免 ImGui ID 冲突
                     ImGui::DragFloat3("中心##pos", glm::value_ptr(tr->center), 0.1f);
                     ImGui::DragFloat3("振幅##pos", glm::value_ptr(tr->amplitude), 0.1f);
-                    ImGui::DragFloat("频率##pos", &tr->frequency, 0.01f, 0.0f, 100.0f);
+                    ImGui::DragFloat("频率##pos", &tr->m_frequency, 0.01f, 0.0f, 100.0f);
                 }
             }
 
@@ -826,13 +829,13 @@ void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
                 ImGui::Text("缩放");
                 ImGui::DragFloat3("基准##scl", glm::value_ptr(sc->center), 0.1f);
                 ImGui::DragFloat3("振幅##scl", glm::value_ptr(sc->amplitude), 0.1f);
-                ImGui::DragFloat("频率##scl", &sc->frequency, 0.01f, 0.0f, 100.0f);
+                ImGui::DragFloat("频率##scl", &sc->m_frequency, 0.01f, 0.0f, 100.0f);
             }
 
             // 旋转通道：匀速旋转与正弦摆动互斥，二选一；参数实时可编辑
             if (AnimChannel *rot = anim->GetChannel(AnimProperty::Rotation)) {
                 ImGui::Separator();
-                if (rot->curve == AnimCurveType::Spin) {
+                if (rot->m_curve == AnimCurveType::Spin) {
                     ImGui::Text("旋转 (匀速)");
                     ImGui::DragFloat3("起始角##rot", glm::value_ptr(rot->center), 1.0f);
                     ImGui::DragFloat3("角速度##rot", glm::value_ptr(rot->speed), 1.0f);
@@ -840,7 +843,7 @@ void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
                     ImGui::Text("旋转 (摆动)");
                     ImGui::DragFloat3("基准##rot", glm::value_ptr(rot->center), 1.0f);
                     ImGui::DragFloat3("振幅##rot", glm::value_ptr(rot->amplitude), 1.0f);
-                    ImGui::DragFloat("频率##rot", &rot->frequency, 0.01f, 0.0f, 100.0f);
+                    ImGui::DragFloat("频率##rot", &rot->m_frequency, 0.01f, 0.0f, 100.0f);
                 }
             }
 
@@ -850,7 +853,7 @@ void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
                 ImGui::Text("灯光颜色");
                 ImGui::ColorEdit3("中心色##clr", glm::value_ptr(clr->center));
                 ImGui::DragFloat3("振幅##clr", glm::value_ptr(clr->amplitude), 0.01f, 0.0f, 1.0f);
-                ImGui::DragFloat("频率##clr", &clr->frequency, 0.01f, 0.0f, 100.0f);
+                ImGui::DragFloat("频率##clr", &clr->m_frequency, 0.01f, 0.0f, 100.0f);
             }
 
             // 灯光强度通道：中心/振幅/频率（标量，取 vec3.x）
@@ -859,7 +862,7 @@ void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
                 ImGui::Text("灯光强度");
                 ImGui::DragFloat("中心##inten", &inten->center.x, 0.1f, 0.0f, 100.0f);
                 ImGui::DragFloat("振幅##inten", &inten->amplitude.x, 0.1f, 0.0f, 100.0f);
-                ImGui::DragFloat("频率##inten", &inten->frequency, 0.01f, 0.0f, 100.0f);
+                ImGui::DragFloat("频率##inten", &inten->m_frequency, 0.01f, 0.0f, 100.0f);
             }
 
             ImGui::TreePop();
@@ -875,11 +878,10 @@ void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
 /* 
  * 材质窗口内容：渲染风格切换 + 材质参数编辑
  *
- * 材质按模型单独登记（Renderer::m_model_materials），不读取共享风格技术的
- * GetMaterial()：Lit/Toon 风格为多模型共用的享实例，其内部材质会被其它模型覆盖。
- * 材质编辑与当前渲染风格解耦：选中模型即可查看/修改材质参数；仅当前生效技术为
- * TechniqueLight（光照/卡通）时实时同步 GPU uniform，其它风格（纯色/纹理）下
- * 的修改会在切回光照风格时由 SetModelStyle 重新应用。
+ * 材质由 Model 持有（Renderer::GetModelMaterial 取的是 model->GetMaterial()），
+ * 共享的 Lit/Toon 风格技术不持有材质，因此这里改完无需任何同步动作：
+ * 下一帧 Model::Draw 会把材质逐 mesh 上传，各模型互不干扰。
+ * 纯色/纹理两套着色器不使用 gMaterial uniform，其下的修改只影响 Lit/Toon 的显示。
  */
 void ToyEngineMainWindow::ShowModelMaterialProperties(Model *model) {
     // ---- 渲染风格（运行时切换，基础版：无参数调节）----
@@ -893,43 +895,31 @@ void ToyEngineMainWindow::ShowModelMaterialProperties(Model *model) {
 
     Material* material = m_renderer->GetModelMaterial(model);
     if (material != nullptr) {
-        if (!material->Name.empty()) {
-            ImGui::Text("材质名称: %s", material->Name.c_str());
+        if (!material->m_name.empty()) {
+            ImGui::Text("材质名称: %s", material->m_name.c_str());
         }
 
-        // 当前生效技术若支持材质（TechniqueLight）则动态转换成功，编辑时同步到
-        // GPU 实现实时预览；否则仅写入材质结构体，切换渲染风格后生效。
-        const auto& meshes = model->GetMeshes();
-        auto* lightEffect = (!meshes.empty())
-            ? dynamic_cast<TechniqueLight*>(meshes[0]->GetEffect())
-            : nullptr;
-
-        // 注意：Material 成员为 public，此处直接修改以实现实时预览；
-        // 编辑后需重新调用 SetMaterial() 同步到当前技术的 GPU uniform。
+        // Material 成员为 public，此处直接修改；材质由 Model::Draw 逐绘制自动上传，无需手动同步
         auto* mat = material;
 
-        glm::vec3 ambient = mat->AmbientColor;
+        glm::vec3 ambient = mat->m_ambient_color;
         if (ImGui::ColorEdit3("环境光颜色", glm::value_ptr(ambient))) {
-            mat->AmbientColor = ambient;
-            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
+            mat->m_ambient_color = ambient;
         }
 
-        glm::vec3 diffuse = mat->DiffuseColor;
+        glm::vec3 diffuse = mat->m_diffuse_color;
         if (ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(diffuse))) {
-            mat->DiffuseColor = diffuse;
-            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
+            mat->m_diffuse_color = diffuse;
         }
 
-        glm::vec3 specular = mat->SpecularColor;
+        glm::vec3 specular = mat->m_specular_color;
         if (ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(specular))) {
-            mat->SpecularColor = specular;
-            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
+            mat->m_specular_color = specular;
         }
 
-        float shininess = mat->Shininess;
+        float shininess = mat->m_shininess;
         if (ImGui::DragFloat("光泽度", &shininess, 0.5f, 0.0f, 256.0f)) {
-            mat->Shininess = shininess;
-            if (lightEffect != nullptr) lightEffect->SetMaterial(mat);
+            mat->m_shininess = shininess;
         }
     }
 }
@@ -957,24 +947,24 @@ void ToyEngineMainWindow::ShowLightProperties() {
         DirectionLight* dirLight = static_cast<DirectionLight*>(light);
 
         // 方向（无位置）
-        ImGui::DragFloat3("方向", glm::value_ptr(dirLight->Direction), 0.1f);
+        ImGui::DragFloat3("方向", glm::value_ptr(dirLight->m_direction), 0.1f);
 
-        ImGui::ColorEdit3("颜色", glm::value_ptr(dirLight->Color));
+        ImGui::ColorEdit3("颜色", glm::value_ptr(dirLight->m_color));
 
         ImGui::Separator();
         ImGui::Text("环境光");
-        ImGui::ColorEdit3("环境光颜色", glm::value_ptr(dirLight->AmbientColor));
-        ImGui::DragFloat("环境光强度", &dirLight->AmbientIntensity, 0.01f, 0.0f, 10.0f);
+        ImGui::ColorEdit3("环境光颜色", glm::value_ptr(dirLight->m_ambient_color));
+        ImGui::DragFloat("环境光强度", &dirLight->m_ambient_intensity, 0.01f, 0.0f, 10.0f);
 
         ImGui::Separator();
         ImGui::Text("漫反射");
-        ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(dirLight->DiffuseColor));
-        ImGui::DragFloat("漫反射强度", &dirLight->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
+        ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(dirLight->m_diffuse_color));
+        ImGui::DragFloat("漫反射强度", &dirLight->m_diffuse_intensity, 0.01f, 0.0f, 10.0f);
 
         ImGui::Separator();
         ImGui::Text("镜面反射");
-        ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(dirLight->SpecularColor));
-        ImGui::DragFloat("镜面反射强度", &dirLight->SpecularIntensity, 0.01f, 0.0f, 10.0f);
+        ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(dirLight->m_specular_color));
+        ImGui::DragFloat("镜面反射强度", &dirLight->m_specular_intensity, 0.01f, 0.0f, 10.0f);
         return;
     }
 
@@ -983,37 +973,37 @@ void ToyEngineMainWindow::ShowLightProperties() {
         SpotLight* spotLight = static_cast<SpotLight*>(light);
 
         // 位置（DebugDraw 每帧直读 Position，gizmo 自动跟随，无需手动同步）
-        ImGui::DragFloat3("位置", glm::value_ptr(spotLight->Position), 0.1f);
+        ImGui::DragFloat3("位置", glm::value_ptr(spotLight->m_position), 0.1f);
         // 方向
-        ImGui::DragFloat3("方向", glm::value_ptr(spotLight->Direction), 0.1f);
+        ImGui::DragFloat3("方向", glm::value_ptr(spotLight->m_direction), 0.1f);
 
-        ImGui::ColorEdit3("颜色", glm::value_ptr(spotLight->Color));
+        ImGui::ColorEdit3("颜色", glm::value_ptr(spotLight->m_color));
 
         ImGui::Separator();
         ImGui::Text("环境光");
-        ImGui::ColorEdit3("环境光颜色", glm::value_ptr(spotLight->AmbientColor));
-        ImGui::DragFloat("环境光强度", &spotLight->AmbientIntensity, 0.01f, 0.0f, 10.0f);
+        ImGui::ColorEdit3("环境光颜色", glm::value_ptr(spotLight->m_ambient_color));
+        ImGui::DragFloat("环境光强度", &spotLight->m_ambient_intensity, 0.01f, 0.0f, 10.0f);
 
         ImGui::Separator();
         ImGui::Text("漫反射");
-        ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(spotLight->DiffuseColor));
-        ImGui::DragFloat("漫反射强度", &spotLight->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
+        ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(spotLight->m_diffuse_color));
+        ImGui::DragFloat("漫反射强度", &spotLight->m_diffuse_intensity, 0.01f, 0.0f, 10.0f);
 
         ImGui::Separator();
         ImGui::Text("镜面反射");
-        ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(spotLight->SpecularColor));
-        ImGui::DragFloat("镜面反射强度", &spotLight->SpecularIntensity, 0.01f, 0.0f, 10.0f);
+        ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(spotLight->m_specular_color));
+        ImGui::DragFloat("镜面反射强度", &spotLight->m_specular_intensity, 0.01f, 0.0f, 10.0f);
 
         ImGui::Separator();
         ImGui::Text("衰减");
-        ImGui::DragFloat("常数项", &spotLight->Attenuation.Constant, 0.01f, 0.0f, 10.0f);
-        ImGui::DragFloat("线性项", &spotLight->Attenuation.Linear, 0.001f, 0.0f, 1.0f);
-        ImGui::DragFloat("指数项", &spotLight->Attenuation.Exp, 0.0001f, 0.0f, 0.1f);
+        ImGui::DragFloat("常数项", &spotLight->Attenuation.m_constant, 0.01f, 0.0f, 10.0f);
+        ImGui::DragFloat("线性项", &spotLight->Attenuation.m_linear, 0.001f, 0.0f, 1.0f);
+        ImGui::DragFloat("指数项", &spotLight->Attenuation.m_exp, 0.0001f, 0.0f, 0.1f);
 
         ImGui::Separator();
         ImGui::Text("聚光锥角");
-        ImGui::DragFloat("内锥角", &spotLight->Cutoff, 0.5f, 0.0f, 90.0f);
-        ImGui::DragFloat("外锥角", &spotLight->OuterCutoff, 0.5f, 0.0f, 90.0f);
+        ImGui::DragFloat("内锥角", &spotLight->m_cutoff, 0.5f, 0.0f, 90.0f);
+        ImGui::DragFloat("外锥角", &spotLight->m_outer_cutoff, 0.5f, 0.0f, 90.0f);
         return;
     }
 
@@ -1021,31 +1011,31 @@ void ToyEngineMainWindow::ShowLightProperties() {
     PointLight* pointLight = static_cast<PointLight*>(light);
 
     // 位置（DebugDraw 每帧直读 Position，gizmo 自动跟随，无需手动同步）
-    ImGui::DragFloat3("位置", glm::value_ptr(pointLight->Position), 0.1f);
+    ImGui::DragFloat3("位置", glm::value_ptr(pointLight->m_position), 0.1f);
 
     // 颜色
-    ImGui::ColorEdit3("颜色", glm::value_ptr(pointLight->Color));
+    ImGui::ColorEdit3("颜色", glm::value_ptr(pointLight->m_color));
 
     ImGui::Separator();
     ImGui::Text("环境光");
-    ImGui::ColorEdit3("环境光颜色", glm::value_ptr(pointLight->AmbientColor));
-    ImGui::DragFloat("环境光强度", &pointLight->AmbientIntensity, 0.01f, 0.0f, 10.0f);
+    ImGui::ColorEdit3("环境光颜色", glm::value_ptr(pointLight->m_ambient_color));
+    ImGui::DragFloat("环境光强度", &pointLight->m_ambient_intensity, 0.01f, 0.0f, 10.0f);
 
     ImGui::Separator();
     ImGui::Text("漫反射");
-    ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(pointLight->DiffuseColor));
-    ImGui::DragFloat("漫反射强度", &pointLight->DiffuseIntensity, 0.01f, 0.0f, 10.0f);
+    ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(pointLight->m_diffuse_color));
+    ImGui::DragFloat("漫反射强度", &pointLight->m_diffuse_intensity, 0.01f, 0.0f, 10.0f);
 
     ImGui::Separator();
     ImGui::Text("镜面反射");
-    ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(pointLight->SpecularColor));
-    ImGui::DragFloat("镜面反射强度", &pointLight->SpecularIntensity, 0.01f, 0.0f, 10.0f);
+    ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(pointLight->m_specular_color));
+    ImGui::DragFloat("镜面反射强度", &pointLight->m_specular_intensity, 0.01f, 0.0f, 10.0f);
 
     ImGui::Separator();
     ImGui::Text("衰减");
-    ImGui::DragFloat("常数项", &pointLight->Attenuation.Constant, 0.01f, 0.0f, 10.0f);
-    ImGui::DragFloat("线性项", &pointLight->Attenuation.Linear, 0.001f, 0.0f, 1.0f);
-    ImGui::DragFloat("指数项", &pointLight->Attenuation.Exp, 0.0001f, 0.0f, 0.1f);
+    ImGui::DragFloat("常数项", &pointLight->Attenuation.m_constant, 0.01f, 0.0f, 10.0f);
+    ImGui::DragFloat("线性项", &pointLight->Attenuation.m_linear, 0.001f, 0.0f, 1.0f);
+    ImGui::DragFloat("指数项", &pointLight->Attenuation.m_exp, 0.0001f, 0.0f, 0.1f);
 }
 
 // ---- 相机属性编辑器 ----
@@ -1109,10 +1099,10 @@ void ToyEngineMainWindow::ShowTerrainProperties() {
 
     // 配置参数（只读展示，运行时修改需要重新生成地形）
     const TerrainConfig& cfg = terrain->GetConfig();
-    ImGui::Text("平面尺寸: %.0f × %.0f", cfg.planeSize, cfg.planeSize);
-    ImGui::Text("网格分辨率: %d × %d", cfg.resolution, cfg.resolution);
-    ImGui::Text("高度缩放: %.1f", cfg.heightScale);
-    ImGui::Text("噪声种子: %u", cfg.noiseSeed);
+    ImGui::Text("平面尺寸: %.0f × %.0f", cfg.m_plane_size, cfg.m_plane_size);
+    ImGui::Text("网格分辨率: %d × %d", cfg.m_resolution, cfg.m_resolution);
+    ImGui::Text("高度缩放: %.1f", cfg.m_height_scale);
+    ImGui::Text("噪声种子: %u", cfg.m_noise_seed);
 }
 
 // ---- 天空穹属性编辑器 ----
@@ -1167,33 +1157,33 @@ void ToyEngineMainWindow::ShowParticleProperties() {
     ImGui::Separator();
 
     // 位置
-    ImGui::DragFloat3("位置", glm::value_ptr(emitter->Position), 0.1f);
+    ImGui::DragFloat3("位置", glm::value_ptr(emitter->m_position), 0.1f);
 
     // 发射参数
     ImGui::Separator();
     ImGui::Text("发射参数");
-    ImGui::DragFloat("发射速率", &emitter->EmitRate, 1.0f, 0.0f, 10000.0f);
-    ImGui::DragInt("最大粒子数", &emitter->MaxParticles, 10, 1, 50000);
+    ImGui::DragFloat("发射速率", &emitter->m_emit_rate, 1.0f, 0.0f, 10000.0f);
+    ImGui::DragInt("最大粒子数", &emitter->m_max_particles, 10, 1, 50000);
 
     // 生命周期
     ImGui::Separator();
     ImGui::Text("生命周期");
-    ImGui::DragFloat("最小寿命", &emitter->MinLife, 0.1f, 0.0f, 60.0f);
-    ImGui::DragFloat("最大寿命", &emitter->MaxLife, 0.1f, 0.0f, 60.0f);
+    ImGui::DragFloat("最小寿命", &emitter->m_min_life, 0.1f, 0.0f, 60.0f);
+    ImGui::DragFloat("最大寿命", &emitter->m_max_life, 0.1f, 0.0f, 60.0f);
 
     // 大小
     ImGui::Separator();
     ImGui::Text("大小");
-    ImGui::DragFloat("初始最小", &emitter->MinSize, 0.1f, 0.0f, 100.0f);
-    ImGui::DragFloat("初始最大", &emitter->MaxSize, 0.1f, 0.0f, 100.0f);
-    ImGui::DragFloat("结束最小", &emitter->MinSizeEnd, 0.1f, 0.0f, 100.0f);
-    ImGui::DragFloat("结束最大", &emitter->MaxSizeEnd, 0.1f, 0.0f, 100.0f);
+    ImGui::DragFloat("初始最小", &emitter->m_min_size, 0.1f, 0.0f, 100.0f);
+    ImGui::DragFloat("初始最大", &emitter->m_max_size, 0.1f, 0.0f, 100.0f);
+    ImGui::DragFloat("结束最小", &emitter->m_min_size_end, 0.1f, 0.0f, 100.0f);
+    ImGui::DragFloat("结束最大", &emitter->m_max_size_end, 0.1f, 0.0f, 100.0f);
 
     // 速度
     ImGui::Separator();
     ImGui::Text("速度");
-    ImGui::DragFloat3("最小速度", glm::value_ptr(emitter->MinVelocity), 0.1f);
-    ImGui::DragFloat3("最大速度", glm::value_ptr(emitter->MaxVelocity), 0.1f);
+    ImGui::DragFloat3("最小速度", glm::value_ptr(emitter->m_min_velocity), 0.1f);
+    ImGui::DragFloat3("最大速度", glm::value_ptr(emitter->m_max_velocity), 0.1f);
 
     // 颜色：烟花配色表（只读，由 ParticleEmitter 内部调色板决定）
     ImGui::Separator();
@@ -1227,8 +1217,8 @@ void ToyEngineMainWindow::ShowParticleProperties() {
     // 物理
     ImGui::Separator();
     ImGui::Text("物理");
-    ImGui::DragFloat3("重力", glm::value_ptr(emitter->Gravity), 0.1f);
-    ImGui::DragFloat("阻力", &emitter->Drag, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat3("重力", glm::value_ptr(emitter->m_gravity), 0.1f);
+    ImGui::DragFloat("阻力", &emitter->m_drag, 0.01f, 0.0f, 1.0f);
 }
 
 // ---- 停靠于视口底部的 FPS 曲线面板 ----
@@ -1344,19 +1334,19 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
     ImGui::Text("光源摄像机");
     // 方向光阴影在深度 Pass 中使用一个"光源视角的摄像机"，参数由 Renderer 每帧计算
     const ShadowCameraParams &shadowCam = m_renderer->GetShadowCameraParams();
-    if (!shadowCam.available) {
+    if (!shadowCam.m_available) {
         ImGui::TextWrapped("无已启用的方向光，本帧未生成光源摄像机。");
     } else {
         if (ImGui::CollapsingHeader("位置 / 朝向")) {
-            ImGui::Text("位置  (%.2f, %.2f, %.2f)", shadowCam.position.x, shadowCam.position.y, shadowCam.position.z);
-            ImGui::Text("方向  (%.2f, %.2f, %.2f)", shadowCam.direction.x, shadowCam.direction.y, shadowCam.direction.z);
-            ImGui::Text("注视  (%.2f, %.2f, %.2f)", shadowCam.lookAt.x, shadowCam.lookAt.y, shadowCam.lookAt.z);
-            ImGui::Text("Up    (%.2f, %.2f, %.2f)", shadowCam.up.x, shadowCam.up.y, shadowCam.up.z);
+            ImGui::Text("位置  (%.2f, %.2f, %.2f)", shadowCam.m_position.x, shadowCam.m_position.y, shadowCam.m_position.z);
+            ImGui::Text("方向  (%.2f, %.2f, %.2f)", shadowCam.m_direction.x, shadowCam.m_direction.y, shadowCam.m_direction.z);
+            ImGui::Text("注视  (%.2f, %.2f, %.2f)", shadowCam.m_look_at.x, shadowCam.m_look_at.y, shadowCam.m_look_at.z);
+            ImGui::Text("Up    (%.2f, %.2f, %.2f)", shadowCam.m_up.x, shadowCam.m_up.y, shadowCam.m_up.z);
         }
         if (ImGui::CollapsingHeader("正交投影")) {
-            ImGui::Text("Left / Right : %.1f / %.1f", shadowCam.orthoLeft, shadowCam.orthoRight);
-            ImGui::Text("Bottom / Top : %.1f / %.1f", shadowCam.orthoBottom, shadowCam.orthoTop);
-            ImGui::Text("Near / Far   : %.1f / %.1f", shadowCam.nearPlane, shadowCam.farPlane);
+            ImGui::Text("Left / Right : %.1f / %.1f", shadowCam.m_ortho_left, shadowCam.m_ortho_right);
+            ImGui::Text("Bottom / Top : %.1f / %.1f", shadowCam.m_ortho_bottom, shadowCam.m_ortho_top);
+            ImGui::Text("Near / Far   : %.1f / %.1f", shadowCam.m_near_plane, shadowCam.m_far_plane);
         }
         if (ImGui::CollapsingHeader("矩阵")) {
             // 按行打印 4×4 矩阵（glm 列主序，m[col][row] 输出第 row 行）
@@ -1369,8 +1359,8 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
                     ImGui::TreePop();
                 }
             };
-            showMatrix("lightView", shadowCam.lightView);
-            showMatrix("lightProjection", shadowCam.lightProjection);
+            showMatrix("lightView", shadowCam.m_light_view);
+            showMatrix("lightProjection", shadowCam.m_light_projection);
         }
     }
 
@@ -1812,18 +1802,18 @@ void ToyEngineMainWindow::PerformPick() {
         for (const auto& mesh : model->GetMeshes()) {
             // 只有三角形图元才能按「每 3 个索引一个三角形」拾取；
             // GL_LINES/GL_POINTS 等调试类网格无面片概念，跳过
-            if (mesh == nullptr || mesh->DrawMode != GL_TRIANGLES || mesh->indices.size() < 3) {
+            if (mesh == nullptr || mesh->m_draw_mode != GL_TRIANGLES || mesh->m_indices.size() < 3) {
                 continue;
             }
-            const std::vector<Vertex>& verts = mesh->vertices;
-            const auto& idx = mesh->indices;
+            const std::vector<Vertex>& verts = mesh->m_vertices;
+            const auto& idx = mesh->m_indices;
             // 采用索引三角形的图元拓扑（GL_TRIANGLES），每 3 个索引构成一个三角形
             for (size_t i = 0; i + 2 < idx.size(); i += 3) {
                 float t = 0.0f;
                 if (RayTriangleIntersect(localOrigin, localDir,
-                        verts[idx[i]].Position,
-                        verts[idx[i + 1]].Position,
-                        verts[idx[i + 2]].Position, t) && t < bestT) {
+                        verts[idx[i]].m_position,
+                        verts[idx[i + 1]].m_position,
+                        verts[idx[i + 2]].m_position, t) && t < bestT) {
                     bestT = t;
                     hitObject = model.get();
                     hitType = "Model";
@@ -1841,10 +1831,10 @@ void ToyEngineMainWindow::PerformPick() {
         glm::vec3 lightPos;
         switch (light->GetLightType()) {
             case LightTypePoint:
-                lightPos = static_cast<PointLight*>(light.get())->Position;
+                lightPos = static_cast<PointLight*>(light.get())->m_position;
                 break;
             case LightTypeSpot:
-                lightPos = static_cast<SpotLight*>(light.get())->Position;
+                lightPos = static_cast<SpotLight*>(light.get())->m_position;
                 break;
             default:
                 continue; // 方向光没有世界位置可拾取
@@ -1867,7 +1857,7 @@ void ToyEngineMainWindow::PerformPick() {
         }
 
         float t = 0.0f;
-        if (RaySphereIntersect(rayOrigin, rayDir, ps->GetEmitter()->Position, kPickRadius, t) && t < bestT) {
+        if (RaySphereIntersect(rayOrigin, rayDir, ps->GetEmitter()->m_position, kPickRadius, t) && t < bestT) {
             bestT = t;
             hitObject = const_cast<ParticleSystem*>(ps);
             hitType = "Particle";
@@ -1879,15 +1869,15 @@ void ToyEngineMainWindow::PerformPick() {
     TerrainManager* terrain = m_renderer->GetTerrainManager();
     if (terrain != nullptr) {
         Mesh* terrainMesh = terrain->GetTerrainMesh();
-        if (terrainMesh != nullptr && terrainMesh->indices.size() >= 3) {
-            const std::vector<Vertex>& verts = terrainMesh->vertices;
-            const std::vector<GLuint>& idx = terrainMesh->indices;
+        if (terrainMesh != nullptr && terrainMesh->m_indices.size() >= 3) {
+            const std::vector<Vertex>& verts = terrainMesh->m_vertices;
+            const std::vector<GLuint>& idx = terrainMesh->m_indices;
             for (size_t i = 0; i + 2 < idx.size(); i += 3) {
                 float t = 0.0f;
                 if (RayTriangleIntersect(rayOrigin, rayDir,
-                        verts[idx[i]].Position,
-                        verts[idx[i + 1]].Position,
-                        verts[idx[i + 2]].Position, t) && t < bestT) {
+                        verts[idx[i]].m_position,
+                        verts[idx[i + 1]].m_position,
+                        verts[idx[i + 2]].m_position, t) && t < bestT) {
                     bestT = t;
                     hitObject = terrain;
                     hitType = "Terrain";
@@ -1937,8 +1927,8 @@ void ToyEngineMainWindow::PerformPick() {
             if (mesh == nullptr) {
                 continue;
             }
-            for (const Vertex& v : mesh->vertices) {
-                const glm::vec3 worldPos = glm::vec3(world * glm::vec4(v.Position, 1.0f));
+            for (const Vertex& v : mesh->m_vertices) {
+                const glm::vec3 worldPos = glm::vec3(world * glm::vec4(v.m_position, 1.0f));
                 aabbMin = glm::min(aabbMin, worldPos);
                 aabbMax = glm::max(aabbMax, worldPos);
             }
@@ -1955,12 +1945,12 @@ void ToyEngineMainWindow::PerformPick() {
         if (hitType == "Light") {
             auto* light = static_cast<Light*>(hitObject);
             if (light->GetLightType() == LightTypePoint) {
-                center = static_cast<PointLight*>(light)->Position;
+                center = static_cast<PointLight*>(light)->m_position;
             } else {
-                center = static_cast<SpotLight*>(light)->Position;
+                center = static_cast<SpotLight*>(light)->m_position;
             }
         } else if (hitType == "Particle") {
-            center = static_cast<ParticleSystem*>(hitObject)->GetEmitter()->Position;
+            center = static_cast<ParticleSystem*>(hitObject)->GetEmitter()->m_position;
         }
         aabbMin = center - glm::vec3(kPickRadius);
         aabbMax = center + glm::vec3(kPickRadius);

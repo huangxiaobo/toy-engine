@@ -17,14 +17,14 @@ Animation::Animation(IAnimTarget *target)
  */
 void Animation::AddChannel(const AnimChannel &channel) {
     for (auto &ch : m_channels) {
-        if (ch.property == channel.property) {
+        if (ch.m_property == channel.m_property) {
             ch = channel;
-            ch.active = true;
+            ch.m_active = true;
             return;
         }
     }
     m_channels.push_back(channel);
-    m_channels.back().active = true;
+    m_channels.back().m_active = true;
 }
 
 /*
@@ -32,7 +32,7 @@ void Animation::AddChannel(const AnimChannel &channel) {
  */
 bool Animation::HasChannel(AnimProperty prop) const {
     for (const auto &ch : m_channels) {
-        if (ch.property == prop && ch.active) {
+        if (ch.m_property == prop && ch.m_active) {
             return true;
         }
     }
@@ -44,7 +44,7 @@ bool Animation::HasChannel(AnimProperty prop) const {
  */
 AnimChannel *Animation::GetChannel(AnimProperty prop) {
     for (auto &ch : m_channels) {
-        if (ch.property == prop && ch.active) {
+        if (ch.m_property == prop && ch.m_active) {
             return &ch;
         }
     }
@@ -68,22 +68,22 @@ void Animation::Update(float dt) {
     m_time += dt;
 
     for (const auto &ch : m_channels) {
-        if (!ch.active) {
+        if (!ch.m_active) {
             continue;
         }
-        if (!m_target->CanAnimate(ch.property)) {
+        if (!m_target->CanAnimate(ch.m_property)) {
             continue;
         }
 
         glm::vec3 value(0.0f);
-        if (ch.curve == AnimCurveType::Sine) {
-            const float phase = glm::two_pi<float>() * ch.frequency * m_time;
+        if (ch.m_curve == AnimCurveType::Sine) {
+            const float phase = glm::two_pi<float>() * ch.m_frequency * m_time;
             value = ch.center + ch.amplitude * glm::sin(phase);
-        } else if (ch.curve == AnimCurveType::Spin) {
+        } else if (ch.m_curve == AnimCurveType::Spin) {
             value = ch.center + ch.speed * m_time;
-        } else if (ch.curve == AnimCurveType::Orbit) {
+        } else if (ch.m_curve == AnimCurveType::Orbit) {
             // 水平面圆周：x 走余弦、z 走正弦，相位差 π/2；y 保持轨道中心高度
-            const float angle = glm::two_pi<float>() * ch.frequency * m_time;
+            const float angle = glm::two_pi<float>() * ch.m_frequency * m_time;
             value.x = ch.center.x + ch.amplitude.x * glm::cos(angle);
             value.y = ch.center.y;
             value.z = ch.center.z + ch.amplitude.z * glm::sin(angle);
@@ -91,7 +91,7 @@ void Animation::Update(float dt) {
             continue;
         }
 
-        m_target->SetAnimValue(ch.property, value);
+        m_target->SetAnimValue(ch.m_property, value);
     }
 }
 

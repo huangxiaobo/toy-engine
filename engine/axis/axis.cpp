@@ -55,10 +55,10 @@ namespace {
 
     // gizmo 单轴描述：id 0-5 (+X,-X,+Y,-Y,+Z,-Z)，深度为视图空间 z
     struct GizmoAxis {
-        int       id;        // 0-5
-        int       axisIndex; // 0=X, 1=Y, 2=Z
-        float     depth;     // 视图空间深度
-        glm::vec3 direction; // 世界空间单位方向
+        int       m_id;        // 0-5
+        int       m_axis_index; // 0=X, 1=Y, 2=Z
+        float     m_depth;     // 视图空间深度
+        glm::vec3 m_direction; // 世界空间单位方向
     };
 } // namespace
 
@@ -90,7 +90,7 @@ void Axis::Draw(const glm::mat4& viewMatrix, const ImVec2& center)
 
     // 按深度升序排序（先画近处，后画远处，避免远处轴盖住近处轴）
     std::sort(axes.begin(), axes.end(),
-        [](const GizmoAxis& a, const GizmoAxis& b) { return a.depth < b.depth; });
+        [](const GizmoAxis& a, const GizmoAxis& b) { return a.m_depth < b.m_depth; });
 
     // 世界坐标 -> gizmo 屏幕坐标（NDC 映射到以 center 为中心、gizmoDiameter 为直径的正方形区域）
     auto worldToScreen = [&](const glm::vec3& worldPos) -> ImVec2 {
@@ -110,13 +110,13 @@ void Axis::Draw(const glm::mat4& viewMatrix, const ImVec2& center)
     // 绘制六轴：中心 -> 圆点把手（线在圆边缘截止）
     for (const auto& axis : axes) {
         // 按深度淡化颜色：深度 +1（正对相机）全亮，深度 0 附近透明度降到 25%
-        float factor = glm::mix(fadeFactor, 1.0f, (axis.depth + 1.0f) * 0.5f);
-        ImVec4 baseColor = ImGui::ColorConvertU32ToFloat4(axisColors[axis.axisIndex]);
+        float factor = glm::mix(fadeFactor, 1.0f, (axis.m_depth + 1.0f) * 0.5f);
+        ImVec4 baseColor = ImGui::ColorConvertU32ToFloat4(axisColors[axis.m_axis_index]);
         ImVec4 fadedColor{ baseColor.x, baseColor.y, baseColor.z, baseColor.w * factor };
         ImU32 finalColor = ImGui::ColorConvertFloat4ToU32(fadedColor);
 
         const ImVec2 originPos = worldToScreen(origin);
-        const ImVec2 handlePos = worldToScreen(axis.direction * lineLength);
+        const ImVec2 handlePos = worldToScreen(axis.m_direction * lineLength);
 
         // 线从中心画到把手，但在圆点把手边缘处截止（避免线段穿入圆内）
         ImVec2 lineDir{ handlePos.x - originPos.x, handlePos.y - originPos.y };
@@ -137,12 +137,12 @@ void Axis::Draw(const glm::mat4& viewMatrix, const ImVec2& center)
     ImFont* font = ImGui::GetFont();
     const float scaledFontSize = ImGui::GetFontSize() * m_scale * labelSize;
     for (const auto& axis : axes) {
-        if (axis.depth < -0.1f) {
+        if (axis.m_depth < -0.1f) {
             continue;
         }
-        const ImVec2 textPos = worldToScreen(axis.direction * lineLength);
-        const char* label = axisLabels[axis.id];
-        const bool isPositive = (axis.id & 1) == 0; // 偶数 id 为正半轴
+        const ImVec2 textPos = worldToScreen(axis.m_direction * lineLength);
+        const char* label = axisLabels[axis.m_id];
+        const bool isPositive = (axis.m_id & 1) == 0; // 偶数 id 为正半轴
         const ImVec2 textSize = font->CalcTextSizeA(scaledFontSize, FLT_MAX, 0.0f, label);
         drawList->AddText(
             font,

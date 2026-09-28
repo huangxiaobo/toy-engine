@@ -23,7 +23,7 @@ private:
     // 距上次刷新以来累计的帧数
     unsigned int m_fps_now = 0;
     // 刷新 FPS 的时间起点
-    std::chrono::steady_clock::time_point m_lastTime;
+    std::chrono::steady_clock::time_point m_last_time;
     // 最近一次统计出的帧率
     float m_fps = 0.0f;
     // FPS 刷新间隔(秒)

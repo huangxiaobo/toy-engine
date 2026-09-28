@@ -20,34 +20,43 @@ using namespace std;
 // RenderContext.shadow（见 render_context.h），Mesh::Draw 直接从 ctx 读取，
 // 与地形链路共用同一条状态通道，避免两处全局状态不同步。
 
-Mesh::Mesh() : DrawMode(GL_TRIANGLES) {
-    VAO = 0;
-    VBO = 0;
-    EBO = 0;
-    m_textureID = 0;
-    m_normalMapID = 0;
+Mesh::Mesh() : m_draw_mode(GL_TRIANGLES) {
 }
 
 Mesh::Mesh(const vector<Vertex> &vertices, const vector<unsigned int> &indices) {
-    DrawMode = GL_TRIANGLES;
-    this->vertices.insert(this->vertices.end(), vertices.begin(), vertices.end());
-    this->indices.insert(this->indices.end(), indices.begin(), indices.end());
+    m_draw_mode = GL_TRIANGLES;
+    this->m_vertices.insert(this->m_vertices.end(), vertices.begin(), vertices.end());
+    this->m_indices.insert(this->m_indices.end(), indices.begin(), indices.end());
     this->SetUpMesh();
 }
 
 Mesh::~Mesh() {
-    // m_effect 是裸指针，只引用不拥有，不需要释放
+    // m_effect 是裸指针，只引用不拥有，不需要释放。
+    // VAO/VBO/EBO 由 SetUpMesh 创建，就地负责回收。前提是析构时 GL 上下文仍存活：
+    // MainWindow::Cleanup 先 reset 渲染器再销毁窗口，顺序上满足。
+    if (m_vao != 0) {
+        glDeleteVertexArrays(1, &m_vao);
+        m_vao = 0;
+    }
+    if (m_vbo != 0) {
+        glDeleteBuffers(1, &m_vbo);
+        m_vbo = 0;
+    }
+    if (m_ebo != 0) {
+        glDeleteBuffers(1, &m_ebo);
+        m_ebo = 0;
+    }
 }
 
 void Mesh::SetUpMesh() {
     // ===================== VAO | VBO =====================
     // 创建并绑定VAO，VAO是一种容器对象，它存储了多个VBO以及与这些VBO相关的顶点属性指针设置（即glVertexAttribPointer的调用）
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
+    glGenVertexArrays(1, &m_vao);
+    glBindVertexArray(m_vao);
 
     // 创建并绑定VBO，VBO是一个GPU上的内存缓冲区，用来存储顶点属性的数据，如位置、颜色、纹理坐标、法线等信息
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glGenBuffers(1, &m_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
 
     /* 为当前绑定到 target 的缓冲区对象创建一个新的数据存储（在 GPU 上创建对应的存储区域，并将内存中的数据发送过去）
         如果 data 不是 NULL，则使用来自此指针的数据初始化数据存储
@@ -56,7 +65,7 @@ void Mesh::SetUpMesh() {
                           const GLvoid* data,  // 数据
                           GLenum usage)        // 创建在 GPU 上的哪一片区域（显存上的每个区域的性能是不一样的）https://registry.khronos.org/OpenGL-Refpages/es3.0/
     */
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(Vertex), m_vertices.data(), GL_STATIC_DRAW);
 
 #if 1
     /* 告知显卡如何解析缓冲区里面的属性值
@@ -78,28 +87,28 @@ void Mesh::SetUpMesh() {
     // Vertex Color
     // 开始 VAO 管理的第二个属性值
     glVertexAttribPointer(Vertex::ColorLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void *) offsetof(Vertex, Color)); // 手动传入第几个属性
+                          (void *) offsetof(Vertex, m_color)); // 手动传入第几个属性
     glEnableVertexAttribArray(Vertex::ColorLocation);
 
     // Vertex Normal
     glEnableVertexAttribArray(Vertex::NormalLocation); // 开始 VAO 管理的第二个属性值
     glVertexAttribPointer(Vertex::NormalLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void *) offsetof(Vertex, Normal)); // 手动传入第几个属性
+                          (void *) offsetof(Vertex, m_normal)); // 手动传入第几个属性
 
     // Vertex TexCoords
     glEnableVertexAttribArray(Vertex::TexCoordsLocation); // 开始 VAO 管理的第三个属性值
     glVertexAttribPointer(Vertex::TexCoordsLocation, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void *) offsetof(Vertex, TexCoords)); // 手动传入第几个属性
+                          (void *) offsetof(Vertex, m_tex_coords)); // 手动传入第几个属性
 
     // Vertex TexCoords
     glEnableVertexAttribArray(Vertex::TangentLocation); // 开始 VAO 管理的第三个属性值
     glVertexAttribPointer(Vertex::TangentLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void *) offsetof(Vertex, Tangent)); // 手动传入第几个属性
+                          (void *) offsetof(Vertex, m_tangent)); // 手动传入第几个属性
 
     // Vertex TexCoords
     glEnableVertexAttribArray(Vertex::BitangentLocation); // 开始 VAO 管理的第三个属性值
     glVertexAttribPointer(Vertex::BitangentLocation, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void *) offsetof(Vertex, Bitangent)); // 手动传入第几个属性
+                          (void *) offsetof(Vertex, m_bitangent)); // 手动传入第几个属性
 
 #endif
 
@@ -114,9 +123,9 @@ void Mesh::SetUpMesh() {
 #endif
 
     // ===================== EBO =====================
-    glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+    glGenBuffers(1, &m_ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indices.size() * sizeof(unsigned int), m_indices.data(), GL_STATIC_DRAW);
     // EBO/IBO 是储存顶点【索引】的
 
     // 解绑 VAO 和 VBO，注意先解绑 VAO再解绑EBO
@@ -126,17 +135,17 @@ void Mesh::SetUpMesh() {
 }
 
 void Mesh::UpdateVertexBuffer() {
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, m_vertices.size() * sizeof(Vertex), m_vertices.data());
 }
 
 vector<Vertex> &Mesh::GetVertices() {
-    return this->vertices;
+    return m_vertices;
 }
 
 
 void Mesh::SetDrawMode(unsigned int mode) {
-    DrawMode = mode;
+    m_draw_mode = mode;
 }
 
 void Mesh::SetEffect(Technique *effect) {
@@ -147,42 +156,43 @@ Technique *Mesh::GetEffect() const {
     return m_effect;
 }
 
-void Mesh::Draw(const RenderContext &ctx, const glm::mat4 &model) {
+void Mesh::Draw(const RenderContext &ctx, const glm::mat4 &model, const Material *material) {
     // 阴影深度 Pass：Renderer 组装 ctx.shadow 后，本函数以光源视角只写深度绘制阴影贴图。
     // 此时不做光照计算，仅用 gDepthMVP(=lightSpace*model) 变换同一份几何，
     // 保证深度贴图几何与主 Pass 完全一致、阴影不错位。
-    if (ctx.shadow.passActive) {
-        if (ctx.shadow.depthTech == nullptr) {
+    if (ctx.m_shadow.m_pass_active) {
+        if (ctx.m_shadow.m_depth_tech == nullptr) {
             return;
         }
-        ctx.shadow.depthTech->Enable();
-        ctx.shadow.depthTech->SetUniform("gDepthMVP", ctx.shadow.lightSpace * model);
+        ctx.m_shadow.m_depth_tech->Enable();
+        ctx.m_shadow.m_depth_tech->SetUniform("gDepthMVP", ctx.m_shadow.m_light_space * model);
         /* 重新绑定 VAO */
-        glBindVertexArray(VAO);
-        glDrawElements(DrawMode, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, (void *) 0);
+        glBindVertexArray(m_vao);
+        glDrawElements(m_draw_mode, static_cast<unsigned int>(m_indices.size()), GL_UNSIGNED_INT, (void *) 0);
         glBindVertexArray(0);
         return;
     }
 
     this->m_effect->Enable();
-    this->m_effect->SetProjectionMatrix(ctx.projection);
-    this->m_effect->SetViewMatrix(ctx.view);
+    this->m_effect->SetProjectionMatrix(ctx.m_projection);
+    this->m_effect->SetViewMatrix(ctx.m_view);
     this->m_effect->SetModelMatrix(model);
     // this->m_effect->SetWVPMatrix(mvp);
-    this->m_effect->SetCamera(ctx.camera);
+    this->m_effect->SetCamera(ctx.m_camera);
+    this->m_effect->SetMaterial(material);
 
-    this->m_effect->SetLights(ctx.lights);
+    this->m_effect->SetLights(ctx.m_lights);
 
     // 阴影贴图相关 uniform：
     //   - gUseShadow 始终设置：阴影可用时为1（着色器据此启用阴影计算），否则为0
     //   - 仅当阴影贴图存在时才上传 lightSpace / 绑定 shadowMap，
     //     避免在阴影被禁用时让着色器采样未绑定纹理导致画面整体变暗
-    this->m_effect->SetUniform("gUseShadow", ctx.shadow.ready ? 1 : 0);
-    if (ctx.shadow.ready) {
+    this->m_effect->SetUniform("gUseShadow", ctx.m_shadow.m_ready ? 1 : 0);
+    if (ctx.m_shadow.m_ready) {
         this->m_effect->SetShadowMap(2);
-        this->m_effect->SetLightSpaceMatrix(ctx.shadow.lightSpace);
+        this->m_effect->SetLightSpaceMatrix(ctx.m_shadow.m_light_space);
         // bias 缩放系数跟随面板滑块（1.0 = 原始公式），正交范围扩大/缩小时需微调抗痤疮
-        this->m_effect->SetUniform("gShadowBiasScale", ctx.shadow.biasScale);
+        this->m_effect->SetUniform("gShadowBiasScale", ctx.m_shadow.m_bias_scale);
     }
 
     // 【调试用】ShadowCalculation 中间结果输出开关：
@@ -201,27 +211,27 @@ void Mesh::Draw(const RenderContext &ctx, const glm::mat4 &model) {
 
     // 绑定纹理：漫反射贴图用第0纹理单元（gTexture），法线贴图用第1纹理单元（gNormalMap）
     // gHasTexture / gHasNormalMap 标志供着色器判断是否采样贴图：
-    // 无贴图时（m_textureID == 0）关闭采样，避免采样到残留/脏纹理单元导致的错误着色
-    this->m_effect->SetUniform("gHasTexture", m_textureID != 0 ? 1 : 0);
-    if (m_textureID != 0) {
+    // 无贴图时（m_texture_id == 0）关闭采样，避免采样到残留/脏纹理单元导致的错误着色
+    this->m_effect->SetUniform("gHasTexture", m_texture_id != 0 ? 1 : 0);
+    if (m_texture_id != 0) {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_textureID);
+        glBindTexture(GL_TEXTURE_2D, m_texture_id);
         // 通知着色器：漫反射采样器绑定到纹理单元0
         this->m_effect->SetUniform("gTexture", 0);
     }
 
-    this->m_effect->SetUniform("gHasNormalMap", m_normalMapID != 0 ? 1 : 0);
-    if (m_normalMapID != 0) {
+    this->m_effect->SetUniform("gHasNormalMap", m_normal_map_id != 0 ? 1 : 0);
+    if (m_normal_map_id != 0) {
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, m_normalMapID);
+        glBindTexture(GL_TEXTURE_2D, m_normal_map_id);
         // 通知着色器：法线贴图采样器绑定到纹理单元1
         this->m_effect->SetUniform("gNormalMap", 1);
     }
 
     /* 重新绑定 VAO */
-    glBindVertexArray(VAO);
+    glBindVertexArray(m_vao);
     // 绘制模式(DrawMode): GL_TRIANGLES, GL_LINES, GL_POINTS
-    glDrawElements(DrawMode, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, (void *) 0);
+    glDrawElements(m_draw_mode, static_cast<unsigned int>(m_indices.size()), GL_UNSIGNED_INT, (void *) 0);
     glBindVertexArray(0);
 }
 
@@ -289,7 +299,7 @@ std::vector<std::unique_ptr<Mesh>> Mesh::CreateTexturedGroundMesh(float size, in
         {
             // top right
             glm::vec3(size / 2.0f, 0.0f, size / 2.0f),   // Position
-            glm::vec3(1.0f, 1.0f, 1.0f),                  // Color (白色，让纹理显示原色)
+            glm::vec3(1.0f, 1.0f, 1.0f),                  // m_color (白色，让纹理显示原色)
             glm::vec3(0.0f, 1.0f, 0.0f),                  // Normal (朝上)
             glm::vec2(repeatCount, repeatCount),          // TexCoords
         },

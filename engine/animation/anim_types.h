@@ -45,15 +45,15 @@ enum class AnimCurveType {
  * 强度等标量属性只使用 x 分量，其余分量保持 0。
  */
 struct AnimChannel {
-    AnimProperty property = AnimProperty::Position;   // 绑定属性
-    AnimCurveType curve = AnimCurveType::Sine;        // 曲线类型
+    AnimProperty m_property = AnimProperty::Position;   // 绑定属性
+    AnimCurveType m_curve = AnimCurveType::Sine;        // 曲线类型
 
     glm::vec3 center{};      // 振荡中心 / 匀速起点
     glm::vec3 amplitude{};   // 单侧振幅（Sine）
-    float frequency = 1.0f;  // 频率 Hz（Sine）
+    float m_frequency = 1.0f;  // 频率 Hz（Sine）
     glm::vec3 speed{};       // 角速度（度/秒）或推进速度（Spin）
 
-    bool active = false;     // 通道是否参与求值
+    bool m_active = false;     // 通道是否参与求值
 };
 
 #endif // __ANIM_TYPES_H__

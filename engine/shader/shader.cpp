@@ -26,6 +26,11 @@ Shader::Shader() {
 }
 
 Shader::~Shader() {
+    // 依赖 Cleanup() 中 m_renderer.reset() 早于 glfwTerminate，保证此处 GL 上下文仍有效
+    if (m_program != 0) {
+        glDeleteProgram(m_program);
+        m_program = 0;
+    }
 }
 
 /*
@@ -98,6 +103,10 @@ void Shader::addShaderFromSourceFile(ShaderType shaderType, const char *filePath
 bool Shader::Link() {
     int success;
 
+    // uniform 位置在链接完成前无效，这里清一次缓存；
+    // 顺带覆盖同一个 Shader 重复链接的情况，避免沿用上一次的旧位置
+    m_uniform_locations.clear();
+
     // 绑定输出到 location 0 必须在链接之前声明才生效（链接期绑定）。
     // 原实现把 BindFragDataLocation 放在 Technique::Enable() 每帧调用，
     // 但 glBindFragDataLocation 只在 glLinkProgram 时生效，运行期重复调用是纯开销。
@@ -154,14 +163,35 @@ bool Shader::UnUse() {
     return true;
 }
 
-// ---- 按名称设置 uniform 的重载族（每帧调用，location 实时查询，性能低于缓存版） ----
+/*
+ * 按名取 uniform 位置，带缓存
+ *
+ * 第一次遇到某个名称时才真正向驱动查询，之后直接命中 m_uniform_locations。
+ * 绘制热路径（如 Mesh::Draw 每次设置 gUseShadow/gHasTexture 等）每帧会调用多次，
+ * 不缓存就等于每帧重复做一遍驱动内部的 uniform 表字符串查找。
+ *
+ * 关于取不到的情况：glGetUniformLocation 找不到时返回 -1，存进 unsigned int 会变成
+ * 全 1 的位模式，glUniform* 收到后按 GL 规范静默忽略。这里缓存的正是这个值，
+ * 所以未声明的 uniform 依旧被静默跳过，与加缓存之前的行为完全一致。
+ */
+unsigned int Shader::ResolveUniformLocation(const char *name) {
+    auto found = m_uniform_locations.find(name);
+    if (found != m_uniform_locations.end()) {
+        return found->second;
+    }
+    unsigned int location = static_cast<unsigned int>(glGetUniformLocation(m_program, name));
+    m_uniform_locations.emplace(name, location);
+    return location;
+}
+
+// ---- 按名称设置 uniform 的重载族（位置走缓存，见 ResolveUniformLocation） ----
 
 void Shader::SetUniformValue(const char *name, float value) {
-    glUniform1f(glGetUniformLocation(m_program, name), value);
+    glUniform1f(ResolveUniformLocation(name), value);
 }
 
 void Shader::SetUniformValue(const char *name, int value) {
-    glUniform1i(glGetUniformLocation(m_program, name), value);
+    glUniform1i(ResolveUniformLocation(name), value);
 }
 
 // bool 重载当前为空实现（预留）
@@ -169,21 +199,20 @@ void Shader::SetUniformValue(const char *name, bool value) {
 }
 
 void Shader::SetUniformValue(const char *name, const glm::vec2 &value) {
-    glUniform2fv(glGetUniformLocation(m_program, name), 1, glm::value_ptr(value));
+    glUniform2fv(ResolveUniformLocation(name), 1, glm::value_ptr(value));
 }
 
 void Shader::SetUniformValue(const char *name, const glm::vec3 &value) {
-    auto location = glGetUniformLocation(m_program, name);
-    SetUniformValue(location, value);
+    SetUniformValue(ResolveUniformLocation(name), value);
 }
 
 void Shader::SetUniformValue(const char *name, const glm::vec4 &value) {
-    glUniform4fv(glGetUniformLocation(m_program, name), 1, glm::value_ptr(value));
+    glUniform4fv(ResolveUniformLocation(name), 1, glm::value_ptr(value));
 }
 
 // 矩阵按列主序上传（GL_FALSE = 不转置），与 glm 默认内存布局一致
 void Shader::SetUniformValue(const char *name, const glm::mat4 &value) {
-    glUniformMatrix4fv(glGetUniformLocation(m_program, name), 1, GL_FALSE, glm::value_ptr(value));
+    glUniformMatrix4fv(ResolveUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
 // ---- 按缓存 location 设置 uniform 的重载族（推荐：location 预取一次，避免逐帧字符串查询） ----

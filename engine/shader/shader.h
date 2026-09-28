@@ -2,6 +2,8 @@
 #define __SHADER_H__
 
 #include <glm/glm.hpp>
+#include <string>
+#include <unordered_map>
 
 enum ShaderType {
     VERTEX_SHADER,
@@ -15,6 +17,8 @@ public:
     Shader(const char *vertexShaderPath, const char *fragmentShaderPath);
 
     ~Shader();
+    Shader(const Shader &) = delete;
+    Shader &operator=(const Shader &) = delete;
 
     void addShaderFromSourceFile(ShaderType shaderType, const char *filePath);
 
@@ -59,8 +63,14 @@ public:
 private:
     void PrintProgramLog(unsigned int id);
 
+    // 按名取 uniform 位置，带缓存：首次查询后存入 m_uniform_locations
+    unsigned int ResolveUniformLocation(const char *name);
+
 private:
     unsigned int m_program;
+
+    // 已解析的 uniform 位置表，key 为 uniform 名称
+    std::unordered_map<std::string, unsigned int> m_uniform_locations;
 };
 
 #endif

@@ -9,7 +9,7 @@
 
 TerrainManager::TerrainManager()
     : m_technique(nullptr)
-    , m_textureID(0) {
+    , m_texture_id(0) {
 }
 
 TerrainManager::~TerrainManager() {
@@ -32,14 +32,14 @@ void TerrainManager::Init(const TerrainConfig& config) {
 
     // 创建噪声生成器
     m_noise = std::make_unique<Noise>();
-    m_noise->SetSeed(config.noiseSeed);
+    m_noise->SetSeed(config.m_noise_seed);
 
     // 创建平面网格（单 chunk，无动态加载/卸载）
     m_plane = std::make_unique<TerrainChunk>(
-        config.planeSize,
-        config.resolution,
+        config.m_plane_size,
+        config.m_resolution,
         m_noise.get(),
-        config.heightScale
+        config.m_height_scale
     );
 
     // 应用已提前绑定的技术与纹理
@@ -47,18 +47,18 @@ void TerrainManager::Init(const TerrainConfig& config) {
         m_plane->SetTechnique(m_technique);
     }
 
-    if (m_textureID != 0) {
-        m_plane->SetTexture(m_textureID);
+    if (m_texture_id != 0) {
+        m_plane->SetTexture(m_texture_id);
     }
 
     // 生成网格（唯一一次，之后无需每帧更新）
     m_plane->GenerateMesh();
 
     std::cout << "TerrainManager initialized:" << std::endl;
-    std::cout << "  Plane size: " << config.planeSize << " x " << config.planeSize << std::endl;
-    std::cout << "  Resolution: " << config.resolution << " x " << config.resolution << std::endl;
-    std::cout << "  Height scale: " << config.heightScale << std::endl;
-    std::cout << "  Noise seed: " << config.noiseSeed << std::endl;
+    std::cout << "  Plane size: " << config.m_plane_size << " x " << config.m_plane_size << std::endl;
+    std::cout << "  Resolution: " << config.m_resolution << " x " << config.m_resolution << std::endl;
+    std::cout << "  Height scale: " << config.m_height_scale << std::endl;
+    std::cout << "  Noise seed: " << config.m_noise_seed << std::endl;
     std::cout << "  Triangles: " << GetTotalTriangleCount() << std::endl;
 }
 
@@ -82,7 +82,7 @@ void TerrainManager::SetTechnique(Technique* tech) {
  * 将纹理应用到平面网格（若已生成），并绑定着色器的纹理采样器。
  */
 void TerrainManager::SetTexture(unsigned int textureID) {
-    m_textureID = textureID;
+    m_texture_id = textureID;
 
     if (m_plane) {
         m_plane->SetTexture(textureID);
@@ -99,7 +99,7 @@ void TerrainManager::SetTexture(unsigned int textureID) {
  *
  * 单一网格平面直接绘制，无需遍历 chunk，
  * 因此不再需要视锥体剔除的多 chunk 遍历。
- * 阴影状态经 RenderContext.shadow 直接传给平面网格，不再逐层转发。
+ * 阴影状态经 RenderContext.m_shadow 直接传给平面网格，不再逐层转发。
  */
 void TerrainManager::Draw(const RenderContext &ctx) {
     if (m_plane) {

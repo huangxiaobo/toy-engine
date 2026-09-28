@@ -12,19 +12,19 @@ public:
     ~ParticleEmitter();
     
     // 发射器配置
-    glm::vec3 Position;           // 发射器位置
-    float EmitRate;               // 每秒发射粒子数
-    int MaxParticles;             // 最大粒子数
+    glm::vec3 m_position;           // 发射器位置
+    float m_emit_rate;               // 每秒发射粒子数
+    int m_max_particles;             // 最大粒子数
     
     // 粒子初始属性范围
-    float MinLife, MaxLife;       // 生命周期范围
-    float MinSize, MaxSize;       // 大小范围
-    glm::vec3 MinVelocity, MaxVelocity; // 速度范围
-    float MinSizeEnd, MaxSizeEnd; // 结束大小范围
+    float m_min_life, m_max_life;       // 生命周期范围
+    float m_min_size, m_max_size;       // 大小范围
+    glm::vec3 m_min_velocity, m_max_velocity; // 速度范围
+    float m_min_size_end, m_max_size_end; // 结束大小范围
     
     // 物理属性
-    glm::vec3 Gravity;            // 重力
-    float Drag;                   // 阻力
+    glm::vec3 m_gravity;            // 重力
+    float m_drag;                   // 阻力
     
     // 方法
     void SetMaxParticles(int maxParticles);
@@ -35,7 +35,7 @@ public:
     
 private:
     std::vector<Particle> m_particles;
-    float m_emitAccumulator;      // 发射累积器
+    float m_emit_accumulator;      // 发射累积器
     
     // 随机数生成器
     std::random_device m_rd;

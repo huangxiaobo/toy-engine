@@ -20,14 +20,14 @@ SkyDome::~SkyDome() {
         delete m_effect;
         m_effect = nullptr;
     }
-    if (m_VAO) {
-        glDeleteVertexArrays(1, &m_VAO);
+    if (m_vao) {
+        glDeleteVertexArrays(1, &m_vao);
     }
-    if (m_VBO) {
-        glDeleteBuffers(1, &m_VBO);
+    if (m_vbo) {
+        glDeleteBuffers(1, &m_vbo);
     }
-    if (m_EBO) {
-        glDeleteBuffers(1, &m_EBO);
+    if (m_ebo) {
+        glDeleteBuffers(1, &m_ebo);
     }
 }
 
@@ -116,24 +116,24 @@ void SkyDome::GenerateSphere(float radius, int sectors, int stacks) {
         }
     }
 
-    m_indexCount = static_cast<unsigned int>(indices.size());
+    m_index_count = static_cast<unsigned int>(indices.size());
 
     // 创建 OpenGL 缓冲区对象
-    glGenVertexArrays(1, &m_VAO);
-    glGenBuffers(1, &m_VBO);
-    glGenBuffers(1, &m_EBO);
+    glGenVertexArrays(1, &m_vao);
+    glGenBuffers(1, &m_vbo);
+    glGenBuffers(1, &m_ebo);
 
-    glBindVertexArray(m_VAO);
+    glBindVertexArray(m_vao);
 
     // 上传顶点数据
-    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
     glBufferData(GL_ARRAY_BUFFER,
                  vertices.size() * sizeof(float),
                  vertices.data(),
                  GL_STATIC_DRAW);
 
     // 上传索引数据
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                  indices.size() * sizeof(unsigned int),
                  indices.data(),
@@ -153,31 +153,31 @@ void SkyDome::GenerateSphere(float radius, int sectors, int stacks) {
 }
 
 void SkyDome::Draw(const RenderContext &ctx) {
-    if (!m_effect || m_indexCount == 0) return;
+    if (!m_effect || m_index_count == 0) return;
 
     // 激活着色器
     m_effect->Enable();
 
     // 设置变换矩阵
-    m_effect->SetProjectionMatrix(ctx.projection);
-    m_effect->SetViewMatrix(ctx.view);
+    m_effect->SetProjectionMatrix(ctx.m_projection);
+    m_effect->SetViewMatrix(ctx.m_view);
 
     // 模型矩阵：仅平移到摄像机位置（天空穹始终以摄像机为中心）
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, ctx.camera);
+    model = glm::translate(model, ctx.m_camera);
     m_effect->SetModelMatrix(model);
 
     // 设置渐变颜色
-    m_effect->SetUniform("horizonColor", m_horizonColor);
-    m_effect->SetUniform("zenithColor", m_zenithColor);
-    m_effect->SetUniform("groundColor", m_groundColor);
+    m_effect->SetUniform("horizonColor", m_horizon_color);
+    m_effect->SetUniform("zenithColor", m_zenith_color);
+    m_effect->SetUniform("groundColor", m_ground_color);
 
     // 临时切换深度函数为 GL_LEQUAL，允许天空穹在远裁剪面（depth=1.0）通过深度测试
     glDepthFunc(GL_LEQUAL);
 
     // 绘制全球体
-    glBindVertexArray(m_VAO);
-    glDrawElements(GL_TRIANGLES, m_indexCount, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(m_vao);
+    glDrawElements(GL_TRIANGLES, m_index_count, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 
     // 恢复默认深度函数
@@ -185,13 +185,13 @@ void SkyDome::Draw(const RenderContext &ctx) {
 }
 
 void SkyDome::SetHorizonColor(const glm::vec3 &color) {
-    m_horizonColor = color;
+    m_horizon_color = color;
 }
 
 void SkyDome::SetZenithColor(const glm::vec3 &color) {
-    m_zenithColor = color;
+    m_zenith_color = color;
 }
 
 void SkyDome::SetGroundColor(const glm::vec3 &color) {
-    m_groundColor = color;
+    m_ground_color = color;
 }

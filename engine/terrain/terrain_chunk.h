@@ -28,6 +28,8 @@ public:
     // 平面参数：planeSize 为平面世界尺寸（长 = 宽），resolution 为每边格子数
     TerrainChunk(float planeSize, int resolution, const Noise* noise, float heightScale);
     ~TerrainChunk();
+    TerrainChunk(const TerrainChunk &) = delete;
+    TerrainChunk &operator=(const TerrainChunk &) = delete;
 
     // 生成网格（平面顶点 + 噪声高度 + 法线 + OpenGL 缓冲），幂等：只生成一次
     void GenerateMesh();
@@ -59,12 +61,12 @@ private:
                           const std::vector<unsigned int>& indices) const;
 
     // 平面参数
-    float m_planeSize;      // 平面世界尺寸（长 = 宽）
+    float m_plane_size;      // 平面世界尺寸（长 = 宽）
     int m_resolution;       // 网格分辨率（每边格子数，顶点数 = resolution+1）
 
     // 噪声与高度
     const Noise* m_noise;   // 噪声生成器（不拥有）
-    float m_heightScale;    // 高度缩放因子
+    float m_height_scale;    // 高度缩放因子
 
     // 地形网格（唯一，无 LOD）
     std::unique_ptr<Mesh> m_mesh;
@@ -73,7 +75,7 @@ private:
     Technique* m_technique;  // 不拥有
 
     // 纹理ID
-    unsigned int m_textureID;
+    unsigned int m_texture_id;
 };
 
 #endif // __TERRAIN_CHUNK_H__

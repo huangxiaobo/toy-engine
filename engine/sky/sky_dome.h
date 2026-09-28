@@ -23,6 +23,8 @@ class SkyDome {
 public:
     SkyDome();
     ~SkyDome();
+    SkyDome(const SkyDome &) = delete;
+    SkyDome &operator=(const SkyDome &) = delete;
 
     /*
      * 初始化天空穹
@@ -51,25 +53,25 @@ public:
     float GetRadius() const { return m_radius; }
     int GetSectors() const { return m_sectors; }
     int GetStacks() const { return m_stacks; }
-    glm::vec3 GetHorizonColor() const { return m_horizonColor; }
-    glm::vec3 GetZenithColor() const { return m_zenithColor; }
-    glm::vec3 GetGroundColor() const { return m_groundColor; }
+    glm::vec3 GetHorizonColor() const { return m_horizon_color; }
+    glm::vec3 GetZenithColor() const { return m_zenith_color; }
+    glm::vec3 GetGroundColor() const { return m_ground_color; }
 
 private:
     /* 半球体网格数据 */
-    unsigned int m_VAO = 0;
-    unsigned int m_VBO = 0;
-    unsigned int m_EBO = 0;
-    unsigned int m_indexCount = 0;
+    unsigned int m_vao = 0;
+    unsigned int m_vbo = 0;
+    unsigned int m_ebo = 0;
+    unsigned int m_index_count = 0;
 
     /* 着色器技术 */
     Technique *m_effect = nullptr;
 
     /* 渐变颜色 */
-    glm::vec3 m_horizonColor = glm::vec3(0.6f, 0.7f, 0.9f);
-    glm::vec3 m_zenithColor = glm::vec3(0.1f, 0.2f, 0.5f);
+    glm::vec3 m_horizon_color = glm::vec3(0.6f, 0.7f, 0.9f);
+    glm::vec3 m_zenith_color = glm::vec3(0.1f, 0.2f, 0.5f);
     // 地面雾色（下半球），默认取地平线色的暗化版本（0.6 倍）
-    glm::vec3 m_groundColor = glm::vec3(0.36f, 0.42f, 0.54f);
+    glm::vec3 m_ground_color = glm::vec3(0.36f, 0.42f, 0.54f);
 
     /* 生成全球体网格 */
     void GenerateSphere(float radius, int sectors, int stacks);

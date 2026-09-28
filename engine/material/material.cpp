@@ -10,7 +10,7 @@
  */
 Material::Material() {
     // 构造时自动生成唯一 UUID
-    Id = Utils::GenerateUUID();
+    m_id = Utils::GenerateUUID();
 }
 
 Material::~Material() {

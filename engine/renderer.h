@@ -7,6 +7,9 @@
 #include <map>
 #include "config.h"
 #include "camera/camera.h" // ProjectionType 为相机属性，枚举定义随相机头文件
+#include "shadow/shadow_pass.h"
+#include "postprocess/post_process_pass.h"
+#include "debug/light_gizmo_pass.h"
 
 class Model;
 class Axis;
@@ -20,7 +23,6 @@ class FPSCounter;
 class TerrainManager;
 class ParticleSystem;
 class SkyDome;
-class ShadowFramebuffer;
 class SceneFramebuffer;
 class DebugDraw;
 class OrbitManipulator;
@@ -35,31 +37,13 @@ enum class RenderStyle {
     Toon      // 卡通渲染（toon.vert/.frag）
 };
 
-// 光源（阴影）摄像机参数
-// 方向光阴影在深度 Pass 中用一个"光源视角的摄像机"把场景写进深度贴图。
-// 这些参数每帧由 Renderer::draw 在阴影深度 Pass 前计算得出（见 renderer.cpp），
-// 保存下来供 ImGui 阴影属性面板展示与调试（位置、朝向、正交投影范围、矩阵等）。
-struct ShadowCameraParams {
-    glm::vec3 position  = glm::vec3(0.0f);                 // 光源位置（光源摄像机所在位置，即 -方向 × 距离）
-    glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f);    // 光照方向（从光源指向场景，归一化）
-    glm::vec3 lookAt    = glm::vec3(0.0f);                 // 注视目标（场景中心）
-    glm::vec3 up        = glm::vec3(0.0f, 1.0f, 0.0f);     // lookAt 使用的 up 向量（预防平行退化的安全 up）
-    float orthoLeft     = -210.0f;                         // 正交投影左边界
-    float orthoRight    = 210.0f;                          // 正交投影右边界
-    float orthoBottom   = -210.0f;                         // 正交投影下边界
-    float orthoTop      = 210.0f;                          // 正交投影上边界
-    float nearPlane     = 1.0f;                            // 近平面
-    float farPlane      = 100.0f;                          // 远平面
-    bool  available     = false;                           // 本帧是否存在已启用的方向光（参数是否有效）
-    glm::mat4 lightView       = glm::mat4(1.0f);           // 光源视图矩阵（lightView）
-    glm::mat4 lightProjection = glm::mat4(1.0f);           // 光源正交投影矩阵（lightProjection）
-};
-
 class Renderer {
 public:
     explicit Renderer();
 
     virtual ~Renderer();
+    Renderer(const Renderer &) = delete;
+    Renderer &operator=(const Renderer &) = delete;
 
 public:
     void init(int w, int h);
@@ -148,33 +132,36 @@ public:
     bool IsShadowMapReady() const;
 
     // 阴影开关：禁用时跳过阴影深度 Pass，也不绑定阴影贴图
-    void SetShadowsEnabled(bool enabled) { m_shadows_enabled = enabled; }
-    bool IsShadowsEnabled() const { return m_shadows_enabled; }
+    void SetShadowsEnabled(bool enabled);
+
+    bool IsShadowsEnabled() const;
 
     // 获取本帧光源（阴影）摄像机参数（供 ImGui 阴影属性面板展示与调试）
-    const ShadowCameraParams &GetShadowCameraParams() const { return m_shadow_camera; }
+    const ShadowCameraParams &GetShadowCameraParams() const;
 
     // 后处理 tone mapping 开关：关闭时全屏 Pass 直通输出（调试用），开启时做 ACES+gamma
-    void SetToneMappingEnabled(bool enabled) { m_tone_mapping_enabled = enabled; }
-    bool IsToneMappingEnabled() const { return m_tone_mapping_enabled; }
+    void SetToneMappingEnabled(bool enabled);
+    bool IsToneMappingEnabled() const;
 
     // 后处理曝光系数（>1 提亮 / <1 压暗），ACES 映射前乘入 HDR 线性值，运行时可调
-    void SetExposure(float exposure) { m_exposure = exposure; }
-    float GetExposure() const { return m_exposure; }
+    void SetExposure(float exposure);
+    float GetExposure() const;
 
     // 后处理饱和度/对比度（在 tonemap+gamma 后调整），默认 1.0 不调整，运行时可调
-    void SetSaturation(float sat) { m_saturation = sat; }
-    float GetSaturation() const { return m_saturation; }
-    void SetContrast(float contrast) { m_contrast = contrast; }
-    float GetContrast() const { return m_contrast; }
+    void SetSaturation(float sat);
+    float GetSaturation() const;
+    void SetContrast(float contrast);
+    float GetContrast() const;
 
     // 阴影 bias 缩放系数（1.0 = 原默认），阴影范围自适应后需现场微调痤疮表现
-    void SetShadowBiasScale(float scale) { m_shadow_bias_scale = scale; }
-    float GetShadowBiasScale() const { return m_shadow_bias_scale; }
+    void SetShadowBiasScale(float scale);
+
+    float GetShadowBiasScale() const;
 
     // 光源调试可视化（DebugDraw gizmo）开关：禁用时跳过 gizmo 顶点收集与绘制
-    void SetDebugDrawEnabled(bool enabled) { m_debug_draw_enabled = enabled; }
-    bool IsDebugDrawEnabled() const { return m_debug_draw_enabled; }
+    void SetDebugDrawEnabled(bool enabled);
+
+    bool IsDebugDrawEnabled() const;
 
     // 线框模式开关：启用时场景 Pass 中地形与模型以线框渲染（阴影 Pass 不受影响）
     void SetWireframeEnabled(bool enabled) { m_wireframe_enabled = enabled; }
@@ -201,8 +188,9 @@ public:
     float GetNormalLength() const { return m_normal_length; }
 
     // 光照范围可视化开关：启用时点光源/聚光灯显示影响范围球体/锥体线框
-    void SetLightRangeEnabled(bool enabled) { m_light_range_enabled = enabled; }
-    bool IsLightRangeEnabled() const { return m_light_range_enabled; }
+    void SetLightRangeEnabled(bool enabled);
+
+    bool IsLightRangeEnabled() const;
 
     // 运行时切换模型渲染风格（基础版，无参数调节）
     // 遍历模型所有 mesh 换成风格池中对应 Technique；切换后下一帧自动生效。
@@ -225,8 +213,6 @@ private:
     void DrawGrid();
     // 收集模型法线线段到 DebugDraw（将顶点世界坐标与法线变换到世界空间）
     void CollectModelNormals();
-    // 计算场景世界空间 AABB（地形范围 + 全部模型几何），供阴影正交范围自适应
-    void computeSceneBounds(glm::vec3 &outMin, glm::vec3 &outMax) const;
 
 private:
     int width{};
@@ -255,8 +241,7 @@ private:
     std::vector<std::unique_ptr<Animation>> m_animations;
     // 光源位置/范围调试可视化系统（DebugDraw，方案 B），独立于 Model 体系
     std::unique_ptr<DebugDraw> m_debug_draw;
-    // 光源调试可视化是否启用（ImGui 可配置，见 SetDebugDrawEnabled）
-    bool m_debug_draw_enabled = false;
+    LightGizmoPass m_light_gizmo;
     // 线框模式是否启用（ImGui 可配置，见 SetWireframeEnabled）
     bool m_wireframe_enabled = false;
     // 网格地面辅助线是否启用（ImGui 可配置，见 SetGridEnabled）
@@ -269,8 +254,6 @@ private:
     bool m_normal_visualization_enabled = false;
     // 法线线段统一长度（世界空间单位），默认 2.0，ImGui 可调（见 SetNormalLength）
     float m_normal_length = 2.0f;
-    // 光照范围可视化是否启用（ImGui 可配置，见 SetLightRangeEnabled）
-    bool m_light_range_enabled = false;
     std::vector<std::unique_ptr<Light>> m_lights;
 
     // 渲染器创建并拥有的地形纹理，用于退出时统一释放
@@ -281,7 +264,7 @@ private:
 
     // 渲染器创建并拥有的着色器技术（Technique），用于统一释放
     std::vector<std::unique_ptr<Technique>> m_techniques;
-    // 渲染器创建并拥有的材质（Material），用于统一释放
+    // 渲染器创建并拥有的材质，目前仅地形材质（模型材质归 Model 持有）
     std::vector<std::unique_ptr<Material>> m_materials;
 
     // ---- 运行时渲染风格切换（基础版）----
@@ -289,42 +272,13 @@ private:
     std::map<RenderStyle, Technique *> m_style_techniques;
     // 模型 → 当前风格（默认 Lit），供 UI 下拉框回显当前选项
     std::map<Model *, RenderStyle> m_model_styles;
-    // 模型 → 材质指针（仅引用不拥有）。风格技术为多模型共享实例，其内部材质会被
-    // 交叉覆盖，属性面板必须按模型查自己的材质（见 GetModelMaterial）
-    std::map<Model *, Material *> m_model_materials;
 
-    // ---- 方向光阴影映射资源 ----
-    // 阴影深度贴图 FBO（只写深度）
-    std::unique_ptr<ShadowFramebuffer> m_shadow_fbo;
-    // 深度 Pass 专用着色器（depth.vert/depth.frag）
-    Technique *m_shadow_depth_tech = nullptr;
-    // 光源空间矩阵（lightProjection * lightView），每帧由方向光计算后上传
-    glm::mat4 m_light_space = glm::mat4(1.0f);
-    // 本帧是否存在已生成的阴影深度贴图（决定主 Pass 是否启用阴影采样）
-    bool m_shadow_map_ready = false;
-    // 阴影是否启用（禁用时直接跳过深度 Pass，也不绑定阴影贴图）
-    bool m_shadows_enabled = true;
-    // 阴影 bias 缩放系数（默认 1.0，见 SetShadowBiasScale）
-    float m_shadow_bias_scale = 1.0f;
-
-    // 本帧光源（阴影）摄像机参数，深度 Pass 计算后保存，供 ImGui 面板展示
-    ShadowCameraParams m_shadow_camera;
+    std::unique_ptr<ShadowPass> m_shadow_pass;
 
     // ---- HDR 场景帧缓冲 + 后处理（多 Pass 渲染框架）----
     // 所有 3D 场景绘制到该 FBO 的 RGBA16F 颜色纹理，后处理 Pass 再采样它做 tone mapping
     std::unique_ptr<SceneFramebuffer> m_scene_fbo;
-    // 后处理全屏 Pass 着色器（post.vert/post.frag），输出到默认帧缓冲
-    Technique *m_post_tech = nullptr;
-    // 全屏三角形 VAO：无顶点属性绑定，仅满足 Core Profile 对 VAO 的强制要求
-    unsigned int m_post_vao = 0;
-    // tone mapping 是否启用（见 SetToneMappingEnabled）
-    bool m_tone_mapping_enabled = true;
-    // 后处理曝光系数（默认 1.0，见 SetExposure）
-    float m_exposure = 1.0f;
-    // 后处理饱和度（默认 1.0 不调整，见 SetSaturation）
-    float m_saturation = 1.0f;
-    // 后处理对比度（默认 1.0 不调整，见 SetContrast）
-    float m_contrast = 1.0f;
+    std::unique_ptr<PostProcessPass> m_post_process_pass;
 
     // ---- 拾取高亮状态 ----
     // 鼠标拾取结果的线框高亮盒（世界空间 AABB），draw 末尾用 DebugDraw 叠加绘制

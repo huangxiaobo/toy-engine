@@ -8,7 +8,7 @@
  * 减少无意义的数值刷新。
  */
 FPSCounter::FPSCounter() {
-    m_lastTime = std::chrono::steady_clock::now();
+    m_last_time = std::chrono::steady_clock::now();
 }
 
 /*
@@ -23,11 +23,11 @@ void FPSCounter::Add() {
 
     // 每达到刷新间隔就根据实际流逝时间计算一次帧率
     auto now = std::chrono::steady_clock::now();
-    double elapsed = std::chrono::duration<double>(now - m_lastTime).count();
+    double elapsed = std::chrono::duration<double>(now - m_last_time).count();
     if (elapsed >= kUpdateIntervalSec) {
         m_fps = static_cast<float>(m_fps_now / elapsed);
         m_fps_now = 0;
-        m_lastTime = now;
+        m_last_time = now;
     }
 }
 

@@ -20,7 +20,7 @@ struct ShadowState;
  *        避免主 Pass 采样到错误的纹理
  *
  * 阴影参数不再由 SetShadowState 逐层转发缓存，而是绘制时直接读取
- * RenderContext.shadow（见 render_context.h），与模型共用同一条状态通道。
+ * RenderContext.m_shadow（见 render_context.h），与模型共用同一条状态通道。
  * 阴影映射涉及三套输入，本类在绘制时按固定纹理单元约定一次性激活/绑定：
  *   - lightSpace : 世界坐标 → 光源裁剪空间（顶点着色器算 FragPosLightSpace）
  *   - shadowMap  : 光源视角深度贴图采样器（片元着色器比较深度判影）
@@ -41,7 +41,7 @@ public:
     /*
      * 绘制阶段应用阴影状态（必须在 Enable() 之后、glDrawElements 之前调用）
      *
-     * 阴影状态直接取自 RenderContext.shadow（每帧由 Renderer 组装），不再本地缓存。
+     * 阴影状态直接取自 RenderContext.m_shadow（每帧由 Renderer 组装），不再本地缓存。
      * 显式激活纹理单元2、重新绑定深度贴图，并上传 shadowMap/lightSpace/gUseShadow，
      * 防止其他对象绘制覆盖了单元2 的纹理绑定。
      */

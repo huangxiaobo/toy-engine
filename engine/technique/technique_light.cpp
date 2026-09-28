@@ -31,7 +31,7 @@ TechniqueLight::TechniqueLight(string name, string vertexShader, string fragment
     InitPointLightUniform(8);
     InitSpotLightUniform(8);
     // m_shader 为基类持有的 unique_ptr，此处传入裸指针供 uniform 缓存
-    MaterialUniform.Init(this->m_shader.get());
+    m_material_uniform.Init(this->m_shader.get());
 }
 
 TechniqueLight::~TechniqueLight() {
@@ -78,8 +78,8 @@ void TechniqueLight::SetLights(const vector<Light *> &lights) {
     // 汇总时显式写回最终的光源数量 uniform，确保对象被禁用（尤其禁用最后一个/全部）时，
     // gPointLightNum / gSpotLightNum 能如实反映当前激活数量，而不是残留上一帧更高的值，
     // 从而避免着色器仍按旧数量遍历到已禁用光源遗留的脏数据（禁用不生效的根因）。
-    this->m_shader->SetUniformValue(PointLightCountUniform, point_light_count);
-    this->m_shader->SetUniformValue(SpotLightCountUniform, spot_light_count);
+    this->m_shader->SetUniformValue(m_point_light_count_uniform, point_light_count);
+    this->m_shader->SetUniformValue(m_spot_light_count_uniform, spot_light_count);
 }
 
 /*
@@ -95,31 +95,31 @@ void TechniqueLight::SetLights(const vector<Light *> &lights) {
 void TechniqueLight::SetDirectionLight(DirectionLight *light) {
     if (light == nullptr) {
         // 禁用状态：清零方向光各字段，使其在片元着色器中不产生光照
-        this->m_shader->SetUniformValue(DirectionLightUniform.Direction, glm::vec3(0.0f, -1.0f, 0.0f));
-        this->m_shader->SetUniformValue(DirectionLightUniform.Color, glm::vec3(0.0f));
-        this->m_shader->SetUniformValue(DirectionLightUniform.AmbientIntensity, 0.0f);
-        this->m_shader->SetUniformValue(DirectionLightUniform.DiffuseIntensity, 0.0f);
-        this->m_shader->SetUniformValue(DirectionLightUniform.SpecularIntensity, 0.0f);
-        this->m_shader->SetUniformValue(DirectionLightUniform.AmbientColor, glm::vec3(0.0f));
-        this->m_shader->SetUniformValue(DirectionLightUniform.DiffuseColor, glm::vec3(0.0f));
-        this->m_shader->SetUniformValue(DirectionLightUniform.SpecularColor, glm::vec3(0.0f));
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_direction, glm::vec3(0.0f, -1.0f, 0.0f));
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_color, glm::vec3(0.0f));
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_ambient_intensity, 0.0f);
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_diffuse_intensity, 0.0f);
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_specular_intensity, 0.0f);
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_ambient_color, glm::vec3(0.0f));
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_diffuse_color, glm::vec3(0.0f));
+        this->m_shader->SetUniformValue(m_direction_light_uniform.m_specular_color, glm::vec3(0.0f));
         return;
     }
-    this->m_shader->SetUniformValue(DirectionLightUniform.Direction, light->Direction);
-    this->m_shader->SetUniformValue(DirectionLightUniform.Color, light->Color);
-    this->m_shader->SetUniformValue(DirectionLightUniform.AmbientIntensity, light->AmbientIntensity);
-    this->m_shader->SetUniformValue(DirectionLightUniform.DiffuseIntensity, light->DiffuseIntensity);
-    this->m_shader->SetUniformValue(DirectionLightUniform.SpecularIntensity, light->SpecularIntensity);
-    this->m_shader->SetUniformValue(DirectionLightUniform.AmbientColor, light->AmbientColor);
-    this->m_shader->SetUniformValue(DirectionLightUniform.DiffuseColor, light->DiffuseColor);
-    this->m_shader->SetUniformValue(DirectionLightUniform.SpecularColor, light->SpecularColor);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_direction, light->m_direction);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_color, light->m_color);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_ambient_intensity, light->m_ambient_intensity);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_diffuse_intensity, light->m_diffuse_intensity);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_specular_intensity, light->m_specular_intensity);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_ambient_color, light->m_ambient_color);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_diffuse_color, light->m_diffuse_color);
+    this->m_shader->SetUniformValue(m_direction_light_uniform.m_specular_color, light->m_specular_color);
 }
 
 /*
  * 预取点光源数组 uniform 位置
  *
  * 为前 num 个点光源槽位逐一查询 uniform 位置并缓存：
- *   - gPointLights[i].Color / Position / 三通道颜色与强度 / 衰减
+ *   - gPointLights[i].m_color / Position / 三通道颜色与强度 / 衰减
  *   - gPointLightNum：当前激活的点光源数量
  *
  * 一次性缓存后，SetPointLight 每帧只做 glUniform* 调用，无字符串解析。
@@ -127,42 +127,42 @@ void TechniqueLight::SetDirectionLight(DirectionLight *light) {
  * 与 GLSL 中 "struct PointLight { ... } gPointLights[8];" 对应。
  */
 void TechniqueLight::InitPointLightUniform(int num) {
-    PointLightCountUniform = this->m_shader->GetUniformLocation("gPointLightNum");
+    m_point_light_count_uniform = this->m_shader->GetUniformLocation("gPointLightNum");
     for (int i = 0; i < num; i++) {
         UniformPointLight uniform;
         string name;
 
         name = std::format("gPointLights[{}].Color", i);
-        uniform.Color = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].Position", i);
-        uniform.Position = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_position = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AmbientIntensity", i);
-        uniform.AmbientIntensity = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_ambient_intensity = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].DiffuseIntensity", i);
-        uniform.DiffuseIntensity = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_diffuse_intensity = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].DiffuseColor", i);
-        uniform.DiffuseColor = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_diffuse_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].SpecularColor", i);
-        uniform.SpecularColor = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_specular_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AmbientColor", i);
-        uniform.AmbientColor = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_ambient_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AttenuationConstant", i);
-        uniform.Atten.Constant = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_atten.m_constant = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AttenuationLinear", i);
-        uniform.Atten.Linear = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_atten.m_linear = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gPointLights[{}].AttenuationExp", i);
-        uniform.Atten.Exp = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_atten.m_exp = this->m_shader->GetUniformLocation(name.c_str());
 
-        PointLightUniforms.push_back(uniform);
+        m_point_light_uniforms.push_back(uniform);
     }
 }
 
@@ -171,17 +171,17 @@ void TechniqueLight::InitPointLightUniform(int num) {
  *
  * 方向光在着色器中对应用户自定义结构体 UniformDirectionLight，字段命名如下，
  * 一次性缓存 location，避免每帧字符串查找：
- *   - gDirectionLight.Direction / Color / 三通道颜色与强度
+ *   - gDirectionLight.m_direction / Color / 三通道颜色与强度
  */
 void TechniqueLight::InitDirectionLightUniform() {
-    DirectionLightUniform.Direction = this->m_shader->GetUniformLocation("gDirectionLight.Direction");
-    DirectionLightUniform.Color = this->m_shader->GetUniformLocation("gDirectionLight.Color");
-    DirectionLightUniform.AmbientIntensity = this->m_shader->GetUniformLocation("gDirectionLight.AmbientIntensity");
-    DirectionLightUniform.DiffuseIntensity = this->m_shader->GetUniformLocation("gDirectionLight.DiffuseIntensity");
-    DirectionLightUniform.SpecularIntensity = this->m_shader->GetUniformLocation("gDirectionLight.SpecularIntensity");
-    DirectionLightUniform.AmbientColor = this->m_shader->GetUniformLocation("gDirectionLight.AmbientColor");
-    DirectionLightUniform.DiffuseColor = this->m_shader->GetUniformLocation("gDirectionLight.DiffuseColor");
-    DirectionLightUniform.SpecularColor = this->m_shader->GetUniformLocation("gDirectionLight.SpecularColor");
+    m_direction_light_uniform.m_direction = this->m_shader->GetUniformLocation("gDirectionLight.Direction");
+    m_direction_light_uniform.m_color = this->m_shader->GetUniformLocation("gDirectionLight.Color");
+    m_direction_light_uniform.m_ambient_intensity = this->m_shader->GetUniformLocation("gDirectionLight.AmbientIntensity");
+    m_direction_light_uniform.m_diffuse_intensity = this->m_shader->GetUniformLocation("gDirectionLight.DiffuseIntensity");
+    m_direction_light_uniform.m_specular_intensity = this->m_shader->GetUniformLocation("gDirectionLight.SpecularIntensity");
+    m_direction_light_uniform.m_ambient_color = this->m_shader->GetUniformLocation("gDirectionLight.AmbientColor");
+    m_direction_light_uniform.m_diffuse_color = this->m_shader->GetUniformLocation("gDirectionLight.DiffuseColor");
+    m_direction_light_uniform.m_specular_color = this->m_shader->GetUniformLocation("gDirectionLight.SpecularColor");
 }
 
 /*
@@ -191,54 +191,54 @@ void TechniqueLight::InitDirectionLightUniform() {
  * 与 GLSL 中 "struct SpotLight { ... } gSpotLights[8];" 对应。
  */
 void TechniqueLight::InitSpotLightUniform(int num) {
-    SpotLightCountUniform = this->m_shader->GetUniformLocation("gSpotLightNum");
+    m_spot_light_count_uniform = this->m_shader->GetUniformLocation("gSpotLightNum");
     for (int i = 0; i < num; i++) {
         UniformSpotLight uniform;
         string name;
 
         name = std::format("gSpotLights[{}].Position", i);
-        uniform.Position = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_position = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].Direction", i);
-        uniform.Direction = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_direction = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].Color", i);
-        uniform.Color = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].AmbientIntensity", i);
-        uniform.AmbientIntensity = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_ambient_intensity = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].DiffuseIntensity", i);
-        uniform.DiffuseIntensity = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_diffuse_intensity = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].SpecularIntensity", i);
-        uniform.SpecularIntensity = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_specular_intensity = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].AmbientColor", i);
-        uniform.AmbientColor = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_ambient_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].DiffuseColor", i);
-        uniform.DiffuseColor = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_diffuse_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].SpecularColor", i);
-        uniform.SpecularColor = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_specular_color = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].AttenuationConstant", i);
-        uniform.Atten.Constant = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_atten.m_constant = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].AttenuationLinear", i);
-        uniform.Atten.Linear = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_atten.m_linear = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].AttenuationExp", i);
-        uniform.Atten.Exp = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_atten.m_exp = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].Cutoff", i);
-        uniform.Cutoff = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_cutoff = this->m_shader->GetUniformLocation(name.c_str());
 
         name = std::format("gSpotLights[{}].OuterCutoff", i);
-        uniform.OuterCutoff = this->m_shader->GetUniformLocation(name.c_str());
+        uniform.m_outer_cutoff = this->m_shader->GetUniformLocation(name.c_str());
 
-        SpotLightUniforms.push_back(uniform);
+        m_spot_light_uniforms.push_back(uniform);
     }
 }
 
@@ -249,22 +249,22 @@ void TechniqueLight::InitSpotLightUniform(int num) {
  * 使着色器知道本次绘制实际参与的光源数量（用于循环上限，避免遍历未初始化槽位）。
  */
 void TechniqueLight::SetSpotLight(int i, SpotLight *light) {
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].Position, light->Position);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].Direction, light->Direction);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].Color, light->Color);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].AmbientIntensity, light->AmbientIntensity);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].DiffuseIntensity, light->DiffuseIntensity);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].SpecularIntensity, light->SpecularIntensity);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].AmbientColor, light->AmbientColor);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].DiffuseColor, light->DiffuseColor);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].SpecularColor, light->SpecularColor);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].Atten.Constant, light->Attenuation.Constant);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].Atten.Linear, light->Attenuation.Linear);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].Atten.Exp, light->Attenuation.Exp);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].Cutoff, light->Cutoff);
-    this->m_shader->SetUniformValue(SpotLightUniforms[i].OuterCutoff, light->OuterCutoff);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_position, light->m_position);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_direction, light->m_direction);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_color, light->m_color);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_ambient_intensity, light->m_ambient_intensity);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_diffuse_intensity, light->m_diffuse_intensity);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_specular_intensity, light->m_specular_intensity);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_ambient_color, light->m_ambient_color);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_diffuse_color, light->m_diffuse_color);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_specular_color, light->m_specular_color);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_atten.m_constant, light->Attenuation.m_constant);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_atten.m_linear, light->Attenuation.m_linear);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_atten.m_exp, light->Attenuation.m_exp);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_cutoff, light->m_cutoff);
+    this->m_shader->SetUniformValue(m_spot_light_uniforms[i].m_outer_cutoff, light->m_outer_cutoff);
 
-    this->m_shader->SetUniformValue(SpotLightCountUniform, i + 1);
+    this->m_shader->SetUniformValue(m_spot_light_count_uniform, i + 1);
 }
 
 /*
@@ -274,18 +274,18 @@ void TechniqueLight::SetSpotLight(int i, SpotLight *light) {
  * 使着色器知道本次绘制实际参与的光源数量（用于循环上限，避免遍历未初始化槽位）。
  */
 void TechniqueLight::SetPointLight(int i, PointLight *light) {
-    this->m_shader->SetUniformValue(PointLightUniforms[i].Color, light->Color);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].Position, light->Position);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].AmbientIntensity, light->AmbientIntensity);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].DiffuseIntensity, light->DiffuseIntensity);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].DiffuseColor, light->DiffuseColor);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].SpecularColor, light->SpecularColor);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].AmbientColor, light->AmbientColor);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].Atten.Constant, light->Attenuation.Constant);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].Atten.Linear, light->Attenuation.Linear);
-    this->m_shader->SetUniformValue(PointLightUniforms[i].Atten.Exp, light->Attenuation.Exp);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_color, light->m_color);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_position, light->m_position);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_ambient_intensity, light->m_ambient_intensity);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_diffuse_intensity, light->m_diffuse_intensity);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_diffuse_color, light->m_diffuse_color);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_specular_color, light->m_specular_color);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_ambient_color, light->m_ambient_color);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_atten.m_constant, light->Attenuation.m_constant);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_atten.m_linear, light->Attenuation.m_linear);
+    this->m_shader->SetUniformValue(m_point_light_uniforms[i].m_atten.m_exp, light->Attenuation.m_exp);
 
-    this->m_shader->SetUniformValue(PointLightCountUniform, i + 1);
+    this->m_shader->SetUniformValue(m_point_light_count_uniform, i + 1);
 }
 
 /*
@@ -298,15 +298,13 @@ void TechniqueLight::SetMaterial(const Material *m) {
     if (m == nullptr) {
         return;
     }
-    // 保存材质指针，供属性面板通过 GetMaterial() 读取并显示
-    m_material = m;
-    // 必须先激活本 technique 的 shader program，否则 glUniform* 会写入
-    // 当前绑定的其他 program（如属性面板编辑时，活跃 program 是上一帧最后绘制的模型）
+    // 必须先激活本 technique 的 shader program：init 阶段调用时没有 program 处于绑定状态，
+    // 不 Use 的话 glUniform* 会全部落空
     this->m_shader->Use();
-    MaterialUniform.SetAmbientColor(this->m_shader.get(), m->AmbientColor);
-    MaterialUniform.SetDiffuseColor(this->m_shader.get(), m->DiffuseColor);
-    MaterialUniform.SetSpecularColor(this->m_shader.get(), m->SpecularColor);
-    MaterialUniform.SetShininess(this->m_shader.get(), m->Shininess);
+    m_material_uniform.SetAmbientColor(this->m_shader.get(), m->m_ambient_color);
+    m_material_uniform.SetDiffuseColor(this->m_shader.get(), m->m_diffuse_color);
+    m_material_uniform.SetSpecularColor(this->m_shader.get(), m->m_specular_color);
+    m_material_uniform.SetShininess(this->m_shader.get(), m->m_shininess);
 }
 
 void TechniqueLight::SetPointLights(vector<PointLight *> lights) {
@@ -331,19 +329,19 @@ MaterialUniform::~MaterialUniform() {
 // 每种 setter 通过缓存好的 GLuint location 直接写入对应 gMaterial.* 字段
 
 void MaterialUniform::SetAmbientColor(Shader *shader, const glm::vec3 &color) {
-    shader->SetUniformValue(AmbientColor, color);
+    shader->SetUniformValue(m_ambient_color, color);
 }
 
 void MaterialUniform::SetDiffuseColor(Shader *shader, const glm::vec3 &color) {
-    shader->SetUniformValue(DiffuseColor, color);
+    shader->SetUniformValue(m_diffuse_color, color);
 }
 
 void MaterialUniform::SetSpecularColor(Shader *shader, const glm::vec3 &color) {
-    shader->SetUniformValue(SpecularColor, color);
+    shader->SetUniformValue(m_specular_color, color);
 }
 
 void MaterialUniform::SetShininess(Shader *shader, float shininess) {
-    shader->SetUniformValue(Shininess, shininess);
+    shader->SetUniformValue(m_shininess, shininess);
 }
 
 /*
@@ -352,10 +350,10 @@ void MaterialUniform::SetShininess(Shader *shader, float shininess) {
  * 在着色器编译链接成功后调用，一次性查询 gMaterial 结构体各字段的 location。
  */
 void MaterialUniform::Init(Shader *shader) {
-    AmbientColor = shader->GetUniformLocation("gMaterial.AmbientColor");
-    DiffuseColor = shader->GetUniformLocation("gMaterial.DiffuseColor");
-    SpecularColor = shader->GetUniformLocation("gMaterial.SpecularColor");
-    Shininess = shader->GetUniformLocation("gMaterial.Shininess");
+    m_ambient_color = shader->GetUniformLocation("gMaterial.AmbientColor");
+    m_diffuse_color = shader->GetUniformLocation("gMaterial.DiffuseColor");
+    m_specular_color = shader->GetUniformLocation("gMaterial.SpecularColor");
+    m_shininess = shader->GetUniformLocation("gMaterial.Shininess");
 }
 
 // 预留：批量应用材质的方法，当前未使用

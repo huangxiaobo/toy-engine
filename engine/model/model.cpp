@@ -7,6 +7,7 @@ using namespace std;
 
 #include "../mesh/mesh.h"
 #include "../texture/texture.h"
+#include "../material/material.h"
 #include "../utils/utils.h"
 #include "../light/light.h"
 #include "../render_context.h"
@@ -122,16 +123,16 @@ std::unique_ptr<Mesh> Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) 
         vector.x = ai_mesh->mVertices[i].x;
         vector.y = ai_mesh->mVertices[i].y;
         vector.z = ai_mesh->mVertices[i].z;
-        vertex.Position = vector; // 将该点数据存储在结构体中
+        vertex.m_position = vector; // 将该点数据存储在结构体中
         // OBJ 不携带顶点色，固定为白色，避免光照链中 albedo 被位置衍生的颜色污染
-        vertex.Color = glm::vec3(1.0f, 1.0f, 1.0f);
+        vertex.m_color = glm::vec3(1.0f, 1.0f, 1.0f);
         // normals
         if (ai_mesh->HasNormals()) // 同理存储法线（如果有的话）
         {
             vector.x = ai_mesh->mNormals[i].x;
             vector.y = ai_mesh->mNormals[i].y;
             vector.z = ai_mesh->mNormals[i].z;
-            vertex.Normal = vector;
+            vertex.m_normal = vector;
         }
         // texture coordinates
         if (ai_mesh->mTextureCoords[0]) // 加载纹理坐标
@@ -141,19 +142,19 @@ std::unique_ptr<Mesh> Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) 
             // 使用顶点可以有多个纹理坐标的模型，所以我们总是取第一个集合(0)。
             vec.x = ai_mesh->mTextureCoords[0][i].x;
             vec.y = ai_mesh->mTextureCoords[0][i].y;
-            vertex.TexCoords = vec;
+            vertex.m_tex_coords = vec;
             // tangent
             vector.x = ai_mesh->mTangents[i].x;
             vector.y = ai_mesh->mTangents[i].y;
             vector.z = ai_mesh->mTangents[i].z;
-            vertex.Tangent = vector;
+            vertex.m_tangent = vector;
             // bitangent
             vector.x = ai_mesh->mBitangents[i].x;
             vector.y = ai_mesh->mBitangents[i].y;
             vector.z = ai_mesh->mBitangents[i].z;
-            vertex.Bitangent = vector;
+            vertex.m_bitangent = vector;
         } else
-            vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+            vertex.m_tex_coords = glm::vec2(0.0f, 0.0f);
 
         vertices.push_back(vertex);
     }
@@ -194,10 +195,10 @@ std::unique_ptr<Mesh> Model::ProcessMesh(aiMesh *ai_mesh, const aiScene *scene) 
     // 创建 mesh 并把材质贴图绑定到网格上（漫反射/法线贴图各自取第一张）
     auto mesh = std::make_unique<Mesh>(vertices, indices);
     for (const auto &tex: textures) {
-        if (tex.type == "texture_diffuse") {
-            mesh->SetTexture(tex.id);
-        } else if (tex.type == "texture_normal") {
-            mesh->SetNormalMap(tex.id);
+        if (tex.m_type == "texture_diffuse") {
+            mesh->SetTexture(tex.m_id);
+        } else if (tex.m_type == "texture_normal") {
+            mesh->SetNormalMap(tex.m_id);
         }
     }
     return mesh;
@@ -214,7 +215,7 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
         // check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
         bool skip = false;
         for (unsigned int j = 0; j < m_textures_loaded.size(); j++) {
-            if (std::strcmp(m_textures_loaded[j].path.data(), str.C_Str()) == 0) {
+            if (std::strcmp(m_textures_loaded[j].m_path.data(), str.C_Str()) == 0) {
                 textures.push_back(m_textures_loaded[j]);
                 skip = true;
                 // a texture with the same filepath has already been loaded, continue to next one. (optimization)
@@ -230,9 +231,9 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
             std::cout << "[texpath] type=" << typeName
                       << " assimp_path=" << str.C_Str()
                       << " resolved=" << resolved << std::endl;
-            texture.id = Utils::LoadTextureFromFile(resolved);
-            texture.type = typeName;
-            texture.path = str.C_Str();
+            texture.m_id = Utils::LoadTextureFromFile(resolved);
+            texture.m_type = typeName;
+            texture.m_path = str.C_Str();
             textures.push_back(texture);
             m_textures_loaded.push_back(texture);
         }
@@ -324,10 +325,13 @@ void Model::SetAnimValue(AnimProperty prop, const glm::vec3 &value) {
     }
 }
 
-// void Model::SetMaterial(Material *material)
-// {
-//     this->m_material = material;
-// }
+void Model::SetMaterial(std::unique_ptr<Material> material) {
+    m_material = std::move(material);
+}
+
+Material *Model::GetMaterial() const {
+    return m_material.get();
+}
 
 // void Model::SetEffect(Technique *effect)
 // {
@@ -397,6 +401,6 @@ void Model::Draw(const RenderContext &ctx, const glm::mat4 &model) {
     model_local = model * model_local;
 
     for (int i = 0; i < this->m_meshes.size(); i++) {
-        this->m_meshes[i]->Draw(ctx, model_local);
+        this->m_meshes[i]->Draw(ctx, model_local, m_material.get());
     }
 }

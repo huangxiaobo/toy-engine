@@ -20,6 +20,8 @@ class SceneFramebuffer {
 public:
     SceneFramebuffer() = default;
     ~SceneFramebuffer();
+    SceneFramebuffer(const SceneFramebuffer &) = delete;
+    SceneFramebuffer &operator=(const SceneFramebuffer &) = delete;
 
     // 创建指定分辨率的 HDR 颜色纹理与 FBO；分辨率变化时内部先释放旧资源再重建
     void Init(int width, int height);
@@ -30,7 +32,7 @@ public:
     void Unbind();
 
     // 获取 HDR 颜色纹理（供后处理 Pass 采样）
-    unsigned int GetColorTexture() const { return m_colorTex; }
+    unsigned int GetColorTexture() const { return m_color_tex; }
 
     int GetWidth() const { return m_width; }
     int GetHeight() const { return m_height; }
@@ -40,11 +42,11 @@ private:
 
     unsigned int m_fbo = 0;
     // HDR 线性颜色纹理（RGBA16F，后处理 Pass 采样它）
-    unsigned int m_colorTex = 0;
+    unsigned int m_color_tex = 0;
     // 离屏深度 Renderbuffer，仅供场景 Pass 深度测试（不直接采样）
-    unsigned int m_depthRbo = 0;
+    unsigned int m_depth_rbo = 0;
     // BindForWrite 时保存的主视口（Unbind 时恢复）；[x, y, width, height]
-    int m_savedViewport[4] = {0, 0, 0, 0};
+    int m_saved_viewport[4] = {0, 0, 0, 0};
     int m_width = 0;
     int m_height = 0;
 };
