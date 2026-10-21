@@ -44,7 +44,9 @@ public:
 private:
     // ---- ImGui 面板创建 ----
     void CreateDockSpace();                  // 创建 DockSpace 并建立初始三栏布局，同时记录中央节点（3D视口）矩形
-    void CreateMenuBar();                    // 渲染主菜单栏（退出 / 面板子菜单含资源、属性开关），位于 DockSpace 宿主窗口顶部
+    void CreateMenuBar();                    // 渲染主菜单栏（视图面板开关 / 工具 / 帮助 / 退出），位于 DockSpace 宿主窗口顶部
+    void ShowStatusBar();                    // 窗口底部状态栏（FPS、选中对象、视口分辨率）
+    void ResetLayout();                      // 恢复默认三栏布局与面板默认可见性（菜单「视图 → 重置布局」调用）
     void CreateUI();
     void CreateResourceListPanel();
     void CreatePropertiesPanel();
@@ -56,6 +58,7 @@ private:
     void DrawViewportAxisGizmo();            // 在视口左下角叠加屏幕空间坐标轴 gizmo（三色六轴 + X/Y/Z 标签）
     void ShowShadowDepthMapPanel();          // 绘制阴影深度贴图可视化调试面板（把深度图作为纹理显示）
     void ShowShadowPropertiesPanel();        // 绘制阴影属性面板（阴影开关、深度贴图预览等全局阴影设置）
+    void ShowPostProcessPanel();             // 绘制后处理面板（Tone Mapping、曝光、饱和度、对比度）
     void ShowDebugPropertiesPanel();         // 绘制调试属性面板（DebugDraw 光源线框开关等渲染调试项）
     void ShowFpsGraph();                     // 绘制视口右上角 FPS 曲线悬浮面板（最近一帧一次的瞬时帧率采样）
     void RebuildShadowDepthPreview(unsigned int srcTex); // 读回深度贴图并重建灰度预览纹理
@@ -117,14 +120,15 @@ private:
     bool m_show_resource_list = true;
     bool m_show_properties = true;
     // 模型属性被拆为三个独立可停靠窗口（右栏 tab）：模型/材质/动画，
-    // 各自独立开关（右上角 X 关闭后可从「面板」菜单重新打开），受 m_show_properties 总开关控制
+    // 各自独立开关（右上角 X 关闭后可从「视图 → 模型窗口」菜单重新打开），受 m_show_properties 总开关控制
     bool m_show_model_window = true;
     bool m_show_material_window = true;
     bool m_show_animation_window = true;
     // 选中模型后置位：下一帧把「模型」tab 设为默认活动窗口（SetNextWindowFocus 后复位）
     bool m_focus_model_window = false;
-    // FPS 曲线悬浮面板开关（菜单「面板 → FPS曲线」控制，默认显示）
-    bool m_show_fps_graph = true;
+    // FPS 曲线面板开关（菜单「视图 → FPS曲线」/ Ctrl+6 控制）
+    // 默认收起：常驻帧率已由底部状态栏显示，曲线按需打开（浮动于视口底部，可自行停靠）
+    bool m_show_fps_graph = false;
     // 阴影深度贴图可视化调试面板开关（把深度图作为纹理显示，辅助诊断阴影问题）
     bool m_show_shadow_depth_map = false;
     // 阴影属性面板开关（阴影开关、光源摄像机参数、深度贴图预览等全局阴影设置）
@@ -132,6 +136,8 @@ private:
     bool m_show_shadow_properties = true;
     // 调试属性面板开关（DebugDraw 光源线框开关等渲染调试项）
     bool m_show_debug_properties = true;
+    // 后处理面板开关（Tone Mapping、曝光、饱和度、对比度，与阴影属性同栏 tab 切换）
+    bool m_show_post_process = true;
 
     // 阴影深度贴图可视化面板的显示状态：
     // 深度贴图是 GL_DEPTH_COMPONENT 只写格式，ImGui 颜色采样器难以可靠显示，

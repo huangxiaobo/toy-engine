@@ -58,6 +58,9 @@ static constexpr size_t kFpsHistoryCapacity = 600;
 // FPS 曲线采样间隔（秒）：按此周期结算一次窗口平均帧率（15 次/秒）
 static constexpr float kFpsSampleIntervalSec = 1.0f / 15.0f;
 
+// 底部状态栏高度：单行文本垂直居中
+static constexpr float kStatusBarHeight = 26.0f;
+
 // ---- GLFW 输入回调（ImGui 优先模式） ----
 // 所有回调遵循同一模式：先转发给 ImGui → 检查 WantCapture → 再交给引擎
 // 通过 glfwSetWindowUserPointer 将 GLFWwindow 关联到 ToyEngineMainWindow 实例
@@ -140,6 +143,31 @@ void ToyEngineMainWindow::KeyCallback(GLFWwindow* window, int key, int scancode,
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
     }
+
+    // 仅在按下瞬间响应，避免按住重复触发
+    if (action != GLFW_PRESS) {
+        return;
+    }
+
+    // F12：截图，与「工具 → 截图」菜单项行为一致
+    if (key == GLFW_KEY_F12) {
+        self->m_screenshot_pending = true;
+        return;
+    }
+
+    // Ctrl+1~7：切换各面板显示，与「视图」菜单中的快捷键标注一一对应
+    if ((mods & GLFW_MOD_CONTROL) != 0) {
+        switch (key) {
+            case GLFW_KEY_1: self->m_show_resource_list = !self->m_show_resource_list; break;
+            case GLFW_KEY_2: self->m_show_properties = !self->m_show_properties; break;
+            case GLFW_KEY_3: self->m_show_shadow_properties = !self->m_show_shadow_properties; break;
+            case GLFW_KEY_4: self->m_show_post_process = !self->m_show_post_process; break;
+            case GLFW_KEY_5: self->m_show_debug_properties = !self->m_show_debug_properties; break;
+            case GLFW_KEY_6: self->m_show_fps_graph = !self->m_show_fps_graph; break;
+            case GLFW_KEY_7: self->m_show_shadow_depth_map = !self->m_show_shadow_depth_map; break;
+            default: break;
+        }
+    }
 }
 
 // 构造/析构定义在 .cpp：unique_ptr 成员需持有类型完整
@@ -200,7 +228,7 @@ bool ToyEngineMainWindow::Initialize() {
         fclose(fontFile);
         std::cout << "找到字体文件" << std::endl;
         ImFont* chineseFont = io.Fonts->AddFontFromFileTTF(
-            "./resource/font/微软雅黑.ttf", 18.0f, nullptr,
+            "./resource/font/微软雅黑.ttf", 16.0f, nullptr,
             io.Fonts->GetGlyphRangesChineseFull());
         if (chineseFont) {
             std::cout << "✅ 成功加载中文字体" << std::endl;
@@ -213,6 +241,15 @@ bool ToyEngineMainWindow::Initialize() {
     }
 
     ImGui::StyleColorsDark();
+    // 默认暗色主题的间距/圆角微调：收紧控件圆角、略增内边距，面板信息密度更均匀
+    ImGuiStyle &style = ImGui::GetStyle();
+    style.WindowRounding = 4.0f;
+    style.FrameRounding = 3.0f;
+    style.GrabRounding = 3.0f;
+    style.ScrollbarRounding = 4.0f;
+    style.FramePadding = ImVec2(8.0f, 4.0f);
+    style.ItemSpacing = ImVec2(8.0f, 6.0f);
+    style.ItemInnerSpacing = ImVec2(6.0f, 4.0f);
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
@@ -339,10 +376,12 @@ void ToyEngineMainWindow::RenderFrame() {
  * 创建/渲染 DockSpace 并建立初始三栏布局
  *
  * 布局：DockBuilder 将 DockSpace 竖直分为左/中/右三栏——
- *   - 左节点：资源列表（占 25% 宽度）
- *   - 右节点：属性面板（占 30% 宽度）
+ *   - 左节点：资源列表（占总宽 20%），下方为调试属性
+ *   - 右节点：属性面板（占总宽 20%），下方为阴影/后处理/深度贴图 tab
  *   - 中央节点：留空，作为 3D 渲染视口（PassthruCentralNode 模式，输入穿透用于相机控制）
  *
+ * 菜单栏占据顶部，底部保留状态栏高度；FPS 曲线不预建停靠节点，
+ * 需要时以浮动窗出现在视口底部（隐藏时不占用视口空间）。
  * 仅首帧执行 DockBuilder 初始化；此后 DockSpace 完全接管布局，用户可自由
  * 拖拽/浮动/调整各面板。每帧结束时将中央节点矩形记录到 m_viewport* 成员，
  * 供 RenderFrame 换算 glViewport 使用。
@@ -359,13 +398,12 @@ void ToyEngineMainWindow::CreateDockSpace() {
         ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->WorkSize);
 
-        // 依次切分：先分出左栏（16.7% = 原 25% 的 2/3），再在剩余空间中分出右栏。
-        // 右栏比例取 0.20（= 16.7% / 剩余 83.3%），使右栏实际占总宽 16.7%，与左栏等宽
+        // 左右栏各占总宽 20%：先分出左栏，再从剩余 80% 中按 0.25 分出右栏（= 20% / 80%）
         ImGuiID mainNode = dockspaceId;
         ImGuiID leftNode = ImGui::DockBuilderSplitNode(
-            mainNode, ImGuiDir_Left, 0.1667f, nullptr, &mainNode);
+            mainNode, ImGuiDir_Left, 0.20f, nullptr, &mainNode);
         ImGuiID rightNode = ImGui::DockBuilderSplitNode(
-            mainNode, ImGuiDir_Right, 0.20f, nullptr, &mainNode);
+            mainNode, ImGuiDir_Right, 0.25f, nullptr, &mainNode);
 
         // 面板窗口按标题绑定到对应节点（窗口标题必须与停靠目标一致）
         // 调试属性面板停靠于左节点下方（与资源列表同栏，垂直排列）
@@ -383,16 +421,14 @@ void ToyEngineMainWindow::CreateDockSpace() {
         ImGui::DockBuilderDockWindow("材质", rightNode);
         ImGui::DockBuilderDockWindow("动画", rightNode);
         ImGui::DockBuilderDockWindow("阴影属性", rightBottomNode);
-
-        // FPS 曲线面板停靠于中央节点下方（视口底部的横条，占中央高度 15%）
-        ImGuiID viewportBottomNode = ImGui::DockBuilderSplitNode(
-            mainNode, ImGuiDir_Down, 0.15f, nullptr, &mainNode);
-        ImGui::DockBuilderDockWindow("FPS曲线", viewportBottomNode);
+        ImGui::DockBuilderDockWindow("后处理", rightBottomNode);
+        // 深度贴图作为右下的第三个 tab：打开后不再以浮动窗遮住视口
+        ImGui::DockBuilderDockWindow("阴影深度贴图", rightBottomNode);
 
         ImGui::DockBuilderFinish(dockspaceId);
     }
 
-    // 全屏宿主窗口承载菜单栏 + DockSpace：无标题、无边框，仅作为两者的容器
+    // 全屏宿主窗口承载菜单栏 + DockSpace + 状态栏：无标题、无边框
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -404,16 +440,23 @@ void ToyEngineMainWindow::CreateDockSpace() {
     ImGui::Begin("##DockSpaceHost", nullptr,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-        ImGuiWindowFlags_MenuBar);
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_MenuBar);
     ImGui::PopStyleVar(3);
 
-    // 主菜单栏（退出/资源/属性）：必须位于 DockSpace 之前渲染，
+    // 主菜单栏：必须位于 DockSpace 之前渲染，
     // DockSpace 的可用区域会自动扣除菜单栏高度
     CreateMenuBar();
 
-    // 渲染 DockSpace：PassthruCentralNode = 中央节点保持为空且输入穿透，
-    // 让 GLFW 回调（相机控制）在中央区域可正常收到鼠标事件
-    ImGui::DockSpace(dockspaceId, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+    // 渲染 DockSpace：显式扣掉底部状态栏高度（空节点不会自动折叠，
+    // 所以不预留任何隐藏面板的分割槽位）；PassthruCentralNode = 中央节点
+    // 保持为空且输入穿透，让 GLFW 回调（相机控制）在中央区域可正常收到鼠标事件
+    const ImVec2 avail = ImGui::GetContentRegionAvail();
+    ImGui::DockSpace(dockspaceId,
+        ImVec2(avail.x, ImMax(avail.y - kStatusBarHeight, 1.0f)),
+        ImGuiDockNodeFlags_PassthruCentralNode);
+
+    ImGui::SetCursorPos(ImVec2(0.0f, ImGui::GetWindowSize().y - kStatusBarHeight));
+    ShowStatusBar();
     ImGui::End();
 
     // 记录中央节点矩形（ImGui 逻辑坐标，左上原点、Y 向下），供 RenderFrame 换算
@@ -427,36 +470,59 @@ void ToyEngineMainWindow::CreateDockSpace() {
 }
 
 /*
- * 主菜单栏（退出 / 面板）
+ * 主菜单栏（视图 / 工具 / 帮助）
  *
  * 菜单结构：
- *   - 退出：请求关闭窗口（与 ESC 键行为一致，ESC 在 KeyCallback 中处理）
- *   - 面板：子菜单，包含
- *       - 资源：切换左侧资源列表面板的显示 / 隐藏（勾选状态 = 面板可见）
- *       - 属性：切换右侧属性面板的显示 / 隐藏（勾选状态 = 面板可见）
+ *   - 视图：按用途分组的面板开关（快捷键 Ctrl+1~7，已在 KeyCallback 中实现），
+ *     每组带灰色小标题；「模型窗口」子菜单收纳模型/材质/动画三个右栏 tab；
+ *     末尾「重置布局」恢复默认三栏，「清除选择」取消当前选中对象
+ *   - 工具：截图（F12）、光源调试线框快捷开关
+ *   - 帮助：关于弹窗（含快捷键速查）
+ *   - 退出：请求关闭窗口（与 ESC 键行为一致，ESC 在 KeyCallback 中处理），
+ *     置于菜单栏末尾符合通用软件惯例
  *
  * 必须在宿主窗口 Begin() 之后、DockSpace() 之前调用，
  * 这样 DockSpace 可用区域自动扣除菜单栏高度，中央节点随之正确下移。
  */
 void ToyEngineMainWindow::CreateMenuBar() {
     if (ImGui::BeginMenuBar()) {
-        // 退出：点击后设置关闭标志，主循环在下一帧退出
-        if (ImGui::MenuItem("退出", "Esc")) {
-            glfwSetWindowShouldClose(m_window, true);
-        }
+        // 视图：分组收纳所有可开关面板；MenuItem 第三参数为选中状态，
+        // 点击时自动切换并显示勾选标记，与面板可见性绑定
+        if (ImGui::BeginMenu("视图")) {
+            ImGui::TextDisabled("基础面板");
+            ImGui::MenuItem("资源列表", "Ctrl+1", &m_show_resource_list);
+            ImGui::MenuItem("属性", "Ctrl+2", &m_show_properties);
 
-        // 面板：子菜单收纳所有可开关面板；MenuItem 的第四个参数为选中状态
-        // 指针（bool*），点击时自动切换并显示勾选标记，与面板可见性绑定
-        if (ImGui::BeginMenu("面板")) {
-            ImGui::MenuItem("资源", nullptr, &m_show_resource_list);
-            ImGui::MenuItem("属性", nullptr, &m_show_properties);
+            ImGui::Separator();
+            ImGui::TextDisabled("渲染调试");
+            ImGui::MenuItem("阴影属性", "Ctrl+3", &m_show_shadow_properties);
+            ImGui::MenuItem("后处理", "Ctrl+4", &m_show_post_process);
+            ImGui::MenuItem("调试属性", "Ctrl+5", &m_show_debug_properties);
+            ImGui::MenuItem("FPS曲线", "Ctrl+6", &m_show_fps_graph);
+
+            ImGui::Separator();
+            ImGui::TextDisabled("深度调试");
+            ImGui::MenuItem("阴影深度贴图", "Ctrl+7", &m_show_shadow_depth_map);
+
+            // 模型选中时右栏拆分出的三个 tab，独立开关（受「属性」总开关控制显示）
+            ImGui::Separator();
+            ImGui::TextDisabled("模型窗口");
             ImGui::MenuItem("模型", nullptr, &m_show_model_window);
             ImGui::MenuItem("材质", nullptr, &m_show_material_window);
             ImGui::MenuItem("动画", nullptr, &m_show_animation_window);
-            ImGui::MenuItem("阴影属性", nullptr, &m_show_shadow_properties);
-            ImGui::MenuItem("调试属性", nullptr, &m_show_debug_properties);
-            ImGui::MenuItem("FPS曲线", nullptr, &m_show_fps_graph);
-            ImGui::MenuItem("阴影深度贴图", nullptr, &m_show_shadow_depth_map);
+
+            // 重置布局：标记 DockSpace 待重建，下一帧 DockBuilder 恢复默认三栏；
+            // 同时把面板可见性恢复为启动默认值
+            ImGui::Separator();
+            if (ImGui::MenuItem("重置布局")) {
+                ResetLayout();
+            }
+
+            // 清除选择：取消当前选中对象，属性面板回到空状态引导提示
+            if (ImGui::MenuItem("清除选择")) {
+                ClearSelection();
+                m_renderer->ClearPickHighlight();
+            }
             ImGui::EndMenu();
         }
 
@@ -464,14 +530,140 @@ void ToyEngineMainWindow::CreateMenuBar() {
         // 实际读取延迟到本帧渲染完成（RenderFrame 末尾）执行，
         // 确保截取到包含全部 UI 叠加的完整一帧
         if (ImGui::BeginMenu("工具")) {
-            if (ImGui::MenuItem("截图")) {
+            if (ImGui::MenuItem("截图", "F12")) {
                 m_screenshot_pending = true;
+            }
+            // 光源 gizmo 显示开关，与调试属性面板中的同名选项绑定同一状态
+            bool debugDraw = m_renderer->IsDebugDrawEnabled();
+            if (ImGui::MenuItem("光源调试线框", nullptr, debugDraw)) {
+                m_renderer->SetDebugDrawEnabled(!debugDraw);
             }
             ImGui::EndMenu();
         }
 
+        // 帮助：关于弹窗
+        if (ImGui::BeginMenu("帮助")) {
+            if (ImGui::MenuItem("关于 Toy Engine")) {
+                ImGui::OpenPopup("关于 Toy Engine");
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::Separator();
+
+        // 退出：点击后设置关闭标志，主循环在下一帧退出
+        if (ImGui::MenuItem("退出", "Esc")) {
+            glfwSetWindowShouldClose(m_window, true);
+        }
+
         ImGui::EndMenuBar();
+
+        // 关于弹窗：与菜单栏同属宿主窗口的 ID 作用域，故在 EndMenuBar 之后、
+        // 宿主窗口 End 之前渲染
+        if (ImGui::BeginPopupModal("关于 Toy Engine", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("Toy Engine 0.1");
+            ImGui::Text("基于 OpenGL 3.3 + Dear ImGui (docking)");
+            ImGui::Separator();
+
+            // 快捷键速查：集中说明常用操作，避免用户记不住键位
+            ImGui::TextDisabled("快捷键");
+            ImGui::Text("左键拖动      旋转视角");
+            ImGui::Text("右键拖动      平移视角");
+            ImGui::Text("滚轮          缩放视角");
+            ImGui::Text("Ctrl+1~7      开关面板");
+            ImGui::Text("F12           截图");
+            ImGui::Text("Esc           退出");
+            ImGui::Separator();
+
+            if (ImGui::Button("关闭")) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
     }
+}
+
+/*
+ * 恢复默认布局与面板可见性
+ *
+ * 菜单「视图 → 重置布局」调用：标记 DockSpace 待重建
+ * （下一帧 DockBuilder 重新三栏），并复位全部面板开关。
+ */
+void ToyEngineMainWindow::ResetLayout() {
+    m_dock_space_initialized = false;
+    m_show_resource_list = true;
+    m_show_properties = true;
+    m_show_shadow_properties = true;
+    m_show_post_process = true;
+    m_show_debug_properties = true;
+    m_show_fps_graph = false;
+    m_show_shadow_depth_map = false;
+    m_show_model_window = true;
+    m_show_material_window = true;
+    m_show_animation_window = true;
+}
+
+/*
+ * 底部状态栏
+ *
+ * 常驻显示帧率、选中对象与视口分辨率：面板隐藏后仍能确认引擎状态。
+ */
+void ToyEngineMainWindow::ShowStatusBar() {
+    const ImVec2 origin = ImGui::GetWindowPos();
+    const ImVec2 size = ImGui::GetWindowSize();
+    const float top = size.y - kStatusBarHeight;
+
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(ImVec2(origin.x, origin.y + top),
+                             ImVec2(origin.x + size.x, origin.y + size.y),
+                             ImGui::GetColorU32(ImGuiCol_MenuBarBg));
+    draw_list->AddLine(ImVec2(origin.x, origin.y + top),
+                       ImVec2(origin.x + size.x, origin.y + top),
+                       ImGui::GetColorU32(ImGuiCol_Separator));
+
+    ImGui::SetCursorPos(ImVec2(8.0f, top + (kStatusBarHeight - ImGui::GetTextLineHeight()) * 0.5f));
+
+    // 帧率取最近的窗口平均采样（与 FPS 曲线面板同源），历史为空时显示占位
+    if (!m_fps_history.empty()) {
+        const float cur_fps = m_fps_history.back();
+        ImGui::Text("FPS %.1f (%.1f ms)", cur_fps, cur_fps > 0.0f ? 1000.0f / cur_fps : 0.0f);
+    } else {
+        ImGui::Text("FPS --");
+    }
+
+    std::string selection = "选中: --";
+    if (m_selected_object != nullptr) {
+        std::string type_label;
+        std::string name;
+        if (m_selected_object_type == "Model") {
+            type_label = "模型";
+            name = static_cast<Model *>(m_selected_object)->GetName();
+        } else if (m_selected_object_type == "Light") {
+            type_label = "灯光";
+            name = static_cast<Light *>(m_selected_object)->GetName();
+        } else if (m_selected_object_type == "Camera") {
+            type_label = "摄像机";
+            name = static_cast<Camera *>(m_selected_object)->GetName();
+        } else if (m_selected_object_type == "Terrain") {
+            type_label = "地形";
+        } else if (m_selected_object_type == "SkyDome") {
+            type_label = "天空穹";
+        } else if (m_selected_object_type == "Particle") {
+            type_label = "粒子";
+            name = std::to_string(m_selected_particle_index);
+        }
+        selection = "选中: " + type_label + (name.empty() ? "" : " · " + name);
+    }
+    ImGui::SameLine(0.0f, 24.0f);
+    ImGui::TextUnformatted(selection.c_str());
+
+    char resolution[64];
+    std::snprintf(resolution, sizeof(resolution), "视口 %d × %d",
+                  static_cast<int>(m_viewport_width), static_cast<int>(m_viewport_height));
+    const float resolution_width = ImGui::CalcTextSize(resolution).x;
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - resolution_width - 8.0f);
+    ImGui::TextUnformatted(resolution);
 }
 
 /*
@@ -507,6 +699,11 @@ void ToyEngineMainWindow::CreateUI() {
         ShowShadowPropertiesPanel();
     }
 
+    // 后处理面板：与阴影属性同栏（右下节点）tab 切换
+    if (m_show_post_process) {
+        ShowPostProcessPanel();
+    }
+
     // 调试属性面板：停靠于左节点（资源列表下方），承载渲染调试开关
     if (m_show_debug_properties) {
         ShowDebugPropertiesPanel();
@@ -527,11 +724,10 @@ void ToyEngineMainWindow::CreateUI() {
  * 左栏：资源列表面板
  *
  * 显示 world.yaml 中定义的所有资源，按类型分组：
- *   - 摄像机（可切换当前摄像机）
+ *   - 摄像机（可切换当前摄像机，正在使用的标「当前」）
  *   - 灯光（可选中编辑属性）
  *   - 模型（可选中编辑属性）
- *   - 地形（单例，可选中查看配置）
- *   - 天空穹（单例，可选中编辑颜色）
+ *   - 场景（地形、天空穹两个单例归入同一分组）
  *   - 粒子系统（可选中编辑发射器参数）
  */
 void ToyEngineMainWindow::CreateResourceListPanel() {
@@ -541,12 +737,17 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
         ImGuiWindowFlags_NoCollapse);
 
     // ---- 摄像机 ----
-    if (ImGui::TreeNodeEx("摄像机", ImGuiTreeNodeFlags_DefaultOpen)) {
-        const auto& cameras = m_renderer->GetCameras();
+    const auto& cameras = m_renderer->GetCameras();
+    if (ImGui::TreeNodeEx(("摄像机 (" + std::to_string(cameras.size()) + ")").c_str(),
+                          ImGuiTreeNodeFlags_DefaultOpen)) {
         for (size_t i = 0; i < cameras.size(); ++i) {
             const auto& camera = cameras[i];
             std::string displayName = camera->GetName().empty()
                 ? "Camera " + std::to_string(i) : camera->GetName();
+            // 正在渲染使用的摄像机加标记，与「选中高亮」区分
+            if (m_current_camera_index == static_cast<int>(i)) {
+                displayName += "（当前）";
+            }
             bool isSelected = (m_selected_object == camera.get()
                 && m_selected_object_type == "Camera"
                 && m_current_camera_index == static_cast<int>(i));
@@ -561,8 +762,9 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
     }
 
     // ---- 灯光 ----
-    if (ImGui::TreeNodeEx("灯光", ImGuiTreeNodeFlags_DefaultOpen)) {
-        const auto& lights = m_renderer->GetLights();
+    const auto& lights = m_renderer->GetLights();
+    if (ImGui::TreeNodeEx(("灯光 (" + std::to_string(lights.size()) + ")").c_str(),
+                          ImGuiTreeNodeFlags_DefaultOpen)) {
         for (size_t i = 0; i < lights.size(); ++i) {
             const auto& light = lights[i];
             if (light == nullptr) continue;
@@ -576,8 +778,9 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
     }
 
     // ---- 模型 ----
-    if (ImGui::TreeNodeEx("模型", ImGuiTreeNodeFlags_DefaultOpen)) {
-        const auto& models = m_renderer->GetModels();
+    const auto& models = m_renderer->GetModels();
+    if (ImGui::TreeNodeEx(("模型 (" + std::to_string(models.size()) + ")").c_str(),
+                          ImGuiTreeNodeFlags_DefaultOpen)) {
         for (size_t i = 0; i < models.size(); ++i) {
             const auto& model = models[i];
             if (model == nullptr) continue;
@@ -590,34 +793,47 @@ void ToyEngineMainWindow::CreateResourceListPanel() {
         ImGui::TreePop();
     }
 
-    // ---- 地形（单例） ----
-    if (auto terrain = m_renderer->GetTerrainManager()) {
-        bool isSelected = (m_selected_object_type == "Terrain");
-        if (ImGui::Selectable("地形", isSelected)) {
-            SelectObject(terrain, "Terrain");
-        }
-    }
-
-    // ---- 天空穹（单例） ----
-    if (auto sky = m_renderer->GetSkyDome()) {
-        bool isSelected = (m_selected_object_type == "SkyDome");
-        if (ImGui::Selectable("天空穹", isSelected)) {
-            SelectObject(sky, "SkyDome");
+    // ---- 场景（地形、天空穹两个单例，归入同一分组与其它资源风格一致）----
+    TerrainManager *terrainMgr = m_renderer->GetTerrainManager();
+    SkyDome *sky = m_renderer->GetSkyDome();
+    if (terrainMgr != nullptr || sky != nullptr) {
+        const std::string sceneGroup = "场景 (" + std::to_string(
+            (terrainMgr != nullptr ? 1 : 0) + (sky != nullptr ? 1 : 0)) + ")";
+        if (ImGui::TreeNodeEx(sceneGroup.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            if (terrainMgr != nullptr) {
+                bool isSelected = (m_selected_object_type == "Terrain");
+                if (ImGui::Selectable("地形", isSelected)) {
+                    SelectObject(terrainMgr, "Terrain");
+                }
+            }
+            if (sky != nullptr) {
+                bool isSelected = (m_selected_object_type == "SkyDome");
+                if (ImGui::Selectable("天空穹", isSelected)) {
+                    SelectObject(sky, "SkyDome");
+                }
+            }
+            ImGui::TreePop();
         }
     }
 
     // ---- 粒子系统 ----
     const auto& particles = m_renderer->GetParticleSystems();
     if (!particles.empty()) {
-        if (ImGui::TreeNodeEx("粒子系统", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::TreeNodeEx(("粒子系统 (" + std::to_string(particles.size()) + ")").c_str(),
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
             for (size_t i = 0; i < particles.size(); ++i) {
                 auto emitter = particles[i]->GetEmitter();
                 if (emitter == nullptr) continue;
-                // 使用发射器位置作为显示名
-                std::string displayName = "Particle " + std::to_string(i);
+                // 显示名带发射器位置坐标，便于区分多个粒子系统
+                char displayName[64];
+                std::snprintf(displayName, sizeof(displayName),
+                              "粒子 %d  (%.1f, %.1f, %.1f)##particle%d",
+                              static_cast<int>(i),
+                              emitter->m_position.x, emitter->m_position.y, emitter->m_position.z,
+                              static_cast<int>(i));
                 bool isSelected = (m_selected_object_type == "Particle"
                     && m_selected_particle_index == static_cast<int>(i));
-                if (ImGui::Selectable(displayName.c_str(), isSelected)) {
+                if (ImGui::Selectable(displayName, isSelected)) {
                     SelectObject(particles[i].get(), "Particle");
                     m_selected_particle_index = static_cast<int>(i);
                 }
@@ -642,7 +858,17 @@ void ToyEngineMainWindow::CreatePropertiesPanel() {
         ImGuiWindowFlags_NoCollapse);
 
     if (m_selected_object == nullptr) {
-        ImGui::Text("请选择一个资源来编辑属性");
+        // 空状态：提示居中显示，引导用户如何选择资源
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetContentRegionAvail().y * 0.35f);
+        const char *hint1 = "未选中任何资源";
+        const char *hint2 = "点击左侧资源列表，或在视口中点击对象";
+        const float width = ImGui::CalcTextSize(hint2).x;
+        const float startX = ImGui::GetCursorPosX()
+            + (ImGui::GetContentRegionAvail().x - width) * 0.5f;
+        ImGui::SetCursorPosX(startX);
+        ImGui::TextDisabled("%s", hint1);
+        ImGui::SetCursorPosX(startX);
+        ImGui::TextDisabled("%s", hint2);
         ImGui::End();
         return;
     }
@@ -668,11 +894,11 @@ void ToyEngineMainWindow::CreatePropertiesPanel() {
 void ToyEngineMainWindow::ShowModelProperties() {
     Model* model = static_cast<Model*>(m_selected_object);
 
+    ImGui::SeparatorText("基本信息");
     ImGui::Text("类型: 模型");
-    ImGui::Separator();
     ImGui::Text("名称: %s", model->GetName().c_str());
-    ImGui::Separator();
 
+    ImGui::SeparatorText("变换");
     glm::vec3 position = model->GetPosition();
     if (ImGui::DragFloat3("位置", glm::value_ptr(position), 0.1f)) {
         model->SetTranslate(position);
@@ -886,15 +1112,16 @@ void ToyEngineMainWindow::ShowAnimationProperties(IAnimTarget *target) {
 void ToyEngineMainWindow::ShowModelMaterialProperties(Model *model) {
     // ---- 渲染风格（运行时切换，基础版：无参数调节）----
     // 四套标准着色器：纯色 / 纹理 / 光照 / 卡通，顺序与 RenderStyle 枚举保持一致
+    ImGui::SeparatorText("渲染风格");
     static const char *kRenderStyleNames[] = {"纯色", "纹理", "光照", "卡通"};
     int styleIdx = static_cast<int>(m_renderer->GetModelStyle(model));
     if (ImGui::Combo("渲染风格", &styleIdx, kRenderStyleNames, IM_ARRAYSIZE(kRenderStyleNames))) {
         m_renderer->SetModelStyle(model, static_cast<RenderStyle>(styleIdx));
     }
-    ImGui::Separator();
 
     Material* material = m_renderer->GetModelMaterial(model);
     if (material != nullptr) {
+        ImGui::SeparatorText("材质参数");
         if (!material->m_name.empty()) {
             ImGui::Text("材质名称: %s", material->m_name.c_str());
         }
@@ -930,39 +1157,35 @@ void ToyEngineMainWindow::ShowModelMaterialProperties(Model *model) {
 void ToyEngineMainWindow::ShowLightProperties() {
     Light* light = static_cast<Light*>(m_selected_object);
 
+    ImGui::SeparatorText("基本信息");
     ImGui::Text("类型: %s", light->GetLightTypeName().c_str());
-    ImGui::Separator();
     ImGui::Text("名称: %s", light->GetName().c_str());
-    ImGui::Separator();
 
     // 开启/关闭开关：切换后实时影响该灯光是否参与光照计算
     bool enabled = light->IsEnabled();
     if (ImGui::Checkbox("启用##light", &enabled)) {
         light->SetEnabled(enabled);
     }
-    ImGui::Separator();
 
     // ---- 方向光 ----
     if (light->GetLightType() == LightTypeDirection) {
         DirectionLight* dirLight = static_cast<DirectionLight*>(light);
 
-        // 方向（无位置）
+        ImGui::SeparatorText("方向");
         ImGui::DragFloat3("方向", glm::value_ptr(dirLight->m_direction), 0.1f);
 
+        ImGui::SeparatorText("颜色");
         ImGui::ColorEdit3("颜色", glm::value_ptr(dirLight->m_color));
 
-        ImGui::Separator();
-        ImGui::Text("环境光");
+        ImGui::SeparatorText("环境光");
         ImGui::ColorEdit3("环境光颜色", glm::value_ptr(dirLight->m_ambient_color));
         ImGui::DragFloat("环境光强度", &dirLight->m_ambient_intensity, 0.01f, 0.0f, 10.0f);
 
-        ImGui::Separator();
-        ImGui::Text("漫反射");
+        ImGui::SeparatorText("漫反射");
         ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(dirLight->m_diffuse_color));
         ImGui::DragFloat("漫反射强度", &dirLight->m_diffuse_intensity, 0.01f, 0.0f, 10.0f);
 
-        ImGui::Separator();
-        ImGui::Text("镜面反射");
+        ImGui::SeparatorText("镜面反射");
         ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(dirLight->m_specular_color));
         ImGui::DragFloat("镜面反射强度", &dirLight->m_specular_intensity, 0.01f, 0.0f, 10.0f);
         return;
@@ -972,36 +1195,32 @@ void ToyEngineMainWindow::ShowLightProperties() {
     if (light->GetLightType() == LightTypeSpot) {
         SpotLight* spotLight = static_cast<SpotLight*>(light);
 
+        ImGui::SeparatorText("位置与方向");
         // 位置（DebugDraw 每帧直读 Position，gizmo 自动跟随，无需手动同步）
         ImGui::DragFloat3("位置", glm::value_ptr(spotLight->m_position), 0.1f);
-        // 方向
         ImGui::DragFloat3("方向", glm::value_ptr(spotLight->m_direction), 0.1f);
 
+        ImGui::SeparatorText("颜色");
         ImGui::ColorEdit3("颜色", glm::value_ptr(spotLight->m_color));
 
-        ImGui::Separator();
-        ImGui::Text("环境光");
+        ImGui::SeparatorText("环境光");
         ImGui::ColorEdit3("环境光颜色", glm::value_ptr(spotLight->m_ambient_color));
         ImGui::DragFloat("环境光强度", &spotLight->m_ambient_intensity, 0.01f, 0.0f, 10.0f);
 
-        ImGui::Separator();
-        ImGui::Text("漫反射");
+        ImGui::SeparatorText("漫反射");
         ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(spotLight->m_diffuse_color));
         ImGui::DragFloat("漫反射强度", &spotLight->m_diffuse_intensity, 0.01f, 0.0f, 10.0f);
 
-        ImGui::Separator();
-        ImGui::Text("镜面反射");
+        ImGui::SeparatorText("镜面反射");
         ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(spotLight->m_specular_color));
         ImGui::DragFloat("镜面反射强度", &spotLight->m_specular_intensity, 0.01f, 0.0f, 10.0f);
 
-        ImGui::Separator();
-        ImGui::Text("衰减");
+        ImGui::SeparatorText("衰减");
         ImGui::DragFloat("常数项", &spotLight->Attenuation.m_constant, 0.01f, 0.0f, 10.0f);
         ImGui::DragFloat("线性项", &spotLight->Attenuation.m_linear, 0.001f, 0.0f, 1.0f);
         ImGui::DragFloat("指数项", &spotLight->Attenuation.m_exp, 0.0001f, 0.0f, 0.1f);
 
-        ImGui::Separator();
-        ImGui::Text("聚光锥角");
+        ImGui::SeparatorText("聚光锥角");
         ImGui::DragFloat("内锥角", &spotLight->m_cutoff, 0.5f, 0.0f, 90.0f);
         ImGui::DragFloat("外锥角", &spotLight->m_outer_cutoff, 0.5f, 0.0f, 90.0f);
         return;
@@ -1010,29 +1229,26 @@ void ToyEngineMainWindow::ShowLightProperties() {
     // ---- 点光源（默认） ----
     PointLight* pointLight = static_cast<PointLight*>(light);
 
+    ImGui::SeparatorText("位置");
     // 位置（DebugDraw 每帧直读 Position，gizmo 自动跟随，无需手动同步）
     ImGui::DragFloat3("位置", glm::value_ptr(pointLight->m_position), 0.1f);
 
-    // 颜色
+    ImGui::SeparatorText("颜色");
     ImGui::ColorEdit3("颜色", glm::value_ptr(pointLight->m_color));
 
-    ImGui::Separator();
-    ImGui::Text("环境光");
+    ImGui::SeparatorText("环境光");
     ImGui::ColorEdit3("环境光颜色", glm::value_ptr(pointLight->m_ambient_color));
     ImGui::DragFloat("环境光强度", &pointLight->m_ambient_intensity, 0.01f, 0.0f, 10.0f);
 
-    ImGui::Separator();
-    ImGui::Text("漫反射");
+    ImGui::SeparatorText("漫反射");
     ImGui::ColorEdit3("漫反射颜色", glm::value_ptr(pointLight->m_diffuse_color));
     ImGui::DragFloat("漫反射强度", &pointLight->m_diffuse_intensity, 0.01f, 0.0f, 10.0f);
 
-    ImGui::Separator();
-    ImGui::Text("镜面反射");
+    ImGui::SeparatorText("镜面反射");
     ImGui::ColorEdit3("镜面反射颜色", glm::value_ptr(pointLight->m_specular_color));
     ImGui::DragFloat("镜面反射强度", &pointLight->m_specular_intensity, 0.01f, 0.0f, 10.0f);
 
-    ImGui::Separator();
-    ImGui::Text("衰减");
+    ImGui::SeparatorText("衰减");
     ImGui::DragFloat("常数项", &pointLight->Attenuation.m_constant, 0.01f, 0.0f, 10.0f);
     ImGui::DragFloat("线性项", &pointLight->Attenuation.m_linear, 0.001f, 0.0f, 1.0f);
     ImGui::DragFloat("指数项", &pointLight->Attenuation.m_exp, 0.0001f, 0.0f, 0.1f);
@@ -1045,11 +1261,11 @@ void ToyEngineMainWindow::ShowCameraProperties() {
     Camera* camera = static_cast<Camera*>(m_selected_object);
     OrbitManipulator* manipulator = m_renderer->GetManipulator();
 
+    ImGui::SeparatorText("基本信息");
     ImGui::Text("类型: 摄像机");
-    ImGui::Separator();
     ImGui::Text("名称: %s", camera->GetName().c_str());
-    ImGui::Separator();
 
+    ImGui::SeparatorText("投影");
     // 投影模式是摄像机属性：下拉框读写当前选中（即当前渲染用）摄像机的属性，
     // Renderer::SetProjectionType 写入后立即重算投影矩阵，切换即时生效
     const char* projTypes[] = { "透视", "正交" };
@@ -1057,7 +1273,8 @@ void ToyEngineMainWindow::ShowCameraProperties() {
     if (ImGui::Combo("投影模式", &projType, projTypes, IM_ARRAYSIZE(projTypes))) {
         m_renderer->SetProjectionType(static_cast<ProjectionType>(projType));
     }
-    ImGui::Separator();
+
+    ImGui::SeparatorText("轨道参数");
 
     if (manipulator == nullptr) {
         ImGui::Text("（无操控器绑定）");
@@ -1090,14 +1307,12 @@ void ToyEngineMainWindow::ShowCameraProperties() {
 void ToyEngineMainWindow::ShowTerrainProperties() {
     TerrainManager* terrain = static_cast<TerrainManager*>(m_selected_object);
 
+    ImGui::SeparatorText("基本信息");
     ImGui::Text("类型: 地形");
-    ImGui::Separator();
-
-    // 只读统计信息
     ImGui::Text("总三角形数: %d", terrain->GetTotalTriangleCount());
-    ImGui::Separator();
 
     // 配置参数（只读展示，运行时修改需要重新生成地形）
+    ImGui::SeparatorText("配置");
     const TerrainConfig& cfg = terrain->GetConfig();
     ImGui::Text("平面尺寸: %.0f × %.0f", cfg.m_plane_size, cfg.m_plane_size);
     ImGui::Text("网格分辨率: %d × %d", cfg.m_resolution, cfg.m_resolution);
@@ -1110,16 +1325,14 @@ void ToyEngineMainWindow::ShowTerrainProperties() {
 void ToyEngineMainWindow::ShowSkyDomeProperties() {
     SkyDome* sky = static_cast<SkyDome*>(m_selected_object);
 
+    ImGui::SeparatorText("只读信息");
     ImGui::Text("类型: 天空穹");
-    ImGui::Separator();
-
-    // 只读参数
     ImGui::Text("半径: %.1f", sky->GetRadius());
     ImGui::Text("水平分段: %d", sky->GetSectors());
     ImGui::Text("垂直分段: %d", sky->GetStacks());
-    ImGui::Separator();
 
     // 可编辑颜色
+    ImGui::SeparatorText("颜色");
     glm::vec3 horizonColor = sky->GetHorizonColor();
     if (ImGui::ColorEdit3("地平线颜色", glm::value_ptr(horizonColor))) {
         sky->SetHorizonColor(horizonColor);
@@ -1152,42 +1365,38 @@ void ToyEngineMainWindow::ShowParticleProperties() {
         return;
     }
 
+    ImGui::SeparatorText("基本信息");
     ImGui::Text("类型: 粒子系统");
     ImGui::Text("索引: %d", m_selected_particle_index);
-    ImGui::Separator();
 
     // 位置
+    ImGui::SeparatorText("位置");
     ImGui::DragFloat3("位置", glm::value_ptr(emitter->m_position), 0.1f);
 
     // 发射参数
-    ImGui::Separator();
-    ImGui::Text("发射参数");
+    ImGui::SeparatorText("发射参数");
     ImGui::DragFloat("发射速率", &emitter->m_emit_rate, 1.0f, 0.0f, 10000.0f);
     ImGui::DragInt("最大粒子数", &emitter->m_max_particles, 10, 1, 50000);
 
     // 生命周期
-    ImGui::Separator();
-    ImGui::Text("生命周期");
+    ImGui::SeparatorText("生命周期");
     ImGui::DragFloat("最小寿命", &emitter->m_min_life, 0.1f, 0.0f, 60.0f);
     ImGui::DragFloat("最大寿命", &emitter->m_max_life, 0.1f, 0.0f, 60.0f);
 
     // 大小
-    ImGui::Separator();
-    ImGui::Text("大小");
+    ImGui::SeparatorText("大小");
     ImGui::DragFloat("初始最小", &emitter->m_min_size, 0.1f, 0.0f, 100.0f);
     ImGui::DragFloat("初始最大", &emitter->m_max_size, 0.1f, 0.0f, 100.0f);
     ImGui::DragFloat("结束最小", &emitter->m_min_size_end, 0.1f, 0.0f, 100.0f);
     ImGui::DragFloat("结束最大", &emitter->m_max_size_end, 0.1f, 0.0f, 100.0f);
 
     // 速度
-    ImGui::Separator();
-    ImGui::Text("速度");
+    ImGui::SeparatorText("速度");
     ImGui::DragFloat3("最小速度", glm::value_ptr(emitter->m_min_velocity), 0.1f);
     ImGui::DragFloat3("最大速度", glm::value_ptr(emitter->m_max_velocity), 0.1f);
 
     // 颜色：烟花配色表（只读，由 ParticleEmitter 内部调色板决定）
-    ImGui::Separator();
-    ImGui::Text("颜色（烟花配色表）");
+    ImGui::SeparatorText("颜色（烟花配色表）");
     {
         // 调色板与 particle_emitter.cpp 中 kFireworkPalette 保持一致
         static const float kPalette[][3] = {
@@ -1215,19 +1424,24 @@ void ToyEngineMainWindow::ShowParticleProperties() {
     }
 
     // 物理
-    ImGui::Separator();
-    ImGui::Text("物理");
+    ImGui::SeparatorText("物理");
     ImGui::DragFloat3("重力", glm::value_ptr(emitter->m_gravity), 0.1f);
     ImGui::DragFloat("阻力", &emitter->m_drag, 0.01f, 0.0f, 1.0f);
 }
 
-// ---- 停靠于视口底部的 FPS 曲线面板 ----
-// 由 DockBuilder 停靠在中央 3D 视口下方的横条槽位，绘制最近
-// kFpsHistoryCapacity 个窗口平均帧率采样（15 次/秒）的折线图，
-// 并显示当前/平均/最低/最高帧率，辅助观察渲染性能波动。
+// ---- FPS 曲线面板（默认收起，Ctrl+6 打开）----
+// 首次打开时贴在 3D 视口底部的横条上，之后沿用 imgui.ini 保存的位置，
+// 用户可自由拖动或停靠到任意节点。收起时不占视口空间。
 void ToyEngineMainWindow::ShowFpsGraph() {
-    // 窗口标题与 DockBuilderDockWindow 的停靠目标一致（见 CreateDockSpace），
-    // 停靠窗口的位置/尺寸由 DockSpace 节点管理，无需也不应手动指定
+    // 视口矩形来自上一帧，首帧无效时交给 ImGui 默认放置
+    if (m_viewport_width > 0.0f && m_viewport_height > 0.0f) {
+        const float height = ImMax(m_viewport_height * 0.15f, 96.0f);
+        ImGui::SetNextWindowPos(
+            ImVec2(m_viewport_x, m_viewport_y + m_viewport_height - height),
+            ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(
+            ImVec2(m_viewport_width, height), ImGuiCond_FirstUseEver);
+    }
     ImGui::Begin("FPS曲线", &m_show_fps_graph,
         ImGuiWindowFlags_NoCollapse);
 
@@ -1246,7 +1460,10 @@ void ToyEngineMainWindow::ShowFpsGraph() {
     // 历史为空时用 0 占位，避免 minFps 初始值（float 最大值）暴露到界面
     const float minFpsDisp = count > 0 ? minFps : 0.0f;
 
-    ImGui::Text("当前 %.1f   平均 %.1f   最低 %.1f   最高 %.1f", curFps, avgFps, minFpsDisp, maxFps);
+    // 帧时间与当前帧率互为倒数，一并显示便于定位卡顿（ms 比 fps 更直观）
+    const float frameMs = curFps > 0.0f ? 1000.0f / curFps : 0.0f;
+    ImGui::Text("当前 %.1f (%.1f ms)   平均 %.1f   最低 %.1f   最高 %.1f",
+                curFps, frameMs, avgFps, minFpsDisp, maxFps);
 
     if (count > 0) {
         // Y 轴范围动态跟随曲线数据：按窗口内最小/最大值各留 10% 余量，
@@ -1262,8 +1479,11 @@ void ToyEngineMainWindow::ShowFpsGraph() {
             scaleMin -= 1.0f;
             scaleMax += 1.0f;
         }
+        // overlay 文本直接叠在曲线右上角，收起统计行时也能一眼看到当前帧率
+        static char overlay[32];
+        std::snprintf(overlay, sizeof(overlay), "%.0f FPS", curFps);
         ImGui::PlotLines("##fps_curve", m_fps_history.data(), static_cast<int>(count),
-                         0, nullptr, scaleMin, scaleMax, ImVec2(-1.0f, 48.0f));
+                         0, overlay, scaleMin, scaleMax, ImVec2(-1.0f, 48.0f));
     } else {
         ImGui::Text("（暂无数据）");
     }
@@ -1275,10 +1495,12 @@ void ToyEngineMainWindow::ShowFpsGraph() {
  * 阴影属性面板
  *
  * 全局阴影设置：开关、深度贴图预览入口。
- * 停靠于右节点（属性面板下方），通过菜单「面板 → 阴影属性」控制显示。
+ * 停靠于右节点（属性面板下方），通过菜单「视图 → 阴影属性」控制显示。
  */
 void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
     ImGui::Begin("阴影属性", &m_show_shadow_properties, ImGuiWindowFlags_NoCollapse);
+
+    ImGui::SeparatorText("阴影");
 
     // 阴影开关：禁用时跳过深度 Pass，也不绑定阴影贴图
     bool shadowsEnabled = m_renderer->IsShadowsEnabled();
@@ -1292,30 +1514,7 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
         m_renderer->SetShadowBiasScale(biasScale);
     }
 
-    // 后处理 tone mapping 开关（对比 ACES+gamma 与直通输出）
-    bool toneMapping = m_renderer->IsToneMappingEnabled();
-    if (ImGui::Checkbox("Tone Mapping", &toneMapping)) {
-        m_renderer->SetToneMappingEnabled(toneMapping);
-    }
-
-    // 曝光系数：tone mapping 前乘入 HDR 线性值，实时调整整体明暗
-    float exposure = m_renderer->GetExposure();
-    if (ImGui::SliderFloat("曝光 (Exposure)", &exposure, 0.1f, 4.0f, "%.2f")) {
-        m_renderer->SetExposure(exposure);
-    }
-
-    // 饱和度/对比度：tonemap+gamma 后统一调整，ACES 输出后按观感微调影调（默认 1.0 不调整）
-    float saturation = m_renderer->GetSaturation();
-    if (ImGui::SliderFloat("饱和度 (Saturation)", &saturation, 0.0f, 2.0f, "%.2f")) {
-        m_renderer->SetSaturation(saturation);
-    }
-    float contrast = m_renderer->GetContrast();
-    if (ImGui::SliderFloat("对比度 (Contrast)", &contrast, 0.5f, 2.0f, "%.2f")) {
-        m_renderer->SetContrast(contrast);
-    }
-
-    ImGui::Separator();
-    ImGui::Text("深度贴图");
+    ImGui::SeparatorText("深度贴图");
     const unsigned int srcTex = m_renderer->GetShadowDepthTexture();
     const bool ready = m_renderer->IsShadowMapReady();
     if (srcTex == 0) {
@@ -1330,25 +1529,26 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
         }
     }
 
-    ImGui::Separator();
-    ImGui::Text("光源摄像机");
+    ImGui::SeparatorText("光源摄像机");
     // 方向光阴影在深度 Pass 中使用一个"光源视角的摄像机"，参数由 Renderer 每帧计算
     const ShadowCameraParams &shadowCam = m_renderer->GetShadowCameraParams();
     if (!shadowCam.m_available) {
         ImGui::TextWrapped("无已启用的方向光，本帧未生成光源摄像机。");
     } else {
-        if (ImGui::CollapsingHeader("位置 / 朝向")) {
+        if (ImGui::TreeNode("位置 / 朝向")) {
             ImGui::Text("位置  (%.2f, %.2f, %.2f)", shadowCam.m_position.x, shadowCam.m_position.y, shadowCam.m_position.z);
             ImGui::Text("方向  (%.2f, %.2f, %.2f)", shadowCam.m_direction.x, shadowCam.m_direction.y, shadowCam.m_direction.z);
             ImGui::Text("注视  (%.2f, %.2f, %.2f)", shadowCam.m_look_at.x, shadowCam.m_look_at.y, shadowCam.m_look_at.z);
             ImGui::Text("Up    (%.2f, %.2f, %.2f)", shadowCam.m_up.x, shadowCam.m_up.y, shadowCam.m_up.z);
+            ImGui::TreePop();
         }
-        if (ImGui::CollapsingHeader("正交投影")) {
+        if (ImGui::TreeNode("正交投影")) {
             ImGui::Text("Left / Right : %.1f / %.1f", shadowCam.m_ortho_left, shadowCam.m_ortho_right);
             ImGui::Text("Bottom / Top : %.1f / %.1f", shadowCam.m_ortho_bottom, shadowCam.m_ortho_top);
             ImGui::Text("Near / Far   : %.1f / %.1f", shadowCam.m_near_plane, shadowCam.m_far_plane);
+            ImGui::TreePop();
         }
-        if (ImGui::CollapsingHeader("矩阵")) {
+        if (ImGui::TreeNode("矩阵")) {
             // 按行打印 4×4 矩阵（glm 列主序，m[col][row] 输出第 row 行）
             auto showMatrix = [](const char *label, const glm::mat4 &m) {
                 if (ImGui::TreeNode(label)) {
@@ -1361,7 +1561,53 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
             };
             showMatrix("lightView", shadowCam.m_light_view);
             showMatrix("lightProjection", shadowCam.m_light_projection);
+            ImGui::TreePop();
         }
+    }
+
+    ImGui::End();
+}
+
+/*
+ * 后处理面板
+ *
+ * 色调映射与影调调整（Tone Mapping、曝光、饱和度、对比度），
+ * 与阴影属性面板同栏 tab 切换，通过菜单「视图 → 后处理」控制显示。
+ */
+void ToyEngineMainWindow::ShowPostProcessPanel() {
+    ImGui::Begin("后处理", &m_show_post_process, ImGuiWindowFlags_NoCollapse);
+
+    ImGui::SeparatorText("色调映射");
+
+    // 后处理 tone mapping 开关（对比 ACES+gamma 与直通输出）
+    bool toneMapping = m_renderer->IsToneMappingEnabled();
+    if (ImGui::Checkbox("Tone Mapping", &toneMapping)) {
+        m_renderer->SetToneMappingEnabled(toneMapping);
+    }
+
+    // 曝光系数：tone mapping 前乘入 HDR 线性值，实时调整整体明暗
+    float exposure = m_renderer->GetExposure();
+    if (ImGui::SliderFloat("曝光 (Exposure)", &exposure, 0.1f, 4.0f, "%.2f")) {
+        m_renderer->SetExposure(exposure);
+    }
+
+    ImGui::SeparatorText("影调");
+
+    // 饱和度/对比度：tonemap+gamma 后统一调整，ACES 输出后按观感微调影调（默认 1.0 不调整）
+    float saturation = m_renderer->GetSaturation();
+    if (ImGui::SliderFloat("饱和度 (Saturation)", &saturation, 0.0f, 2.0f, "%.2f")) {
+        m_renderer->SetSaturation(saturation);
+    }
+    float contrast = m_renderer->GetContrast();
+    if (ImGui::SliderFloat("对比度 (Contrast)", &contrast, 0.5f, 2.0f, "%.2f")) {
+        m_renderer->SetContrast(contrast);
+    }
+
+    if (ImGui::Button("重置为默认")) {
+        m_renderer->SetToneMappingEnabled(true);
+        m_renderer->SetExposure(1.0f);
+        m_renderer->SetSaturation(1.0f);
+        m_renderer->SetContrast(1.0f);
     }
 
     ImGui::End();
@@ -1381,55 +1627,57 @@ void ToyEngineMainWindow::ShowShadowPropertiesPanel() {
 void ToyEngineMainWindow::ShowDebugPropertiesPanel() {
     ImGui::Begin("调试属性", &m_show_debug_properties, ImGuiWindowFlags_NoCollapse);
 
-    // ---- 光源调试可视化 ----
-    bool debugDraw = m_renderer->IsDebugDrawEnabled();
-    if (ImGui::Checkbox("光源调试线框 (DebugDraw)", &debugDraw)) {
-        m_renderer->SetDebugDrawEnabled(debugDraw);
+    // ---- 可视化开关组 ----
+    if (ImGui::CollapsingHeader("可视化", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // 光源调试线框（DebugDraw）：控制场景中光源位置/范围 gizmo 的显示
+        bool debugDraw = m_renderer->IsDebugDrawEnabled();
+        if (ImGui::Checkbox("光源调试线框 (DebugDraw)", &debugDraw)) {
+            m_renderer->SetDebugDrawEnabled(debugDraw);
+        }
+
+        // 线框模式：地形/模型以线框渲染（GLPolygonMode 切换，阴影 Pass 不受影响）
+        bool wireframe = m_renderer->IsWireframeEnabled();
+        if (ImGui::Checkbox("线框模式 (场景)", &wireframe)) {
+            m_renderer->SetWireframeEnabled(wireframe);
+        }
+
+        // 网格地面辅助线：XZ 平面世界网格，帮助判断空间方位
+        bool grid = m_renderer->IsGridEnabled();
+        if (ImGui::Checkbox("网格地面", &grid)) {
+            m_renderer->SetGridEnabled(grid);
+        }
+
+        // 法线可视化：启用时顶点法线以彩色线段显示（RGB 编码方向），用于检查法线朝向
+        bool normalVis = m_renderer->IsNormalVisualizationEnabled();
+        if (ImGui::Checkbox("法线可视化", &normalVis)) {
+            m_renderer->SetNormalVisualizationEnabled(normalVis);
+        }
+        // 法线线段统一长度（世界空间单位），滑块实时调整，所有模型等长
+        float normalLen = m_renderer->GetNormalLength();
+        if (ImGui::SliderFloat("法线长度", &normalLen, 0.1f, 10.0f, "%.1f")) {
+            m_renderer->SetNormalLength(normalLen);
+        }
+
+        // 光照范围可视化：在光源 gizmo 基础上叠加球形/锥形影响范围线框，直观展示衰减边界
+        bool lightRange = m_renderer->IsLightRangeEnabled();
+        if (ImGui::Checkbox("光照范围可视化", &lightRange)) {
+            m_renderer->SetLightRangeEnabled(lightRange);
+        }
     }
 
-    // ---- 线框模式 ----
-    bool wireframe = m_renderer->IsWireframeEnabled();
-    if (ImGui::Checkbox("线框模式 (场景)", &wireframe)) {
-        m_renderer->SetWireframeEnabled(wireframe);
-    }
+    // ---- 视口设置组 ----
+    if (ImGui::CollapsingHeader("视口", ImGuiTreeNodeFlags_DefaultOpen)) {
+        // 视口背景色：运行时修改 glClearColor RGB
+        glm::vec3 clearColor = m_renderer->GetClearColor();
+        if (ImGui::ColorEdit3("视口背景色", glm::value_ptr(clearColor))) {
+            m_renderer->SetClearColor(clearColor);
+        }
 
-    // ---- 网格地面辅助线 ----
-    bool grid = m_renderer->IsGridEnabled();
-    if (ImGui::Checkbox("网格地面", &grid)) {
-        m_renderer->SetGridEnabled(grid);
-    }
-
-    // ---- 法线可视化 ----
-    // 启用时模型顶点法线以彩色线段显示（RGB 编码方向），用于检查法线朝向
-    bool normalVis = m_renderer->IsNormalVisualizationEnabled();
-    if (ImGui::Checkbox("法线可视化", &normalVis)) {
-        m_renderer->SetNormalVisualizationEnabled(normalVis);
-    }
-    // 法线线段统一长度（世界空间单位），滑块实时调整，所有模型等长
-    float normalLen = m_renderer->GetNormalLength();
-    if (ImGui::SliderFloat("法线长度", &normalLen, 0.1f, 10.0f, "%.1f")) {
-        m_renderer->SetNormalLength(normalLen);
-    }
-
-    // ---- 光照范围可视化 ----
-    // 在光源 gizmo 基础上叠加球形/锥形影响范围线框，直观展示衰减边界
-    bool lightRange = m_renderer->IsLightRangeEnabled();
-    if (ImGui::Checkbox("光照范围可视化", &lightRange)) {
-        m_renderer->SetLightRangeEnabled(lightRange);
-    }
-
-    ImGui::Separator();
-
-    // ---- 视口背景色 ----
-    glm::vec3 clearColor = m_renderer->GetClearColor();
-    if (ImGui::ColorEdit3("视口背景色", glm::value_ptr(clearColor))) {
-        m_renderer->SetClearColor(clearColor);
-    }
-
-    // ---- 视野 FOV（度）----
-    float fov = m_renderer->GetFov();
-    if (ImGui::SliderFloat("FOV (度)", &fov, 10.0f, 160.0f, "%.1f")) {
-        m_renderer->SetFov(fov);
+        // 视野 FOV（度）：滑块实时调整透视投影范围
+        float fov = m_renderer->GetFov();
+        if (ImGui::SliderFloat("FOV (度)", &fov, 10.0f, 160.0f, "%.1f")) {
+            m_renderer->SetFov(fov);
+        }
     }
 
     ImGui::End();
